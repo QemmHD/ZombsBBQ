@@ -489,9 +489,16 @@ export class JointScene extends Phaser.Scene {
     const consider = (id: string, kind: 'w' | 'c' | 'p') => {
       const a = this.actors.get(id);
       if (!a?.puppet || !a.holder.visible) return;
-      const b = a.puppet.root.getBounds();
-      const pad = 6;
-      if (wx < b.left - pad || wx > b.right + pad || wy < b.top - pad || wy > b.bottom + pad) return;
+      // the part images carry transparent padding, so judge by a body-sized box: a narrow column up the
+      // figure from its feet (wide and low when lying), topped where the drawn head ends
+      const lying = Math.abs(a.puppet.body.rotation) > 0.5;
+      const bb = a.puppet.root.getBounds();
+      const cx = lying ? bb.centerX : a.holder.x;
+      const hw = lying ? 44 : 22;
+      const bottom = lying ? a.holder.y + 6 : bb.bottom - 4;
+      const top = lying ? a.holder.y - 34 : Math.max(bb.top + 10, bottom - a.puppet.height - 6);
+      const b = new Phaser.Geom.Rectangle(cx - hw, top, hw * 2, bottom - top);
+      if (wx < b.left || wx > b.right || wy < b.top || wy > b.bottom) return;
       // distance to the body's centre line, measured relative to its size: being well inside a small
       // seated figure beats grazing the edge of a big one standing in front
       const nx = (wx - b.centerX) / Math.max(12, b.width / 2);
