@@ -44,7 +44,14 @@ export type CustomerState = 'entering' | 'waiting' | 'eating' | 'leaving' | 'tur
 export interface Customer extends Mover {
   id: string;
   type: string;
+  /** a first name (older saves: none) */
+  name?: string;
   state: CustomerState;
+  /** walking in: 'door' = heading for the doorway, 'look' = stopped there looking round until doorUntil */
+  stage?: 'door' | 'look';
+  doorUntil?: number;
+  /** just served: holding the plate (no eating yet) until this time */
+  holdUntil?: number;
   seatId?: string;
   tableId?: string;
   waitLeft: number;
@@ -70,6 +77,10 @@ export type WorkerState =
   | 'toRest'
   | 'resting'
   | 'daydream'
+  /** hangry warning: slumped and moaning for a few seconds before going for a customer (Rest cancels) */
+  | 'hungry'
+  /** worked down to 0 energy: passed out face-down where they stood (tap to wake) */
+  | 'asleep'
   | 'raiding'
   | 'down';
 
@@ -100,6 +111,18 @@ export interface Worker extends Mover {
   nextDaydream: number;
   /** raid KO: back on their feet at this sim time */
   downUntil?: number;
+  /** hangry warning: goes for a customer at this time */
+  hungryEnd?: number;
+  /** no bites before this time (one bite a minute at most) */
+  nextBiteAt?: number;
+  /** last time a "can't reach" was reported for them (so it isn't repeated every frame) */
+  cantReachAt?: number;
+}
+
+/** A fired zombie shambling off down the street (drawn until they're out of sight). */
+export interface Departing extends Mover {
+  id: string;
+  type: string;
 }
 
 export type StoveStatus = 'empty' | 'reserved' | 'cooking' | 'paused' | 'done' | 'burnt';
@@ -192,6 +215,14 @@ export type GameEvent =
   | { t: 'goal'; goalId: string }
   | { t: 'purple'; stars: number; gained: boolean }
   | { t: 'daydream'; workerId: string }
+  /** a zombie went hangry: the warning slump before it bites */
+  | { t: 'hungry'; workerId: string }
+  /** worked down to nothing: passed out face-down */
+  | { t: 'asleep'; workerId: string }
+  /** back on their feet after a nap, passing out or a knock-out */
+  | { t: 'woke'; workerId: string; from: 'asleep' | 'resting' | 'down' }
+  /** somebody can't find a way to where they need to be */
+  | { t: 'cantReach'; workerId: string; what: string }
   | { t: 'toast'; text: string };
 
 export interface GameState {
@@ -225,9 +256,10 @@ export interface GameState {
   seen: Record<string, 'met' | 'infected'>;
   goalsDone: string[];
   rivals: Record<string, RivalProgress>;
-  graves: { day: string; green: number; red: number };
   inventory: { headstone: number; summon: number };
   spawnCooldown: number;
+  /** fired zombies on their way out */
+  departing?: Departing[];
   /** last few customer types, to keep the crowd varied */
   recentTypes: string[];
   tut: number;
@@ -247,6 +279,8 @@ export interface GameState {
     infectedRare: number;
     happy: number;
     angry: number;
+    /** dishes left on the stove until they burnt */
+    burnt: number;
     cleared: number;
     floorsFixed: number;
     cooked: Record<string, number>;
@@ -301,7 +335,7 @@ export function addFurniture(s: GameState, item: string, x: number, y: number, d
 }
 
 export function freshStats(): GameState['stats'] {
-  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0 };
+  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, burnt: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0 };
 }
 
 /** The starting café, as the original handed it over: a grimy 7x6 room with the bare essentials. */
@@ -334,7 +368,6 @@ export function createInitialState(seed = 1234): GameState {
     seen: {},
     goalsDone: [],
     rivals: {},
-    graves: { day: '', green: 5, red: 5 },
     inventory: { headstone: 1, summon: 0 },
     spawnCooldown: 6,
     recentTypes: [],
@@ -376,6 +409,9 @@ export function migrate(raw: unknown): GameState | null {
   if (st.version === SAVE_VERSION) {
     // newer stat counters (e.g. decor) start at zero on older v3 saves
     st.stats = { ...freshStats(), ...(st.stats ?? {}) };
+    // the never-used daily grave counters of earlier builds
+    delete (st as { graves?: unknown }).graves;
+    st.crewCap = Math.max(st.crewCap ?? 1, crewCapForLevel(st.level ?? 1));
     if (st.recipes) st.recipes = st.recipes.filter((r) => DISH_BY_ID[r]);
     return st;
   }

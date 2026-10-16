@@ -60,6 +60,8 @@ const WORKER_STATE: Record<Worker['state'], string> = {
   toRest: 'Off for a nap',
   resting: 'Napping on the sidewalk… Zzz',
   daydream: 'Daydreaming about brains… (tap to snap out of it)',
+  hungry: 'HUNGRY! About to go for a customer… (Rest or Refill to calm them)',
+  asleep: 'Passed out face-down, out of energy. Tap to wake, or Rest / Refill',
   raiding: 'Out on a raid',
   down: 'Knocked out cold. Reanimating…',
 };

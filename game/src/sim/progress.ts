@@ -1,4 +1,4 @@
-import { DISH_BY_ID } from './data';
+import { DISH_BY_ID, TUNING } from './data';
 import { GOALS, type GoalDef } from './catalog';
 import { DOOR_X, isInside, key } from './grid';
 import { grimeCount } from './build';
@@ -91,6 +91,16 @@ export function claimGoal(s: GameState, id: string): string | null {
 }
 
 // ---------- the fridge ----------
+
+/** The fridge only holds so much: past this, new loot pushes out the oldest dish. */
+export const fridgeFull = (s: GameState) => s.fridge.length >= TUNING.fridgeMax;
+
+/** Throw a fridge dish out (to make room for raid loot). */
+export function binFridge(s: GameState, index: number): string | null {
+  if (!s.fridge[index]) return 'Nothing there.';
+  s.fridge.splice(index, 1);
+  return null;
+}
 
 export function serveFromFridge(s: GameState, index: number): string | null {
   const it = s.fridge[index];
@@ -193,17 +203,6 @@ function updatePet(s: GameState, p: Pet, dt: number) {
     p.state = 'sniff';
     p.nextAction = s.now + 3;
   } else p.nextAction = s.now + 4 + rand(s) * 6;
-}
-
-// ---------- daily raid items ----------
-
-export function today(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-
-export function refreshDaily(s: GameState, day = today()) {
-  if (s.graves.day !== day) s.graves = { day, green: 5, red: 5 };
 }
 
 export function updateProgress(s: GameState, dt: number) {
