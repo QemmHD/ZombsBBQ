@@ -7,46 +7,16 @@
  * counter to swipe food), or press ATTACK. Tap a target with nobody picked and everyone who's in
  * piles on it.
  */
-import Phaser from "phaser";
-import { HW, TILE_H, TILE_W, WALL_H } from "../art3/kit";
-import { FURN_META, chairFamilyOf } from "../art3/furniture";
-import { KITCHEN_META } from "../art3/kitchen";
-import {
-  DISH_BY_ID,
-  DOOR_X,
-  ITEM_BY_ID,
-  RIVAL_BY_ID,
-  focusTarget,
-  order,
-  stealDish,
-  worldToIso,
-  type RaidEvent,
-  type RaidState,
-  type RaidUnit,
-} from "../sim";
-import type { Controller } from "../game/controller";
-import { sfx } from "../game/sfx";
-import {
-  TEX_S,
-  charArt,
-  charLoaded,
-  ensureProps,
-  hasProp,
-  loadChar,
-  loadProps,
-} from "./assets";
-import {
-  WALLS,
-  depthOf,
-  drawLot,
-  furnArt,
-  iso,
-  moverDepth,
-  propImage,
-  scenery,
-  wallAnchor,
-} from "./lot";
-import { Puppet } from "./puppet";
+import Phaser from 'phaser';
+import { HW, TILE_H, TILE_W, WALL_H } from '../art3/kit';
+import { FURN_META, chairFamilyOf } from '../art3/furniture';
+import { KITCHEN_META } from '../art3/kitchen';
+import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, RIVAL_BY_ID, focusTarget, order, stealDish, worldToIso, type RaidEvent, type RaidState, type RaidUnit } from '../sim';
+import type { Controller } from '../game/controller';
+import { sfx } from '../game/sfx';
+import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps } from './assets';
+import { FrontDoor, WALLS, depthOf, drawLot, furnArt, iso, moverDepth, propImage, scenery, wallAnchor } from './lot';
+import { Puppet } from './puppet';
 
 interface UnitView {
   holder: Phaser.GameObjects.Container;
@@ -62,7 +32,7 @@ interface UnitView {
 /** Waitresses (`staff_x_b`) fall back to their waiter's art if they haven't been drawn. */
 function artFor(id: string): string {
   if (charArt(id)) return id;
-  const base = id.replace(/_b$/, "");
+  const base = id.replace(/_b$/, '');
   return charArt(base) ? base : id;
 }
 
@@ -84,9 +54,10 @@ export class RaidScene extends Phaser.Scene {
   private lastUserPan = -99;
   private lastHitText = new Map<string, number>();
   private lastPow = -9;
+  private door?: FrontDoor;
 
   constructor() {
-    super("raid");
+    super('raid');
   }
 
   init(data: { ctl: Controller }) {
@@ -99,33 +70,26 @@ export class RaidScene extends Phaser.Scene {
 
   create() {
     const r = this.ctl.raid!;
-    this.cameras.main.setBackgroundColor("#4f5a2c");
+    this.cameras.main.setBackgroundColor('#4f5a2c');
     const keys = new Set<string>([`rsign_${r.rival}`]);
     for (const f of r.furniture) {
       const a = furnArt(f.item, f.dir);
       keys.add(a.key);
       if (a.back) keys.add(a.back);
     }
-    for (const w of r.wallItems)
-      keys.add(`${ITEM_BY_ID[w.item].art}_${w.wall}`);
+    for (const w of r.wallItems) keys.add(`${ITEM_BY_ID[w.item].art}_${w.wall}`);
     for (const c of r.counter) keys.add(DISH_BY_ID[c.dish].icon);
-    for (const [k, , , flip] of scenery(r.room.w, r.room.h, true))
-      keys.add(flip && hasProp(`${k}_se`) ? `${k}_se` : k);
+    for (const [k, , , flip] of scenery(r.room.w, r.room.h, true)) keys.add(flip && hasProp(`${k}_se`) ? `${k}_se` : k);
     const chars = new Set(r.units.map((u) => artFor(u.art)));
-    void Promise.all([
-      loadProps(this).then(() => ensureProps(this, keys)),
-      ...[...chars].map((id) => loadChar(this, id)),
-    ]).then(() => {
+    void Promise.all([loadProps(this).then(() => ensureProps(this, keys)), ...[...chars].map((id) => loadChar(this, id))]).then(() => {
       this.buildCafe();
       this.fitCamera();
       this.setupInput();
       this.ready = true;
-      this.game.events.emit("raid-ready");
+      this.game.events.emit('raid-ready');
     });
-    this.scale.on("resize", this.fitCamera, this);
-    this.events.once("shutdown", () =>
-      this.scale.off("resize", this.fitCamera, this),
-    );
+    this.scale.on('resize', this.fitCamera, this);
+    this.events.once('shutdown', () => this.scale.off('resize', this.fitCamera, this));
   }
 
   // ---------- the rival café ----------
@@ -135,11 +99,11 @@ export class RaidScene extends Phaser.Scene {
     const def = RIVAL_BY_ID[r.rival];
     const W = r.room.w;
     const H = r.room.h;
-    drawLot(this, {
+    this.door = drawLot(this, {
       w: W,
       h: H,
       wallKey: (side) => `wall_${side}_${def.wall}`,
-      floorKeys: (x, y) => [`floor_${def.floor}_${(x + y) % 2 ? "a" : "b"}`],
+      floorKeys: (x, y) => [`floor_${def.floor}_${(x + y) % 2 ? 'a' : 'b'}`],
       wallItems: r.wallItems.map((w, i) => ({
         id: `w${i}`,
         key: `${ITEM_BY_ID[w.item].art}_${w.wall}`,
@@ -147,14 +111,12 @@ export class RaidScene extends Phaser.Scene {
         index: w.index,
       })),
       scenery: scenery(W, H, true),
-    });
+    }).door;
     // the shop sign, bolted over the door
     const sign = `rsign_${r.rival}`;
     if (hasProp(sign)) {
-      const a = wallAnchor("r", DOOR_X - 1);
-      propImage(this, sign, a.x - HW / 2, a.y - WALL_H * 0.66).setDepth(
-        WALLS + DOOR_X * 10 + 4,
-      );
+      const a = wallAnchor('r', DOOR_X - 1);
+      propImage(this, sign, a.x - HW / 2, a.y - WALL_H * 0.66).setDepth(WALLS + DOOR_X * 10 + 4);
     }
     for (const f of r.furniture) {
       const p = iso(f.x, f.y);
@@ -163,13 +125,9 @@ export class RaidScene extends Phaser.Scene {
       propImage(this, a.key, p.x, p.y, a.flip).setDepth(d + 2);
       if (a.back) propImage(this, a.back, p.x, p.y, a.flip).setDepth(d + 6);
       // a pot on every burner: the kitchen's working
-      if (
-        ITEM_BY_ID[f.item].kind === "stove" &&
-        this.textures.exists("fx_steam_1")
-      ) {
-        const top =
-          p.y - (KITCHEN_META.stoveTopZ[ITEM_BY_ID[f.item].art] ?? 36);
-        const steam = propImage(this, "fx_steam_1", p.x, top, a.flip)
+      if (ITEM_BY_ID[f.item].kind === 'stove' && this.textures.exists('fx_steam_1')) {
+        const top = p.y - (KITCHEN_META.stoveTopZ[ITEM_BY_ID[f.item].art] ?? 36);
+        const steam = propImage(this, 'fx_steam_1', p.x, top, a.flip)
           .setDepth(d + 3)
           .setAlpha(0.8);
         this.tweens.add({
@@ -186,18 +144,8 @@ export class RaidScene extends Phaser.Scene {
     if (ct) {
       const f = r.furniture.find((x) => x.x === ct.x && x.y === ct.y)!;
       const p = iso(ct.x, ct.y);
-      const top =
-        p.y - (KITCHEN_META.counterTopZ[ITEM_BY_ID[f.item].art] ?? 36);
-      r.counter.forEach((c, i) =>
-        this.counterDishes.push(
-          propImage(
-            this,
-            DISH_BY_ID[c.dish].icon,
-            p.x - 6 + i * 12,
-            top - 2 - i * 5,
-          ).setDepth(depthOf(ct.x, ct.y) + 3 + i * 0.1),
-        ),
-      );
+      const top = p.y - (KITCHEN_META.counterTopZ[ITEM_BY_ID[f.item].art] ?? 36);
+      r.counter.forEach((c, i) => this.counterDishes.push(propImage(this, DISH_BY_ID[c.dish].icon, p.x - 6 + i * 12, top - 2 - i * 5).setDepth(depthOf(ct.x, ct.y) + 3 + i * 0.1)));
     }
   }
 
@@ -221,18 +169,12 @@ export class RaidScene extends Phaser.Scene {
   private followAction(dt: number) {
     const r = this.ctl.raid!;
     if (this.drag?.moved || this.t - this.lastUserPan < 4) return;
-    const active = r.units.filter(
-      (u) =>
-        u.side === "z" &&
-        u.hp > 0 &&
-        u.state !== "queued" &&
-        u.state !== "gone",
-    );
+    const active = r.units.filter((u) => u.side === 'z' && u.hp > 0 && u.state !== 'queued' && u.state !== 'gone');
     const cam = this.cameras.main;
     let tz = this.baseZoom;
     let tx: number;
     let ty: number;
-    if (active.length && r.phase === "fight") {
+    if (active.length && r.phase === 'fight') {
       let sx = 0;
       let sy = 0;
       for (const u of active) {
@@ -250,14 +192,11 @@ export class RaidScene extends Phaser.Scene {
     }
     const k = 1 - Math.exp(-dt * 2);
     cam.setZoom(cam.zoom + (tz - cam.zoom) * k);
-    cam.centerOn(
-      cam.midPoint.x + (tx - cam.midPoint.x) * k,
-      cam.midPoint.y + (ty - cam.midPoint.y) * k,
-    );
+    cam.centerOn(cam.midPoint.x + (tx - cam.midPoint.x) * k, cam.midPoint.y + (ty - cam.midPoint.y) * k);
   }
 
   private setupInput() {
-    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       const cam = this.cameras.main;
       this.drag = {
         x: p.x,
@@ -267,7 +206,7 @@ export class RaidScene extends Phaser.Scene {
         moved: false,
       };
     });
-    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (!this.drag || !p.isDown) return;
       const dx = p.x - this.drag.x;
       const dy = p.y - this.drag.y;
@@ -275,13 +214,10 @@ export class RaidScene extends Phaser.Scene {
       if (this.drag.moved) {
         this.lastUserPan = this.t;
         const cam = this.cameras.main;
-        cam.setScroll(
-          this.drag.sx - dx / cam.zoom,
-          this.drag.sy - dy / cam.zoom,
-        );
+        cam.setScroll(this.drag.sx - dx / cam.zoom, this.drag.sy - dy / cam.zoom);
       }
     });
-    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
       if (this.drag && !this.drag.moved) this.tap(p.worldX, p.worldY);
       this.drag = null;
     });
@@ -289,73 +225,52 @@ export class RaidScene extends Phaser.Scene {
 
   private tap(wx: number, wy: number) {
     const r = this.ctl.raid;
-    if (!r || r.phase !== "fight") return;
+    if (!r || r.phase !== 'fight') return;
     // whoever's body is closest to the finger
     let best: { u: RaidUnit; score: number } | null = null;
     for (const u of r.units) {
       const v = this.views.get(u.id);
-      if (
-        !v ||
-        !v.holder.visible ||
-        u.hp <= 0 ||
-        u.state === "gone" ||
-        u.state === "down"
-      )
-        continue;
+      if (!v || !v.holder.visible || u.hp <= 0 || u.state === 'gone' || u.state === 'down') continue;
       const h = (v.puppet?.height ?? 90) * v.holder.scaleY;
-      if (
-        Math.abs(wx - v.holder.x) < 26 &&
-        wy < v.holder.y + 10 &&
-        wy > v.holder.y - h - 8
-      ) {
-        const score =
-          (wx - v.holder.x) ** 2 + ((wy - (v.holder.y - h * 0.45)) * 0.7) ** 2;
+      if (Math.abs(wx - v.holder.x) < 26 && wy < v.holder.y + 10 && wy > v.holder.y - h - 8) {
+        const score = (wx - v.holder.x) ** 2 + ((wy - (v.holder.y - h * 0.45)) * 0.7) ** 2;
         if (!best || score < best.score) best = { u, score };
       }
     }
     const sel = this.ctl.raidSel;
     if (best) {
       const u = best.u;
-      if (u.side === "z") {
+      if (u.side === 'z') {
         this.ctl.selectRaider(sel === u.id ? null : u.id);
-        sfx("groan", { pitch: 0.8 + Math.random() * 0.4 });
+        sfx('groan', { pitch: 0.8 + Math.random() * 0.4 });
         return;
       }
       if (sel) {
-        const err = order(r, sel, { kind: "target", id: u.id });
+        const err = order(r, sel, { kind: 'target', id: u.id });
         if (err) this.ctl.toast(err, false);
         else {
-          sfx("tap");
-          this.ctl.info(u.side === "c" ? "Lunch!" : `Get the ${u.name}!`);
+          sfx('tap');
+          this.ctl.info(u.side === 'c' ? 'Lunch!' : `Get the ${u.name}!`);
         }
         this.ctl.selectRaider(null);
         return;
       }
       focusTarget(r, u.id);
-      sfx("tap");
-      this.ctl.info(
-        u.side === "c" ? "Dinner time!" : `Everybody on the ${u.name}!`,
-      );
+      sfx('tap');
+      this.ctl.info(u.side === 'c' ? 'Dinner time!' : `Everybody on the ${u.name}!`);
       return;
     }
     // the counter: swipe the food
     for (const off of [0, 20, 40]) {
       const t = worldToIso(wx, wy + off, TILE_W, TILE_H);
-      if (
-        !r.counter.some(
-          (c) => Math.round(t.x) === c.x && Math.round(t.y) === c.y,
-        )
-      )
-        continue;
+      if (!r.counter.some((c) => Math.round(t.x) === c.x && Math.round(t.y) === c.y)) continue;
       const slot = r.counter.findIndex((c) => c.servings > 0);
-      if (slot < 0) return this.ctl.toast("Nothing left to steal!", false);
-      const err = sel
-        ? order(r, sel, { kind: "steal", slot })
-        : stealDish(r, slot);
+      if (slot < 0) return this.ctl.toast('Nothing left to steal!', false);
+      const err = sel ? order(r, sel, { kind: 'steal', slot }) : stealDish(r, slot);
       if (err) this.ctl.toast(err, false);
       else {
-        sfx("tap");
-        this.ctl.info("Swipe that dish!");
+        sfx('tap');
+        this.ctl.info('Swipe that dish!');
       }
       this.ctl.selectRaider(null);
       return;
@@ -369,10 +284,7 @@ export class RaidScene extends Phaser.Scene {
     if (v) return v;
     const holder = this.add.container(0, 0);
     const shadow = this.add.ellipse(0, 0, 34, 11, 0x16120c, 0.28);
-    const ring = this.add
-      .ellipse(0, 0, 46, 16)
-      .setStrokeStyle(2, 0xd9b44a, 1)
-      .setVisible(false);
+    const ring = this.add.ellipse(0, 0, 46, 16).setStrokeStyle(2, 0xd9b44a, 1).setVisible(false);
     const bar = this.add.graphics();
     holder.add([ring, shadow, bar]);
     v = {
@@ -384,7 +296,7 @@ export class RaidScene extends Phaser.Scene {
       shadow,
       ring,
     };
-    if (u.kind === "summon") holder.setScale(1.15);
+    if (u.kind === 'summon') holder.setScale(1.15);
     this.views.set(u.id, v);
     return v;
   }
@@ -397,32 +309,26 @@ export class RaidScene extends Phaser.Scene {
     v.barQ = q;
     const g = v.bar;
     g.clear();
-    if (u.side === "c") return;
+    if (u.side === 'c') return;
     g.fillStyle(0x16120c, 0.9).fillRect(-16, 0, 32, 5);
-    g.fillStyle(u.side === "z" ? 0x7a9a32 : 0xa3342a, 1).fillRect(
-      -15,
-      1,
-      Math.max(1, 30 * f),
-      3,
-    );
+    g.fillStyle(u.side === 'z' ? 0x7a9a32 : 0xa3342a, 1).fillRect(-15, 1, Math.max(1, 30 * f), 3);
   }
 
   /** A diner still on their chair: sat on the seat, facing the table (backs to us on ne chairs). */
   private seatPose(r: RaidState, u: RaidUnit) {
     if (!u.seatId) return null;
     const seat = r.furniture.find((f) => f.id === u.seatId);
-    if (!seat || Math.abs(u.x - seat.x) > 0.05 || Math.abs(u.y - seat.y) > 0.05)
-      return null;
+    if (!seat || Math.abs(u.x - seat.x) > 0.05 || Math.abs(u.y - seat.y) > 0.05) return null;
     const p = iso(seat.x, seat.y);
-    const dir = seat.dir ?? "sw";
+    const dir = seat.dir ?? 'sw';
     const off = FURN_META.seatOffset[dir];
-    const fam = chairFamilyOf(furnArt(seat.item, dir).key) ?? "plain";
+    const fam = chairFamilyOf(furnArt(seat.item, dir).key) ?? 'plain';
     const hip = this.views.get(u.id)?.puppet?.hipY ?? 20;
     return {
       x: p.x + off.dx,
       y: p.y + off.dy - (FURN_META.seatZ[fam] ?? 18) + hip,
-      facing: (dir === "se" || dir === "ne" ? 1 : -1) as 1 | -1,
-      back: dir === "ne" || dir === "nw",
+      facing: (dir === 'se' || dir === 'ne' ? 1 : -1) as 1 | -1,
+      back: dir === 'ne' || dir === 'nw',
       depth: depthOf(seat.x, seat.y) + 4,
     };
   }
@@ -433,20 +339,21 @@ export class RaidScene extends Phaser.Scene {
     this.t += dt;
     const r = this.ctl.raid;
     this.followAction(dt);
+    this.door?.update(
+      dt,
+      this.t,
+      r.units.filter((u) => u.state !== 'gone' && u.state !== 'queued' && u.hp > 0),
+      false,
+    );
     const buff = r.buff && r.t < r.buff.until ? r.buff.kind : null;
     for (const u of r.units) {
       const v = this.view(u);
-      const gone = u.state === "gone";
+      const gone = u.state === 'gone';
       v.holder.setVisible(!gone);
       if (gone) continue;
-      const seat =
-        (u.state === "idle" || u.state === "scream") && u.kind === "customer"
-          ? this.seatPose(r, u)
-          : null;
+      const seat = (u.state === 'idle' || u.state === 'scream') && u.kind === 'customer' ? this.seatPose(r, u) : null;
       const p = seat ?? iso(u.x, u.y);
-      v.holder
-        .setPosition(p.x, p.y)
-        .setDepth(seat ? seat.depth : moverDepth(u.x, u.y, 4));
+      v.holder.setPosition(p.x, p.y).setDepth(seat ? seat.depth : moverDepth(u.x, u.y, 4));
       if (!v.puppet && charLoaded(this, v.charId)) {
         const a = charArt(v.charId);
         if (a) {
@@ -454,41 +361,26 @@ export class RaidScene extends Phaser.Scene {
           v.holder.addAt(v.puppet.root, 2);
         }
       }
-      const down = u.hp <= 0 || u.state === "down";
+      const down = u.hp <= 0 || u.state === 'down';
       const top = -(v.puppet?.height ?? 90) - 8;
       this.drawBar(v, u, down ? -30 : top);
       v.shadow.setVisible(!seat && !down);
       v.ring
-        .setVisible(
-          this.ctl.raidSel === u.id ||
-            (u.state === "queued" &&
-              !this.ctl.raidSel &&
-              u ===
-                r.units.find((x) => x.side === "z" && x.state === "queued")),
-        )
-        .setAlpha(
-          this.ctl.raidSel === u.id
-            ? 1
-            : 0.35 + Math.abs(Math.sin(this.t * 3)) * 0.4,
-        );
+        .setVisible(this.ctl.raidSel === u.id || (u.state === 'queued' && !this.ctl.raidSel && u === r.units.find((x) => x.side === 'z' && x.state === 'queued')))
+        .setAlpha(this.ctl.raidSel === u.id ? 1 : 0.35 + Math.abs(Math.sin(this.t * 3)) * 0.4);
       if (!v.puppet) continue;
       if (seat) v.puppet.setFacing(seat.facing, seat.back);
-      else
-        v.puppet.setFacing(
-          u.facing,
-          !!u.back && (u.state === "walk" || u.state === "flee"),
-        );
-      const zombie =
-        u.side === "z" && (u.kind === "zombie" || u.kind === "summon");
+      else v.puppet.setFacing(u.facing, !!u.back && (u.state === 'walk' || u.state === 'flee'));
+      const zombie = u.side === 'z' && (u.kind === 'zombie' || u.kind === 'summon');
       const attackT = r.t - u.attackAt;
-      let pose: Parameters<Puppet["pose"]>[0] = "idle";
-      if (down) pose = "lie";
-      else if (seat) pose = "sit";
-      else if (u.state === "flee") pose = "run";
-      else if (u.state === "grabbed") pose = "shiver";
-      else if (u.state === "eat" || u.state === "steal") pose = "eat";
-      else if (attackT < 0.5) pose = "attack";
-      else if (u.state === "walk" && u.path.length) pose = "walk";
+      let pose: Parameters<Puppet['pose']>[0] = 'idle';
+      if (down) pose = 'lie';
+      else if (seat) pose = 'sit';
+      else if (u.state === 'flee') pose = 'run';
+      else if (u.state === 'grabbed') pose = 'shiver';
+      else if (u.state === 'eat' || u.state === 'steal') pose = 'eat';
+      else if (attackT < 0.5) pose = 'attack';
+      else if (u.state === 'walk' && u.path.length) pose = 'walk';
       v.puppet.pose(pose, dt, {
         zombie,
         attackT,
@@ -496,62 +388,46 @@ export class RaidScene extends Phaser.Scene {
         seated: !!seat,
       });
       const face = down
-        ? "dazed"
-        : u.state === "flee" || u.state === "scream" || u.state === "grabbed"
-          ? "scream"
-          : u.state === "eat"
-            ? "chomp"
+        ? 'dazed'
+        : u.state === 'flee' || u.state === 'scream' || u.state === 'grabbed'
+          ? 'scream'
+          : u.state === 'eat'
+            ? 'chomp'
             : zombie && attackT < 0.5
-              ? "chomp"
-              : u.side === "r" && r.t - u.hitAt < 0.4
-                ? "shock"
-                : u.side === "r" && r.aggro
-                  ? "angry"
+              ? 'chomp'
+              : u.side === 'r' && r.t - u.hitAt < 0.4
+                ? 'shock'
+                : u.side === 'r' && r.aggro
+                  ? 'angry'
                   : undefined;
       v.puppet.setFace(face as never);
       if (r.t - u.hitAt < 0.12) v.puppet.setTint(0xff9090);
-      else if (u.side === "z" && buff)
-        v.puppet.setTint(
-          Math.sin(this.t * 14) > 0
-            ? buff === "str"
-              ? 0xff7a6a
-              : 0x9be36b
-            : 0xffffff,
-        );
+      else if (u.side === 'z' && buff) v.puppet.setTint(Math.sin(this.t * 14) > 0 ? (buff === 'str' ? 0xff7a6a : 0x9be36b) : 0xffffff);
       else if (r.focus === u.id) v.puppet.setTint(0xfff2a0);
       else v.puppet.clearTint();
     }
-    r.counter.forEach((c, i) =>
-      this.counterDishes[i]?.setVisible(c.servings > 0),
-    );
+    r.counter.forEach((c, i) => this.counterDishes[i]?.setVisible(c.servings > 0));
     // play new events
-    while (this.seenEvents < r.events.length)
-      this.fx(r.events[this.seenEvents++]);
+    while (this.seenEvents < r.events.length) this.fx(r.events[this.seenEvents++]);
     if (r.events.length < this.seenEvents) this.seenEvents = r.events.length;
   }
 
   // ---------- juice ----------
 
-  private floatText(
-    x: number,
-    y: number,
-    text: string,
-    color: string,
-    size = 13,
-  ) {
+  private floatText(x: number, y: number, text: string, color: string, size = 13) {
     const t = this.add
       .text(x, y, text, {
-        fontFamily: "Arial Black, Arial, sans-serif",
+        fontFamily: 'Arial Black, Arial, sans-serif',
         fontSize: `${size}px`,
         color,
-        stroke: "#16120C",
+        stroke: '#16120C',
         strokeThickness: 3,
       })
       .setResolution(TEX_S)
       .setOrigin(0.5)
       .setDepth(1e6)
       .setScale(0.4);
-    this.tweens.add({ targets: t, scale: 1, duration: 160, ease: "Back.Out" });
+    this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out' });
     this.tweens.add({
       targets: t,
       y: y - 30,
@@ -571,7 +447,7 @@ export class RaidScene extends Phaser.Scene {
       targets: i,
       scale: 1 / TEX_S,
       duration: 120,
-      ease: "Back.Out",
+      ease: 'Back.Out',
     });
     this.tweens.add({
       targets: i,
@@ -586,121 +462,82 @@ export class RaidScene extends Phaser.Scene {
     const r = this.ctl.raid!;
     const unitOf = (id: string) => r.units.find((u) => u.id === id);
     switch (e.t) {
-      case "hit": {
+      case 'hit': {
         const p = iso(e.x, e.y);
         const u = unitOf(e.unit);
-        if (u?.kind === "customer") {
-          this.floatText(p.x, p.y - 80, "SCRATCH!", "#C9A63A", 12);
-          sfx("hit", { volume: 0.4 });
+        if (u?.kind === 'customer') {
+          this.floatText(p.x, p.y - 80, 'SCRATCH!', '#C9A63A', 12);
+          sfx('hit', { volume: 0.4 });
           break;
         }
         if (this.t - (this.lastHitText.get(e.unit) ?? -9) > 0.45) {
           this.lastHitText.set(e.unit, this.t);
-          this.floatText(
-            p.x + (Math.random() - 0.5) * 16,
-            p.y - 90,
-            `-${Math.max(1, Math.round(e.dmg))}`,
-            u?.side === "z" ? "#E06A55" : "#F2E7C4",
-            12,
-          );
+          this.floatText(p.x + (Math.random() - 0.5) * 16, p.y - 90, `-${Math.max(1, Math.round(e.dmg))}`, u?.side === 'z' ? '#E06A55' : '#F2E7C4', 12);
         }
-        if (
-          this.t - this.lastPow > 0.3 &&
-          Math.random() < 0.5 &&
-          (this.lastPow = this.t)
-        )
-          this.pop("fx_hit", p.x, p.y - 60, 180);
+        if (this.t - this.lastPow > 0.3 && Math.random() < 0.5 && (this.lastPow = this.t)) this.pop('fx_hit', p.x, p.y - 60, 180);
         const by = unitOf(e.by);
-        sfx(by?.kind === "boss" ? "whack" : "hit", { volume: 0.5 });
+        sfx(by?.kind === 'boss' ? 'whack' : 'hit', { volume: 0.5 });
         break;
       }
-      case "ko": {
+      case 'ko': {
         const p = iso(e.x, e.y);
-        this.pop("fx_skull", p.x, p.y - 40, 1500);
-        sfx("ko", { volume: 0.6 });
-        if (unitOf(e.unit)?.kind === "boss") this.cameras.main.shake(400, 0.01);
+        this.pop('fx_skull', p.x, p.y - 40, 1500);
+        sfx('ko', { volume: 0.6 });
+        if (unitOf(e.unit)?.kind === 'boss') this.cameras.main.shake(400, 0.01);
         break;
       }
-      case "scream": {
+      case 'scream': {
         const p = iso(e.x, e.y);
-        if (Math.random() < 0.6)
-          this.floatText(
-            p.x,
-            p.y - 110,
-            Math.random() < 0.5 ? "AAAH!" : "ZOMBIES!",
-            "#F2E7C4",
-            11,
-          );
-        if (Math.random() < 0.5)
-          sfx("scream", { pitch: 0.9 + Math.random() * 0.5, volume: 0.6 });
+        if (Math.random() < 0.6) this.floatText(p.x, p.y - 110, Math.random() < 0.5 ? 'AAAH!' : 'ZOMBIES!', '#F2E7C4', 11);
+        if (Math.random() < 0.5) sfx('scream', { pitch: 0.9 + Math.random() * 0.5, volume: 0.6 });
         break;
       }
-      case "eat": {
+      case 'eat': {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 80, `CHOMP! +$${e.cash}`, "#D9C25A", 14);
-        this.pop("fx_cash", p.x, p.y - 60);
-        sfx("chomp");
-        setTimeout(
-          () => sfx("scream", { pitch: 1 + Math.random() * 0.3 }),
-          120,
-        );
+        this.floatText(p.x, p.y - 80, `CHOMP! +$${e.cash}`, '#D9C25A', 14);
+        this.pop('fx_cash', p.x, p.y - 60);
+        sfx('chomp');
+        setTimeout(() => sfx('scream', { pitch: 1 + Math.random() * 0.3 }), 120);
         break;
       }
-      case "escape":
+      case 'escape':
         break;
-      case "enter":
-        sfx("groan", { pitch: 0.7 + Math.random() * 0.4, volume: 0.6 });
+      case 'enter':
+        sfx('groan', { pitch: 0.7 + Math.random() * 0.4, volume: 0.6 });
         break;
-      case "steal": {
+      case 'steal': {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 90, "SWIPED!", "#9BD62E", 15);
+        this.floatText(p.x, p.y - 90, 'SWIPED!', '#9BD62E', 15);
         this.pop(DISH_BY_ID[e.dish].icon, p.x, p.y - 70, 900);
-        sfx("cashRegister", { volume: 0.6 });
+        sfx('cashRegister', { volume: 0.6 });
         break;
       }
-      case "boss": {
+      case 'boss': {
         const p = iso(e.x, e.y);
         const def = RIVAL_BY_ID[r.rival];
-        this.floatText(
-          p.x,
-          p.y - 120,
-          `${def.chef.toUpperCase()}!`,
-          "#E06A55",
-          20,
-        );
+        this.floatText(p.x, p.y - 120, `${def.chef.toUpperCase()}!`, '#E06A55', 20);
         this.ctl.info(`“${def.taunt}”`);
         this.cameras.main.shake(350, 0.006);
-        sfx("summon", { volume: 0.5 });
+        sfx('summon', { volume: 0.5 });
         break;
       }
-      case "buff":
-        this.cameras.main.flash(
-          220,
-          e.kind === "str" ? 200 : 120,
-          e.kind === "str" ? 70 : 200,
-          60,
-        );
-        sfx(e.kind === "str" ? "stomp" : "heal");
+      case 'buff':
+        this.cameras.main.flash(220, e.kind === 'str' ? 200 : 120, e.kind === 'str' ? 70 : 200, 60);
+        sfx(e.kind === 'str' ? 'stomp' : 'heal');
         break;
-      case "summon": {
+      case 'summon': {
         const u = unitOf(e.unit);
         if (u) {
           const p = iso(u.x, u.y);
-          this.floatText(p.x, p.y - 150, "BIG FOOT-LONG!", "#D9C25A", 18);
+          this.floatText(p.x, p.y - 150, 'BIG FOOT-LONG!', '#D9C25A', 18);
         }
         this.cameras.main.shake(500, 0.01);
-        sfx("summon");
+        sfx('summon');
         break;
       }
-      case "end":
-        sfx(
-          e.result === "won"
-            ? "raidWin"
-            : e.result === "lost"
-              ? "raidLose"
-              : "flag",
-        );
-        this.game.events.emit("raid-ended");
+      case 'end':
+        sfx(e.result === 'won' ? 'raidWin' : e.result === 'lost' ? 'raidLose' : 'flag');
+        this.game.events.emit('raid-ended');
         break;
     }
   }

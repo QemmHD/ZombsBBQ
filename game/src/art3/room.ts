@@ -260,6 +260,82 @@ function door(side: Side, open: boolean) {
   };
 }
 
+// ---------------------------------------------------------------- the real front door
+// The north-east wall's door section is a true opening: the wall image gets a hole cut clean through it
+// (so you see the sidewalk and whoever is walking past), a frame around it, and a door leaf that is
+// either shut in the opening or swung open into the room on its left-hand hinge.
+const DOOR = { u0: 0.2, u1: 0.84, v1: 0.58 };
+const holeR = () => wquad('r', DOOR.u0, DOOR.u1, 0, DOOR.v1);
+
+/** The same wall image with the doorway cut out of it. */
+export function withDoorway(a: ArtAsset, key: string): ArtAsset {
+  const id = `${key.replace(/[^a-zA-Z0-9]/g, '')}hole`;
+  const open = a.svg.match(/^<svg[^>]*>/)![0];
+  const mask = `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${f(a.w)}" height="${f(a.h)}"><rect width="${f(a.w)}" height="${f(a.h)}" fill="#fff"/><path d="${holeR()}" fill="#000"/></mask></defs>`;
+  const svg = open + mask + `<g mask="url(#${id})">` + a.svg.slice(open.length, -'</svg>'.length) + '</g></svg>';
+  return { ...a, key, svg };
+}
+
+/** Jambs, lintel and a worn threshold around the opening. */
+function doorFrame(d: Doc): string {
+  const { u0, u1, v1 } = DOOR;
+  const outer = wquad('r', u0 - 0.07, u1 + 0.07, 0, v1 + 0.045);
+  let s = F(`${outer}${holeR()}`, '#5A4128', 0, 'fill-rule="evenodd"');
+  s += d.clip(outer, L(`M${wp('r', u0 - 0.035, 0).map(f).join(',')}L${wp('r', u0 - 0.035, v1 + 0.02).map(f).join(',')}M${wp('r', u1 + 0.035, 0).map(f).join(',')}L${wp('r', u1 + 0.035, v1 + 0.02).map(f).join(',')}`, 0.5, '#3A2A18', 'opacity="0.7"'));
+  s += L(outer, LW, INK) + L(holeR(), 0.9, INK);
+  // scuffs where a hundred shoulders have bumped it
+  s += F(blob(...wp('r', u1 + 0.03, 0.3), 2, 6, 41), '#2E2216', 0, 'opacity="0.5"');
+  // threshold strip
+  s += F(wquad('r', u0, u1, 0, 0.02), '#8A8578', 0.6);
+  return s;
+}
+
+/** The door shut in its frame (the OPEN / CLOSED board is hung on it by the scene). */
+function doorLeafClosed(d: Doc): string {
+  const { u0, u1, v1 } = DOOR;
+  const leaf = wquad('r', u0, u1, 0, v1);
+  let s = F(leaf, d.linear(...wp('r', u0, v1), ...wp('r', u1, 0), [[0, '#86663F'], [1, '#6A4E2E']]) as string, LW);
+  s += F(wquad('r', u0 + 0.09, u1 - 0.09, 0.06, 0.22), '#6B4F30', 0.6);
+  // a grimy little window with a crack across it
+  const win = wquad('r', u0 + 0.11, u1 - 0.11, 0.33, 0.5);
+  s += F(win, '#3E4A4C', 0.7);
+  s += d.clip(win, L(`M${wp('r', u0 + 0.13, 0.36).map(f).join(',')}L${wp('r', u0 + 0.3, 0.48).map(f).join(',')}`, 1.4, '#9DB3B6', 'opacity="0.6"') + crack(...wp('r', u1 - 0.2, 0.47), 2.2, 18, 9, 0.5, '#C9D4D2', 1));
+  const [kx, ky] = wp('r', u1 - 0.08, 0.27);
+  s += dot(kx, ky, 1.5, '#B08A3A') + dot(kx - 0.4, ky - 0.4, 0.5, '#F0D68A');
+  s += d.clip(leaf, F(blob(...wp('r', (u0 + u1) / 2, 0.03), 12, 4, 31), PAL.grimeD, 0, 'opacity="0.45"') + F(blob(...wp('r', u1 - 0.12, 0.2), 4, 6, 33), PAL.blood, 0, 'opacity="0.35"'));
+  return s;
+}
+
+/** Extra room on the left of the open-door image: the leaf swings toward the viewer. */
+export const DOOR_SWING_PAD = 36;
+/** The door swung open into the room, hinged on the left jamb (the doorway stays clear). */
+function doorLeafOpen(d: Doc): string {
+  const { u0, u1, v1 } = DOOR;
+  const w = u1 - u0;
+  const sh = ([x, y]: Pt): Pt => [x + DOOR_SWING_PAD, y];
+  const along: Pt = [-w * HW, w * HH]; // one leaf-width toward the camera, along the room's y axis
+  const h0 = sh(wp('r', u0, 0));
+  const h1 = sh(wp('r', u0, v1));
+  const e0: Pt = [h0[0] + along[0], h0[1] + along[1]];
+  const e1: Pt = [h1[0] + along[0], h1[1] + along[1]];
+  const lerp = (a: Pt, b: Pt, t: number): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const at = (t: number, v: number): Pt => lerp(lerp(h0, e0, t), lerp(h1, e1, t), v / v1);
+  const q = (t0: number, t1: number, va: number, vb: number) => poly([at(t0, va), at(t1, va), at(t1, vb), at(t0, vb)]);
+  // shadow the leaf throws on the floor
+  let s = F(poly([h0, e0, [e0[0] + 6, e0[1] + 3], [h0[0] + 6, h0[1] + 3]]), '#000', 0, 'opacity="0.22"');
+  // its edge (door thickness), then the inside face
+  s += F(poly([e0, [e0[0] + 3, e0[1] + 1.6], [e1[0] + 3, e1[1] + 1.6], e1]), '#4E3A22', 0.8);
+  s += F(poly([h0, e0, e1, h1]), d.linear(...h1, ...e0, [[0, '#7A5C38'], [1, '#93734A']]) as string, LW);
+  s += F(q(0.12, 0.88, 0.06, 0.22), '#6B4F30', 0.6);
+  s += F(q(0.14, 0.86, 0.33, 0.5), '#3E4A4C', 0.7);
+  s += d.clip(q(0.14, 0.86, 0.33, 0.5), L(`M${at(0.2, 0.36).map(f).join(',')}L${at(0.5, 0.48).map(f).join(',')}`, 1.4, '#9DB3B6', 'opacity="0.55"'));
+  const [kx, ky] = at(0.9, 0.27);
+  s += dot(kx, ky, 1.5, '#B08A3A') + dot(kx - 0.4, ky - 0.4, 0.5, '#F0D68A');
+  // hinges
+  s += F(q(0, 0.05, 0.08, 0.13), '#3A3833', 0.4) + F(q(0, 0.05, 0.45, 0.5), '#3A3833', 0.4);
+  return s;
+}
+
 function boardedWindow(side: Side) {
   return (d: Doc) => {
     const q = wquad(side, 0.14, 0.86, 0.42, 0.74);
@@ -427,9 +503,16 @@ export function buildRoom(): ArtAsset[] {
   for (const side of ['l', 'r'] as Side[]) {
     out.push(wallAsset(`door_${side}_closed`, door(side, false)));
     out.push(wallAsset(`door_${side}_open`, door(side, true)));
+    if (side === 'r') {
+      out.push(wallAsset('door_frame_r', doorFrame));
+      out.push(wallAsset('door_leaf_r_closed', doorLeafClosed));
+      out.push(asset('door_leaf_r_open', WW + DOOR_SWING_PAD, WH + 24, (DOOR_SWING_PAD + WW / 2) / (WW + DOOR_SWING_PAD), WH / (WH + 24), doorLeafOpen));
+    }
     out.push(wallAsset(`window_boarded_${side}`, boardedWindow(side)));
     out.push(wallAsset(`window_small_${side}`, smallWindow(side)));
   }
+  // the door section of the north-east wall, in every finish, with the doorway cut through
+  for (const a of out.filter((x) => /^wall_r_/.test(x.key))) out.push(withDoorway(a, `${a.key}_door`));
   // floors
   out.push(floorAsset('floor_dirty_a', (d) => tiles2x2(d, 1, PAL.tile, PAL.tileB, PAL.grout, true)));
   out.push(floorAsset('floor_dirty_b', (d) => tiles2x2(d, 2, PAL.tileB, PAL.tile, PAL.grout, true)));
