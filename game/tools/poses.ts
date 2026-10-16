@@ -26,8 +26,10 @@ const ROWS: { pose: Pose; carry?: boolean; label?: string; attack?: boolean }[] 
   { pose: 'lie' },
 ];
 const FRAMES = 5;
-const CW = 92;
-const CH = 132;
+const K = Number(q.get('k') ?? 1); // zoom
+const only = q.get('rows')?.split(',');
+const CW = 92 * K;
+const CH = 132 * K;
 
 class Sheet extends Phaser.Scene {
   async create() {
@@ -36,7 +38,7 @@ class Sheet extends Phaser.Scene {
     const { charArt } = await import('../src/scenes/assets');
     const ha = charArt(human)!;
     const za = charArt(zombie);
-    ROWS.forEach((row, ri) => {
+    ROWS.filter((r) => !only || only.includes(r.label ?? r.pose)).forEach((row, ri) => {
       const y = 20 + ri * CH + CH - 18;
       this.add.text(6, y - CH + 26, row.label ?? row.pose, { fontSize: '13px', color: '#e8dcc0' });
       const cells: { art: typeof ha; back?: boolean; z?: boolean; f: number }[] = [];
@@ -44,10 +46,10 @@ class Sheet extends Phaser.Scene {
       cells.push({ art: ha, back: true, f: 1 });
       if (za) for (let f = 0; f < 3; f++) cells.push({ art: za, z: true, f });
       cells.forEach((cell, ci) => {
-        const x = 90 + ci * CW;
-        this.add.ellipse(x, y, 40, 12, 0x000000, 0.3);
+        const x = 60 + 30 * K + ci * CW;
+        this.add.ellipse(x, y, 40 * K, 12 * K, 0x000000, 0.3);
         const p = new Puppet(this, cell.art);
-        p.root.setPosition(x, y);
+        p.root.setPosition(x, y).setScale(K);
         p.setFacing(1, !!cell.back);
         const cycle = row.pose === 'walk' ? 1.625 / 2.2 : row.pose === 'run' ? 0.667 / 1.4 : row.pose === 'eat' ? 2.42 : row.pose === 'cook' ? 2.08 : 1.625;
         (p as unknown as { phase: number }).phase = (cell.f / FRAMES) * Math.PI * 2;
@@ -63,7 +65,7 @@ class Sheet extends Phaser.Scene {
 new Phaser.Game({
   type: new URLSearchParams(location.search).has('canvas') ? Phaser.CANVAS : Phaser.WEBGL,
   width: 90 + 9 * CW,
-  height: 40 + ROWS.length * CH,
+  height: 40 + (only?.length ?? ROWS.length) * CH,
   backgroundColor: '#3a332a',
   scene: Sheet,
   render: { antialias: true, ...(q.get('mt') ? { maxTextures: Number(q.get('mt')) } : {}), ...(q.get('bs') ? { batchSize: Number(q.get('bs')) } : {}) },
