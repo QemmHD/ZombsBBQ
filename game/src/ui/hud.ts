@@ -56,6 +56,7 @@ export class Hud {
   private lastStructure = '';
   private fireArmed = '';
   private modalClose: (() => void) | null = null;
+  private pendingLevels: number[] = [];
   readonly edit: EditBar;
   readonly raid: RaidUi;
 
@@ -122,7 +123,8 @@ export class Hud {
     document.body.dataset.mode = ctl.mode;
     ctl.onToast((t) => this.showToast(t));
     ctl.onEvent((e) => {
-      if (e.t === 'levelup') openLevelUp(this, e.level);
+      // never stomp another popup (e.g. raid results): queue it for the next quiet moment
+      if (e.t === 'levelup') this.pendingLevels.push(e.level);
       if (e.t === 'infected') {
         const w = ctl.state.workers.find((x) => x.id === e.workerId);
         if (w) ctl.info(`${w.name} joined the crew!`);
@@ -221,6 +223,11 @@ export class Hud {
     if (this.ctl.mode === 'play' && this.ctl.selection && this.ctl.selection.kind !== 'dishPicker') this.renderCard();
     if (this.ctl.mode === 'edit') this.edit.refresh();
     if (this.ctl.mode === 'raid') this.raid.refresh();
+    if (this.pendingLevels.length && !this.modalOpen && this.ctl.mode !== 'raid') {
+      // several levels at once (big raid haul): celebrate the highest, listing every unlock
+      const lv = this.pendingLevels.splice(0);
+      openLevelUp(this, Math.min(...lv), Math.max(...lv));
+    }
     if (this.ctl.offlineReport && !this.modalOpen) {
       openOffline(this, this.ctl.offlineReport);
       this.ctl.offlineReport = null;

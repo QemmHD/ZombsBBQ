@@ -34,6 +34,11 @@ export class RaidScene extends Phaser.Scene {
   private t = 0;
   private seenEvents = 0;
   private drag: { x: number; y: number; sx: number; sy: number; moved: boolean } | null = null;
+  /** the whole-lot framing; the action cam zooms in from here once the brawl starts */
+  private baseZoom = 1;
+  private lastUserPan = -99;
+  private lastHitText = new Map<string, number>();
+  private lastPow = -9;
 
   constructor() {
     super('raid');
@@ -136,9 +141,39 @@ export class RaidScene extends Phaser.Scene {
     const w = (ARENA_N + 4) * TILE_W;
     const h = (ARENA_N + 4) * TILE_H + WALL_H;
     const z = Math.min((cssW - 150) / w, (cssH - 70) / h) * 1.15;
-    cam.setZoom(z * dpr);
+    this.baseZoom = z * dpr;
+    cam.setZoom(this.baseZoom);
     const c = iso(ARENA_N / 2 + 0.8, ARENA_N / 2 - 0.2);
     cam.centerOn(c.x, c.y - 20);
+  }
+
+  /** Action cam: once zombies are in, drift toward the brawl and zoom in so the fighting reads on a phone. */
+  private followAction(dt: number) {
+    const r = this.ctl.raid!;
+    if (this.drag?.moved || this.t - this.lastUserPan < 4) return;
+    const active = r.units.filter((u) => u.side === 'z' && u.hp > 0 && u.state !== 'queued' && u.state !== 'gone');
+    const cam = this.cameras.main;
+    let tz = this.baseZoom;
+    let tx = cam.midPoint.x;
+    let ty = cam.midPoint.y;
+    if (active.length && r.phase === 'fight') {
+      let sx = 0, sy = 0;
+      for (const u of active) {
+        const p = iso(u.x, u.y);
+        sx += p.x;
+        sy += p.y;
+      }
+      tx = sx / active.length;
+      ty = sy / active.length - 40;
+      tz = this.baseZoom * 1.7;
+    } else {
+      const c = iso(ARENA_N / 2 + 0.8, ARENA_N / 2 - 0.2);
+      tx = c.x;
+      ty = c.y - 20;
+    }
+    const k = 1 - Math.exp(-dt * 2.2);
+    cam.setZoom(cam.zoom + (tz - cam.zoom) * k);
+    cam.centerOn(cam.midPoint.x + (tx - cam.midPoint.x) * k, cam.midPoint.y + (ty - cam.midPoint.y) * k);
   }
 
   private setupInput() {
@@ -152,6 +187,7 @@ export class RaidScene extends Phaser.Scene {
       const dy = p.y - this.drag.y;
       if (Math.hypot(dx, dy) > 12) this.drag.moved = true;
       if (this.drag.moved) {
+        this.lastUserPan = this.t;
         const cam = this.cameras.main;
         cam.setScroll(this.drag.sx - dx / cam.zoom, this.drag.sy - dy / cam.zoom);
       }
@@ -248,6 +284,7 @@ export class RaidScene extends Phaser.Scene {
     const dt = Math.min(deltaMs / 1000, 0.1);
     this.t += dt;
     const r = this.ctl.raid;
+    this.followAction(dt);
     for (const u of r.units) {
       if (u.kind === 'gate') {
         this.gateImg?.setAlpha(u.hp > 0 ? 1 : 0).setTint(r.t - u.hitAt < 0.12 ? 0xff9090 : 0xffffff);
@@ -321,8 +358,11 @@ export class RaidScene extends Phaser.Scene {
       case 'hit': {
         const p = iso(e.x, e.y);
         const u = unitOf(e.unit);
-        this.floatText(p.x + (Math.random() - 0.5) * 16, p.y - 70, `-${Math.max(1, Math.round(e.dmg))}`, u?.side === 'z' ? '#ff5a4a' : '#ffffff', 12);
-        if (Math.random() < 0.35) this.pop('fx_hit', p.x, p.y - 50, 180);
+        if (this.t - (this.lastHitText.get(e.unit) ?? -9) > 0.45) {
+          this.lastHitText.set(e.unit, this.t);
+          this.floatText(p.x + (Math.random() - 0.5) * 16, p.y - 70, `-${Math.max(1, Math.round(e.dmg))}`, u?.side === 'z' ? '#ff5a4a' : '#ffffff', 12);
+        }
+        if (this.t - this.lastPow > 0.3 && Math.random() < 0.5 && (this.lastPow = this.t)) this.pop('fx_hit', p.x, p.y - 50, 180);
         const by = unitOf(e.by);
         if (by?.kind !== 'zapper') sfx(by?.kind === 'boss' ? 'whack' : 'hit', { volume: 0.5 });
         break;

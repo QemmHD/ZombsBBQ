@@ -15,6 +15,7 @@ import {
   zombies,
   RIVALS,
   DECOR_STARS,
+  crewCapForLevel,
   type WorkerState,
 } from '../sim';
 import { audio, sfx } from '../game/sfx';
@@ -173,8 +174,19 @@ export function openZombiepedia(hud: Hud) {
   hud.openModal(`<h2>${icon('ui_zombiepedia', 'h-ico')} Zombiepedia <span class="sub">${met}/${CUSTOMERS.length} met</span></h2><div class="pedia">${cards}</div><p class="small">Who shows up depends on your level and star rating. Rare customers get common once your stars beat their requirement.</p>`, { cls: 'wide' });
 }
 
-export function openLevelUp(hud: Hud, level: number) {
+export function openLevelUp(hud: Hud, from: number, level = from) {
   const unlocks: string[] = [];
+  for (let l = from; l < level; l++) collectUnlocks(l, unlocks);
+  collectUnlocks(level, unlocks);
+  hud.openModal(
+    `<div class="burst"><h2 class="big">LEVEL ${level}!</h2></div>${unlocks.length ? `<div class="unlocks">${unlocks.map((u) => `<div>${u}</div>`).join('')}</div>` : '<p>The joint grows more infamous…</p>'}<div class="actions"><button class="btn green" data-close>Sweet!</button></div>`,
+    { cls: 'narrow' },
+  );
+}
+
+function collectUnlocks(level: number, unlocks: string[]) {
+  const slots = crewCapForLevel(level) - crewCapForLevel(level - 1);
+  if (slots > 0) unlocks.push(`${icon('ui_crew', 'ico')} +${slots} crew slot${slots > 1 ? 's' : ''}`);
   for (const d of DISHES) if (d.source === 'level' && d.level === level) unlocks.push(`${icon(d.icon, 'ico')} ${d.name}`);
   for (const it of ITEMS) if (it.level === level) unlocks.push(`<img class="unl-ico" src="${itemThumb(it)}" alt=""/> ${it.name}`);
   for (const t of THEMES) if (t.level === level && t.id !== 'shack') unlocks.push(`${t.name} theme`);
@@ -182,10 +194,6 @@ export function openLevelUp(hud: Hud, level: number) {
   for (const e of EXPANSIONS) if (e.level === level) unlocks.push(`${icon('ui_expand', 'ico')} Expand to ${e.size}×${e.size}`);
   for (const r of RIVALS) if (r.level === level) unlocks.push(`${icon('ui_raid', 'ico')} Raid ${r.name}`);
   if (level === 2) unlocks.push(`${icon('ui_raid', 'ico')} The raid map!`);
-  hud.openModal(
-    `<div class="burst"><h2 class="big">LEVEL ${level}!</h2></div>${unlocks.length ? `<div class="unlocks">${unlocks.map((u) => `<div>${u}</div>`).join('')}</div>` : '<p>The joint grows more infamous…</p>'}<div class="actions"><button class="btn green" data-close>Sweet!</button></div>`,
-    { cls: 'narrow' },
-  );
 }
 
 export function openOffline(hud: Hud, r: { sec: number; cash: number }) {

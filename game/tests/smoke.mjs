@@ -293,8 +293,11 @@ await shot('expanded-roadhouse');
 
 // ---------- 6. raid: map → rival → squad → fight → result ----------
 await page.evaluate(() => {
-  for (const w of window.zbbq.ctl.state.workers) if (w.kind === 'zombie') (w.energy = w.stats.energy), (w.state = 'idle'), (w.path = []);
+  const s = window.zbbq.ctl.state;
+  for (const w of s.workers) if (w.kind === 'zombie') (w.energy = w.stats.energy), (w.state = 'idle'), (w.path = []);
+  s.xp = window.zbbq.sim.xpToNext(s.level) - 5; // the raid win will level us up mid-raid
 });
+const lvBefore = await page.evaluate(() => window.zbbq.ctl.state.level);
 await tapSel('[data-k="map"]', 'raid map');
 await wait(400);
 await shot('map');
@@ -332,9 +335,14 @@ for (let i = 0; i < 20; i++) {
 await wait(1200);
 log.result = await page.evaluate(() => window.zbbq.ctl.raidResult && { result: window.zbbq.ctl.raidResult.result, cash: window.zbbq.ctl.raidResult.cash });
 await shot('raid-result');
+check(await page.evaluate(() => !!document.querySelector('[data-a="home"]')), 'raid results card stays up even when the win levels you up');
 await tapSel('[data-a="home"]', 'home after raid');
 await wait(800);
 check((await page.evaluate(() => window.zbbq.ctl.mode)) === 'play', 'home after raid');
+check((await page.evaluate(() => window.zbbq.ctl.state.level)) > lvBefore, 'raid XP levelled up');
+check(await modalOpen(), 'queued level-up popup shows once home');
+await shot('levelup-after-raid');
+while (await modalOpen()) await closeModal();
 await shot('home-after-raid');
 
 // ---------- 7. reload: save/load keeps everything ----------

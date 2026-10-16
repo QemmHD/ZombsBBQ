@@ -513,7 +513,7 @@ LOOKS.construction = {
   },
   hairFront: (d, z) =>
     d.tone('M-16.4,-55.4C-17,-60 -15.8,-63 -13.4,-64.6L-10.6,-63.4C-12.2,-61 -12.8,-58 -12.8,-55.6Z', ['#2B211C', '#1A1412'], 1.4, [-0.5, -0.5]) + hardHat(d, ['#FFC23D', '#E09A10'], z),
-  hairBack: (d, z) => cel(d, backHairD(-6, -70), ['#2B211C', '#1A1412'], { off: [-1, -1], hi: 0.8 }) + hardHatBack(d, ['#FFC23D', '#E09A10'], z),
+  hairBack: (d, z) => cel(d, backHairD(3, -70), ['#2B211C', '#1A1412'], { off: [-1, -1], hi: 0.8 }) + hardHatBack(d, ['#FFC23D', '#E09A10'], z),
   face: 'smile',
   zface: 'underbite',
   beard: ['#2B211C', '#1A1412'],
@@ -1772,7 +1772,7 @@ LOOKS.you = {
   },
   hairFront: (d, z) =>
     d.tone('M-16.6,-55C-17.4,-60.4 -16,-63.4 -13.6,-64.6L-11.2,-63.2L-10.8,-60.2L-12.6,-58.6L-12.8,-55.4Z', ['#5A3420', '#3E2214'], 1.4, [-0.5, -0.5]) + hardHat(d, ['#FFD23D', '#E0A21A'], z, false),
-  hairBack: (d, z) => cel(d, backHairD(-6, -70), ['#5A3420', '#3E2214'], { off: [-1, -1], hi: 0.8 }) + hardHatBack(d, ['#FFD23D', '#E0A21A'], z),
+  hairBack: (d, z) => cel(d, backHairD(3, -70), ['#5A3420', '#3E2214'], { off: [-1, -1], hi: 0.8 }) + hardHatBack(d, ['#FFD23D', '#E0A21A'], z),
   face: 'smile',
   zface: 'droopy',
 };

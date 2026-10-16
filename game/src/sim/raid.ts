@@ -543,7 +543,10 @@ function nudge(r: RaidState, u: RaidUnit, dx: number, dy: number) {
   }
 }
 
-/** Units on the same side gently push apart so the horde doesn't stack on one tile. */
+/** Personal space (tiles): wide enough that brawlers fan out around a target instead of stacking. */
+const SEP = 0.62;
+
+/** Units gently push apart so the horde doesn't stack on one tile. */
 function separate(r: RaidState) {
   const list = r.units.filter((u) => alive(u) && u.speed > 0 && u.state !== 'queued');
   for (let i = 0; i < list.length; i++)
@@ -551,8 +554,8 @@ function separate(r: RaidState) {
       const a = list[i];
       const b = list[j];
       const d = dist(a, b);
-      if (d > 0.001 && d < 0.45) {
-        const push = (0.45 - d) * 0.5;
+      if (d > 0.001 && d < SEP) {
+        const push = (SEP - d) * 0.5;
         const dx = ((a.x - b.x) / d) * push;
         const dy = ((a.y - b.y) / d) * push;
         nudge(r, a, dx, dy);
