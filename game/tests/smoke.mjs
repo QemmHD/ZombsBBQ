@@ -247,8 +247,12 @@ await page.evaluate(() => {
   const { ctl, sim } = window.zbbq;
   const s = ctl.state;
   const g = s.stoves[0];
-  if (g.status === 'done' || g.status === 'burnt') sim.plateDish(s, g.id);
-  if (g.status !== 'empty') sim.cancelCooking(s, g.id);
+  // clear the stove: a done dish is carried to the counter by a worker (not instant), so tick until it's gone
+  if (g.status === 'cooking' || g.status === 'paused' || g.status === 'reserved') sim.cancelCooking(s, g.id);
+  for (let i = 0; i < 600 && g.status !== 'empty'; i++) {
+    if (g.status === 'done' || g.status === 'burnt') sim.plateDish(s, g.id);
+    ctl.update(0.1);
+  }
   const you = s.workers.find((w) => w.kind === 'you');
   sim.releaseJob(s, you);
   Object.assign(you, { state: 'idle', path: [] });
