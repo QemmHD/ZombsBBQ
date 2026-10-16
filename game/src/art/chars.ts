@@ -44,7 +44,7 @@ const WHITE: Tone = ['#FBF7EE', '#DCD3C0'];
 // ------------------------------------------------------------------ rig layout
 const HIP_Y = -19.5;
 const LEG_X = 4.6;
-const SH_X = 10.2;
+const SH_X = 11;
 const SH_Y = -40.6;
 const NECK: Pt = [0.5, -44];
 const TORSO_PIV: Pt = [0, -16];
@@ -85,6 +85,8 @@ interface Look {
   pale?: boolean;
   noBlush?: boolean;
   headBoxTop?: number;
+  /** Zombie face variant (0-2) so the zombie forms don't all share one face. */
+  zv?: 0 | 1 | 2;
 }
 
 // ------------------------------------------------------------------ small painters
@@ -168,7 +170,7 @@ function zeye(d: Doc, cx: number, cy: number, r: number, lid: number, tilt: numb
 }
 
 // ------------------------------------------------------------------ torso shapes
-function torsoD(torn: boolean, ws = 9.8, wh = 10.6, top = -44, bot = -16): string {
+function torsoD(torn: boolean, ws = 10.6, wh = 11.4, top = -44, bot = -16): string {
   const head =
     `M${f(-ws)},${f(top + 3.2)}C${f(-ws)},${f(top + 0.4)} ${f(-ws + 2.6)},${f(top - 0.8)} ${f(-ws + 5.5)},${f(top - 0.8)}` +
     `L${f(ws - 5.5)},${f(top - 0.8)}C${f(ws - 2.6)},${f(top - 0.8)} ${f(ws)},${f(top + 0.4)} ${f(ws)},${f(top + 3.2)}` +
@@ -191,7 +193,7 @@ function neck(d: Doc, skin: Tone): string {
 /** Pants waistband visible under a tucked shirt (clipped to the torso). */
 function waist(d: Doc, td: string, pants: Tone, belt?: string, buckle?: string): string {
   let s = d.clip(td, P(`M-14,-20.2H14V-12H-14Z`, pants[0]) + P(`M2,-20.2H14V-12H2Z`, pants[1]));
-  s += S('M-10.6,-20.2H10.6', 1.1);
+  s += S('M-11.4,-20.2H11.4', 1.1);
   if (belt) {
     s += d.clip(td, P('M-14,-21.6H14V-18.8H-14Z', belt) + S('M-14,-21.6H14M-14,-18.8H14', 0.9));
     if (buckle) s += P(rrect(-0.9, -22, 3, 3.6, 0.6), buckle, 0.9);
@@ -293,6 +295,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     glasses: true,
   },
   yoga: {
+    zv: 1,
     skin: ['#E0A878', '#BF8455'],
     pants: ['#7B4FC4', '#5A3698'],
     shoe: ['#FF7FB0', '#D9578A'],
@@ -307,15 +310,15 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
       const td = torsoD(false);
       let s = d.tone(td, sk);
       let tank =
-        'M-9.4,-43.4L-6.2,-43.6C-5.2,-38.2 6.2,-38.2 7.2,-43.6L10,-43.4C10.4,-36 10.6,-28 10.6,-21.4';
-      if (z) tank += zigzag([10.6, -21.4], [-10.6, -21.4], 4, -1.6).map(([x, y]) => `L${f(x)},${f(y)}`).join('');
-      else tank += 'L-10.6,-21.4';
-      tank += 'C-10.6,-28 -10.2,-36 -9.4,-43.4Z';
+        'M-10.2,-43.4L-6.2,-43.6C-5.2,-38.2 6.2,-38.2 7.2,-43.6L10.8,-43.4C11.2,-36 11.4,-28 11.4,-21.4';
+      if (z) tank += zigzag([11.4, -21.4], [-11.4, -21.4], 4, -1.6).map(([x, y]) => `L${f(x)},${f(y)}`).join('');
+      else tank += 'L-11.4,-21.4';
+      tank += 'C-11.4,-28 -11,-36 -10.2,-43.4Z';
       s += d.clip(td, d.tone(tank, ['#2EC4B6', '#1E978C'], OW * 0.8));
-      s += S('M-8.6,-31.6Q0.5,-29.6 9.8,-31.6', 0.9, '#1E978C');
+      s += S('M-9.4,-31.6Q0.5,-29.6 10.6,-31.6', 0.9, '#1E978C');
       // leggings waistband
       s += d.clip(td, P('M-14,-21H14V-12H-14Z', '#7B4FC4') + P('M3,-21H14V-12H3Z', '#5A3698') + S('M-14,-18.6H14', 1.2, '#FF7FB0'));
-      s += S('M-10.6,-21H10.6', 1.1) + S(td, OW);
+      s += S('M-11.4,-21H11.4', 1.1) + S(td, OW);
       if (z) s += rip(d, 4.4, -35.6, 0.8) + stain(-5, -26, 0.7, '#5E9A2A', 0.6);
       return s;
     },
@@ -338,6 +341,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     brow: '#A8772A',
   },
   teen: {
+    zv: 2,
     skin: ['#9C6440', '#7A4A2C'],
     pants: ['#3D5F9E', '#2B4675'],
     shoe: ['#F4F4F4', '#C9CED6'],
@@ -346,7 +350,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     sleeveCol: ['#E2453C', '#B32E28'],
     cuff: '#B32E28',
     torso: (d, z) => {
-      const td = torsoD(z, 10.2, 11.2);
+      const td = torsoD(z, 11, 12);
       let s = d.tone('M-8.8,-41.6C-10.6,-48.8 -4,-50.8 0.5,-50.8C5,-50.8 11.6,-48.8 9.8,-41.6Z', ['#C93A31', '#9E2822'], OW);
       s += d.tone(td, ['#E2453C', '#B32E28']);
       if (!z) s += d.clip(td, P('M-14,-19.6H14V-12H-14Z', '#B32E28') + S('M-14,-19.6H14', 1) + S('M-8,-19.4V-16M-4,-19.4V-16M0,-19.4V-16M4,-19.4V-16M8,-19.4V-16', 0.6, '#8E1F1A'));
@@ -374,6 +378,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     noBlush: true,
   },
   politician: {
+    zv: 1,
     skin: ['#F5CDB0', '#DDA88A'],
     pants: ['#26355E', '#1A2546'],
     shoe: ['#2A2A32', '#14141A'],
@@ -412,7 +417,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     sleeve: 'short',
     sleeveCol: ['#3D7DD8', '#2B5DA8'],
     torso: (d, z) => {
-      const td = torsoD(z, 10, 11);
+      const td = torsoD(z, 10.8, 11.8);
       let s = d.tone(td, ['#FF7A1A', '#D9561A']);
       s += d.clip(td, P('M-3.8,-45L0.5,-33.6L4.8,-45Z', '#3D7DD8', 1.1));
       s += S('M0.5,-33.6V-16', 1.1);
@@ -435,6 +440,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     noBlush: true,
   },
   nurse: {
+    zv: 2,
     skin: ['#F7D9B8', '#DDB08A'],
     pants: ['#FFFFFF', '#D5D8DC'],
     shoe: ['#FFFFFF', '#CDD3DA'],
@@ -444,13 +450,13 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     torso: (d, z) => {
       const bot = -11.6;
       let dress =
-        'M-9.8,-40.8C-9.8,-43.6 -7.2,-44.8 -4.3,-44.8L5.3,-44.8C8.2,-44.8 10.8,-43.6 10.8,-40.8L10.8,-33' +
-        `L13.2,${f(bot + 2)}`;
-      if (z) dress += zigzag([13.2, bot], [-12.2, bot], 6, -2).map(([x, y]) => `L${f(x)},${f(y)}`).join('');
-      else dress += `C13.2,${f(bot)} 12.4,${f(bot)} 11.4,${f(bot)}L-10.4,${f(bot)}C-11.4,${f(bot)} -12.2,${f(bot)} -12.2,${f(bot + 2)}`;
-      dress += 'L-9.8,-33Z';
+        'M-10.6,-40.8C-10.6,-43.6 -8,-44.8 -4.8,-44.8L5.8,-44.8C9,-44.8 11.6,-43.6 11.6,-40.8L11.6,-33' +
+        `L13.8,${f(bot + 2)}`;
+      if (z) dress += zigzag([13.8, bot], [-12.8, bot], 6, -2).map(([x, y]) => `L${f(x)},${f(y)}`).join('');
+      else dress += `C13.8,${f(bot)} 13,${f(bot)} 12,${f(bot)}L-11,${f(bot)}C-12,${f(bot)} -12.8,${f(bot)} -12.8,${f(bot + 2)}`;
+      dress += 'L-10.6,-33Z';
       let s = d.tone(dress, ['#F7A8C0', '#D97A98']);
-      s += S('M-9.8,-33.2C-4,-34.6 5,-34.6 10.8,-33.2', 1.2);
+      s += S('M-10.6,-33.2C-4,-34.6 5,-34.6 11.6,-33.2', 1.2);
       s += d.tone('M-6,-32.8C-3,-33.6 4,-33.6 7,-32.8L8.6,-14C3,-12.8 -2,-12.8 -7.6,-14Z', ['#FFFFFF', '#E1E4E8'], 1.1, [-0.6, -0.6]);
       s += P(rrect(-0.2, -27, 1.6, 6, 0.3), '#E2343B') + P(rrect(-2.4, -24.8, 6, 1.6, 0.3), '#E2343B');
       s += P('M-3.6,-44.8L0.5,-41.6L5,-44.8L3,-45.6L0.5,-43.8L-2,-45.6Z', '#FFFFFF', 1);
@@ -468,14 +474,15 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
       const nc = 'M-11.4,-69.6L-9.2,-79.6L13,-79.6L15.2,-69.6Q2,-72.6 -11.4,-69.6Z';
       const capG = d.tone(nc, ['#FFFFFF', '#DDE2E8'], OW, [-0.8, -0.8]) +
         P(rrect(1.1, -78.4, 1.8, 6, 0.3), '#E2343B') + P(rrect(-0.9, -76.4, 5.8, 1.8, 0.3), '#E2343B');
+      if (z) s += S('M-14,-66Q-18,-68 -18.4,-64.6M16,-63.6Q19.4,-64.4 19.6,-61', 1.1, '#8F3B1C');
       s += z ? G(capG, 'rotate(-10 2 -72)') : capG;
-      if (z) s += strays('#8F3B1C');
       return s;
     },
     face: 'smile',
     brow: '#8F3B1C',
   },
   cop: {
+    zv: 1,
     skin: ['#B97A4E', '#935A33'],
     pants: ['#22335F', '#17244A'],
     shoe: ['#2A2A32', '#14141A'],
@@ -513,6 +520,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     noBlush: true,
   },
   ceo: {
+    zv: 2,
     skin: ['#EAC09A', '#CC9A70'],
     pants: ['#3B3E46', '#26282E'],
     shoe: ['#1E1E24', '#0C0C10'],
@@ -569,7 +577,7 @@ const LOOKS: Record<HumanId | 'you' | 'gus', Look> = {
     sleeve: 'short',
     sleeveCol: ['#4A4F57', '#34383E'],
     torso: (d) => {
-      const td = torsoD(true, 10.4, 11.2);
+      const td = torsoD(true, 11.2, 12);
       let s = d.tone(td, ['#4A4F57', '#34383E']);
       s += apron(d, true, true);
       s += rip(d, -8, -38.4, 0.7);
@@ -610,15 +618,41 @@ function face(d: Doc, look: Look, z: boolean): string {
       }
       s += drool(-0.2, -47.2, 4.6, 1.7);
     } else {
-      s += zeye(d, -3.8, -57.4, 4.4, 0.42, -0.7, 0.6, 0.8);
-      s += zeye(d, 7, -56.8, 3.5, 0.3, 0.8, 0.4, 0.6);
-      s += S('M-8.4,-63.4Q-4,-64.8 -0.4,-62.6M4.4,-61.8Q7.6,-63.4 10.6,-61.4', 1.4, brow);
-      const m = 'M-1.6,-50.4C1.6,-51.2 6.4,-51.2 9,-52.2C8.4,-47.6 4.6,-45.6 2,-46.2C0,-46.8 -1.2,-48.4 -1.6,-50.4Z';
+      const v = look.zv ?? 0;
+      if (v === 1) {
+        s += zeye(d, -3.8, -57.4, 4.2, 0.3, 0.7, 0.8, 0.6);
+        s += zeye(d, 7, -56.8, 3.7, 0.52, -0.9, 0.2, 0.9);
+        s += S('M-8.4,-62.6Q-4,-64.6 -0.4,-63.2M4.4,-60.6Q7.6,-61.6 10.6,-60.8', 1.4, brow);
+      } else if (v === 2) {
+        s += zeye(d, -3.8, -57.2, 4.7, 0.36, -0.4, 1.4, 0.4);
+        s += zeye(d, 7.2, -56.8, 3.3, 0.22, 0.6, -0.8, 0.8);
+        s += S('M-8.8,-63.8Q-4,-65.2 0,-63M4.6,-62Q7.6,-63.8 10.6,-62.4', 1.4, brow);
+      } else {
+        s += zeye(d, -3.8, -57.4, 4.4, 0.42, -0.7, 0.6, 0.8);
+        s += zeye(d, 7, -56.8, 3.5, 0.3, 0.8, 0.4, 0.6);
+        s += S('M-8.4,-63.4Q-4,-64.8 -0.4,-62.6M4.4,-61.8Q7.6,-63.4 10.6,-61.4', 1.4, brow);
+      }
+      const m = v === 2
+        ? 'M-0.4,-50.2C2.4,-50.6 6.4,-50.8 8.4,-51.4C8,-48.2 5,-46.8 2.8,-47.2C1,-47.6 -0.2,-48.6 -0.4,-50.2Z'
+        : 'M-1.6,-50.4C1.6,-51.2 6.4,-51.2 9,-52.2C8.4,-47.6 4.6,-45.6 2,-46.2C0,-46.8 -1.2,-48.4 -1.6,-50.4Z';
       s += P(m, MOUTH, 1.1) + d.clip(m, P(ell(4.6, -45.8, 3, 1.6), TONGUE));
-      s += tooth(0.6, -50.8, 2, 2.2) + tooth(5.4, -51.4, 1.8, 2);
-      s += drool(0, -48, 4.6, 1.7);
+      if (v === 2) {
+        s += tooth(3.2, -50.8, 2, 2.2);
+        s += P('M4.4,-47.6C4.2,-45 5.4,-43.8 6.8,-44.2C8,-44.6 8,-46.4 7.4,-48Z', TONGUE, 1);
+        s += drool(1.2, -48, 4, 1.5);
+      } else {
+        s += v === 1 ? tooth(2.4, -50.9, 2, 2.2) + tooth(6.4, -51.6, 1.6, 1.8) : tooth(0.6, -50.8, 2, 2.2) + tooth(5.4, -51.4, 1.8, 2);
+        s += drool(v === 1 ? 7.6 : 0, v === 1 ? -49.6 : -48, 4.6, 1.7);
+      }
     }
     s += S('M2.4,-55Q4.6,-54.4 3.4,-52.4', 1, ZDEEP);
+    if (look.mustache) {
+      // the cop keeps his (now rather droopy) mustache
+      s += d.tone('M-2.6,-51.4C-1,-54.2 2.4,-53.8 3.8,-52.2C5.2,-54 8.8,-54.4 10,-51.6C10.6,-49.4 9.6,-48.4 9.2,-49.6C7.8,-50.8 5.4,-50.8 3.8,-51C2.2,-50.4 -0.8,-50.4 -2,-49.2C-2.8,-49.6 -3,-50.4 -2.6,-51.4Z', look.mustache, 1.1, [-0.4, -0.4]);
+    }
+    if (look.beard) {
+      s += P('M-12.6,-52C-11,-45 -5,-42.4 2,-42.6C9,-42.6 15.6,-46 17,-53C14,-49.6 11.6,-48.6 10,-49L8.6,-45.6L7,-47.2C5,-45 0,-45 -2,-47.4L-3.4,-45.6L-4.4,-49.4C-7,-49 -10,-49.8 -12.6,-52Z', look.beard, 1.2);
+    }
     s += stitches(-11.6, -63.4, -6.2, -66.8, 2);
     s += P(ell(12.4, -65, 2, 1.4), PATCH);
     return s;
@@ -682,7 +716,7 @@ function face(d: Doc, look: Look, z: boolean): string {
   }
   if (look.pale) {
     // tired under-eye bags: Patient Zero is not feeling great
-    s += S('M-6,-53.8Q-3.6,-52.6 -1.4,-53.8M5,-53.6Q6.8,-52.6 8.6,-53.6', 0.8, '#B49AC0');
+    s += S('M-5.8,-53.6Q-3.6,-52.6 -1.6,-53.6M5.2,-53.4Q6.8,-52.6 8.4,-53.4', 0.7, '#C4A8A8', 'opacity="0.8"');
   }
   return s;
 }
@@ -763,7 +797,7 @@ function armPart(key: string, look: Look, z: boolean, side: -1 | 1): CharPart {
   const sx = side * SH_X;
   const sh: Pt = [sx, SH_Y];
   const wrist: Pt = [sx + side * 2.3, -28];
-  const hand: Pt = [sx + side * 2.6, -25.4];
+  const hand: Pt = [sx + side * 2.6, -25.2];
   return part(key, [sx - 9, -48, sx + 9, -17], sh, (d) => {
     const sk = z ? ZSK : look.skin;
     const shapes: string[] = [];
@@ -794,9 +828,9 @@ function armPart(key: string, look: Look, z: boolean, side: -1 | 1): CharPart {
       shapes.push(sl);
       if (look.bandage && near) {
         const bd = G(
-          P(rrect(-2.9, -2.4, 5.8, 4.8, 1.2), '#FFFFFF', 1.1) + S('M-1,-2.4V2.4M1,-2.4V2.4', 0.6, '#C9C2B4') +
-            P(ell(1.6, -0.2, 0.7), '#E06A6A', 0, OUT, 'opacity="0.55"'),
-          `translate(${f(sx + side * 1.9)} -30.6) rotate(${f(-side * 8)})`,
+          P(rrect(-3.4, -2.8, 6.8, 5.6, 1.4), '#FFFFFF', 1.1) + S('M-3.2,-0.8L3.2,-2M-3.2,1.4L3.2,0.2', 0.7, '#C9C2B4') +
+            P(ell(0.8, 0.2, 0.9), '#E06A6A', 0, OUT, 'opacity="0.5"') + S('M3,1.6l1.6,1.6', 1, '#FFFFFF'),
+          `translate(${f(sx + side * 1.8)} -31.4) rotate(${f(-side * 10)})`,
         );
         s += bd;
       }
@@ -808,8 +842,8 @@ function armPart(key: string, look: Look, z: boolean, side: -1 | 1): CharPart {
     if (look.wristband) s += P(rrect(wrist[0] - 2.8, wrist[1] - 1, 5.6, 2.4, 0.8), look.wristband, 0.9);
     if (look.watch && near) s += P(rrect(wrist[0] - 2.8, wrist[1] - 0.6, 5.6, 2.2, 0.6), '#FFC83D', 0.9);
     // mitt hand with a thumb nub
-    const hd = ell(hand[0], hand[1], 3.6, 3.4);
-    const thumb = ell(hand[0] + 2.4, hand[1] - 1.4, 1.5, 1.3);
+    const hd = ell(hand[0], hand[1], 3.9, 3.7);
+    const thumb = ell(hand[0] - side * 2.6, hand[1] - 1.5, 1.6, 1.4); // thumbs point toward the body
     s += d.tone(thumb, sk, OW * 0.75, [-0.4, -0.4]);
     s += d.tone(hd, sk, OW, [-0.7, -0.7]);
     s += S(`M${f(hand[0] - 0.6)},${f(hand[1] + 0.8)}l0.3,1.8M${f(hand[0] + 1)},${f(hand[1] + 0.6)}l0.4,1.8`, 0.8, darker(sk[1]));

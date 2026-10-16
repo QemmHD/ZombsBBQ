@@ -51,9 +51,9 @@ export function accessTile(s: GameState, f: Furniture): Pt {
 function seatNeighbor(s: GameState, seat: Furniture): Pt {
   const blocked = blockedTiles(s);
   const cands = [
-    { x: seat.x - 1, y: seat.y },
-    { x: seat.x + 1, y: seat.y },
-    { x: seat.x, y: seat.y + seat.side! },
+    { x: seat.x, y: seat.y + 1 },
+    { x: seat.x, y: seat.y - 1 },
+    { x: seat.x + seat.side!, y: seat.y },
   ];
   return cands.find((c) => isFree(c.x, c.y, blocked)) ?? cands[0];
 }
@@ -311,8 +311,13 @@ function spawnCustomers(s: GameState, dt: number) {
   if (present >= target) return;
   const st = stars(s);
   const pool = CUSTOMERS.filter((d) => d.minLevel <= s.level && d.minStars <= st);
-  let r = rand(s) * pool.reduce((a, d) => a + d.weight, 0);
-  const def = pool.find((d) => (r -= d.weight) < 0) ?? pool[0];
+  // gentle anti-streak: recently seen types are less likely, so the crowd stays varied
+  const recent = (s.recentTypes ??= []);
+  const w = (id: string, base: number) => base * (recent.includes(id) ? 0.25 : 1);
+  let r = rand(s) * pool.reduce((a, d) => a + w(d.id, d.weight), 0);
+  const def = pool.find((d) => (r -= w(d.id, d.weight)) < 0) ?? pool[0];
+  recent.push(def.id);
+  if (recent.length > 2) recent.shift();
   const at = spawnPoint(s);
   const c: Customer = {
     id: `c${s.nextId++}`,
@@ -345,7 +350,7 @@ function updateCustomer(s: GameState, c: Customer, dt: number) {
       if (move(c, dt)) {
         c.state = 'waiting';
         const seat = furnById(s, c.seatId!);
-        if (seat) faceTowards(c, seat.x, seat.y - seat.side!);
+        if (seat) faceTowards(c, seat.x - seat.side!, seat.y);
       }
       break;
     }

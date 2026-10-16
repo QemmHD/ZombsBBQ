@@ -278,6 +278,9 @@ body {
   max-width: min(440px, 52vw);
   transition: opacity 0.3s, transform 0.3s;
 }
+.card-open .hint {
+  max-width: calc(100vw - min(330px, 46vw) - var(--safe-l) - var(--safe-r) - 84px);
+}
 .hint.hidden {
   opacity: 0;
   transform: translateY(20px);

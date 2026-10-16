@@ -10,7 +10,7 @@ export interface Furniture {
   y: number;
   /** bench: which table it belongs to */
   tableId?: string;
-  /** bench: side of the table (-1 = up-right side, +1 = down-left side) */
+  /** bench: side of the table along x (-1 = bench at table.x - 1, drawn behind; +1 = at table.x + 1, in front) */
   side?: -1 | 1;
   locked?: boolean;
 }
@@ -116,6 +116,8 @@ export interface GameState {
   customers: Customer[];
   workers: Worker[];
   spawnCooldown: number;
+  /** last few customer types, to keep the crowd varied */
+  recentTypes?: string[];
   tut: number;
   tutTimer: number;
   freeInfects: number;
@@ -189,13 +191,13 @@ export function createInitialState(seed = 1234): GameState {
   // Picnic tables, each with a bench on either side (one seat per bench).
   for (const [tx, ty] of [
     [3, 3],
-    [6, 3],
-    [4, 6],
+    [6, 4],
+    [3, 6],
   ]) {
     const t = add({ kind: 'table', x: tx, y: ty });
-    add({ kind: 'bench', x: tx, y: ty - 1, tableId: t.id, side: -1 });
-    add({ kind: 'bench', x: tx, y: ty + 1, tableId: t.id, side: 1 });
+    add({ kind: 'bench', x: tx - 1, y: ty, tableId: t.id, side: -1 });
+    add({ kind: 'bench', x: tx + 1, y: ty, tableId: t.id, side: 1 });
   }
-  s.workers.push(makeWorker(s, 'you', 'you', { x: DOOR_X - 2, y: 1 }));
+  s.workers.push(makeWorker(s, 'you', 'you', { x: DOOR_X - 1, y: 2 }));
   return s;
 }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CHAR_IDS, TILE_H, TILE_W, WALL_H, buildChar, buildProps, type CharArt } from '../art';
+import { CHAR_IDS, PROP_META, TILE_H, TILE_W, WALL_H, buildChar, buildProps, type CharArt } from '../art';
 import {
   DOOR_X,
   LOT_MAX,
@@ -85,7 +85,7 @@ export class JointScene extends Phaser.Scene {
     this.setupCamera();
     this.setupInput();
     this.ctl.onEvent((e) => this.fx(e));
-    this.scale.on('resize', () => this.applyZoom());
+    this.scale.on('resize', () => this.applyZoom(true));
   }
 
   // ---------- static world ----------
@@ -114,24 +114,17 @@ export class JointScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Walls: wall_r runs along the room's back-right edge (gy = 0), wall_l along the back-left edge (gx = 0).
-   * Each segment image is TILE_W/2 wide; its bottom edge is the tile edge it stands on.
-   */
+  /** Walls (art contract): wall_r sits on each tile's upper-right edge along gy = 0, wall_l on the upper-left edge along gx = 0. */
   private buildWalls() {
     for (let gx = 0; gx < ROOM_N; gx++) {
       const c = iso(gx, 0);
-      // back-right edge of tile (gx,0): from its top corner (c.x, c.y - H/2) to right corner (c.x + W/2, c.y)
       const key = gx === DOOR_X ? 'wall_r_door' : gx === 1 ? 'wall_r_menu' : 'wall_r';
-      const i = this.add.image(c.x, c.y - TILE_H / 2, key).setScale(1 / TEX_S).setOrigin(0, WALL_H / (WALL_H + TILE_H / 2));
-      i.setDepth(depthOf(gx, 0) - 6);
+      this.img(key, c.x + TILE_W / 4, c.y).setDepth(depthOf(gx, 0) - 6);
     }
     for (let gy = 0; gy < ROOM_N; gy++) {
       const c = iso(0, gy);
-      // back-left edge of tile (0,gy): from its left corner (c.x - W/2, c.y) to top corner (c.x, c.y - H/2)
       const key = gy === 1 ? 'wall_l_sign' : gy === 5 ? 'wall_l_window' : 'wall_l';
-      const i = this.add.image(c.x, c.y - TILE_H / 2, key).setScale(1 / TEX_S).setOrigin(1, WALL_H / (WALL_H + TILE_H / 2));
-      i.setDepth(depthOf(0, gy) - 6);
+      this.img(key, c.x - TILE_W / 4, c.y).setDepth(depthOf(0, gy) - 6);
     }
   }
 
@@ -141,17 +134,17 @@ export class JointScene extends Phaser.Scene {
     const s = this.ctl.state;
     for (const f of s.furniture) {
       let key: string = f.kind;
-      if (f.kind === 'bench') key = f.side === -1 ? 'bench_r' : 'bench_l';
+      if (f.kind === 'bench') key = f.side === -1 ? 'bench_l' : 'bench_r';
       if (f.kind === 'keg') key = 'barrel_keg';
       const p = iso(f.x, f.y);
-      const i = this.img(key, p.x, p.y).setDepth(depthOf(f.x, f.y) + (f.kind === 'bench' && f.side === -1 ? -3 : 1));
-      if (f.locked) i.setTint(0x777777).setAlpha(0.75);
+      const i = this.img(key, p.x, p.y).setDepth(depthOf(f.x, f.y) + 1);
+      if (f.locked) i.setTint(0x8a8a8a);
       this.furnViews.set(f.id, i);
     }
     for (const st of s.stoves) {
       const f = s.furniture.find((x) => x.id === st.furnitureId)!;
       const p = iso(f.x, f.y);
-      const fire = st.kind === 'grill' ? this.img('grill_fire', p.x, p.y - 24).setDepth(depthOf(f.x, f.y) + 2).setVisible(false) : undefined;
+      const fire = st.kind === 'grill' ? this.img('grill_fire', p.x, p.y - PROP_META.grillTopZ).setDepth(depthOf(f.x, f.y) + 2).setVisible(false) : undefined;
       const dish = this.img('dish_hotdog', p.x, p.y - 44).setDepth(depthOf(f.x, f.y) + 4).setVisible(false);
       const badge = this.img('fx_alert', p.x + 16, p.y - 56).setDepth(depthOf(f.x, f.y) + 5).setVisible(false);
       const ring = this.add.graphics().setDepth(depthOf(f.x, f.y) + 5);
@@ -160,9 +153,9 @@ export class JointScene extends Phaser.Scene {
     for (const slot of s.counter) {
       const f = s.furniture.find((x) => x.id === slot.furnitureId)!;
       const p = iso(f.x, f.y);
-      const dish = this.img('dish_hotdog', p.x, p.y - 28).setDepth(depthOf(f.x, f.y) + 2).setVisible(false);
+      const dish = this.img('dish_hotdog', p.x, p.y - PROP_META.counterTopZ).setDepth(depthOf(f.x, f.y) + 2).setVisible(false);
       const text = this.add
-        .text(p.x + 14, p.y - 40, '', { fontFamily: 'Arial Rounded MT Bold, Arial, sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#fff', backgroundColor: '#8e1b2e', padding: { x: 3, y: 1 } })
+        .text(p.x + 16, p.y - PROP_META.counterTopZ - 14, '', { fontFamily: 'Arial Rounded MT Bold, Arial, sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#fff', backgroundColor: '#8e1b2e', padding: { x: 3, y: 1 } })
         .setResolution(TEX_S)
         .setOrigin(0.5)
         .setDepth(depthOf(f.x, f.y) + 3);
@@ -174,28 +167,38 @@ export class JointScene extends Phaser.Scene {
 
   private setupCamera() {
     const cam = this.cameras.main;
-    const c = iso(ROOM_N / 2 - 0.5, ROOM_N / 2 - 0.5);
-    cam.centerOn(c.x, c.y - 10);
     const tl = iso(LOT_MIN, LOT_MAX);
     const br = iso(LOT_MAX, LOT_MIN);
     const top = iso(LOT_MIN, LOT_MIN);
     const bottom = iso(LOT_MAX, LOT_MAX);
     cam.setBounds(tl.x, top.y - WALL_H, br.x - tl.x, bottom.y - top.y + WALL_H);
-    this.applyZoom();
+    this.applyZoom(true);
   }
 
+  /** CSS-pixel zoom that fits the whole room (walls included) between the awning and the side buttons. */
   private baseZoom() {
-    // fit the room comfortably on an iPhone in landscape
-    const cssH = this.scale.height / (window.devicePixelRatio || 1);
-    const cssW = this.scale.width / (window.devicePixelRatio || 1);
-    const roomW = ROOM_N * TILE_W + 40;
-    const roomH = ROOM_N * TILE_H + WALL_H + 40;
-    return Math.min(cssW / roomW, cssH / roomH) * 1.12;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = this.scale.width / dpr;
+    const cssH = this.scale.height / dpr;
+    const availW = cssW - 2 * 76;
+    const availH = cssH - 58;
+    const roomW = ROOM_N * TILE_W;
+    const roomH = ROOM_N * TILE_H + WALL_H;
+    return Math.min(availW / roomW, availH / roomH) * 1.06;
   }
 
-  private applyZoom() {
+  private applyZoom(recenter = false) {
     const dpr = window.devicePixelRatio || 1;
-    this.cameras.main.setZoom(this.baseZoom() * this.userZoom * dpr);
+    const z = this.baseZoom() * this.userZoom;
+    const cam = this.cameras.main;
+    const keep = recenter ? null : { x: cam.midPoint.x, y: cam.midPoint.y };
+    cam.setZoom(z * dpr);
+    if (keep) cam.centerOn(keep.x, keep.y);
+    else {
+      // room center, nudged down so the back walls clear the awning
+      const c = iso(ROOM_N / 2 - 0.5, ROOM_N / 2 - 0.5);
+      cam.centerOn(c.x, c.y - WALL_H / 2 - 26 / z);
+    }
   }
 
   private setupInput() {
@@ -246,8 +249,24 @@ export class JointScene extends Phaser.Scene {
     return [this.input.pointer1, this.input.pointer2].filter((p) => p && p.isDown);
   }
 
+  private stoveAt(wx: number, wy: number) {
+    const s = this.ctl.state;
+    for (const off of [0, 22, 44]) {
+      const t = worldToIso(wx, wy + off, TILE_W, TILE_H);
+      const f = s.furniture.find((x) => x.x === Math.round(t.x) && x.y === Math.round(t.y));
+      const st = f && s.stoves.find((x) => x.furnitureId === f.id);
+      if (st) return st;
+    }
+    return undefined;
+  }
+
   private tap(wx: number, wy: number) {
     const s = this.ctl.state;
+    // with a cook selected, a tap on a stove means "cook here", even if someone stands in front of it
+    if (this.ctl.selection?.kind === 'worker') {
+      const st = this.stoveAt(wx, wy);
+      if (st) return this.ctl.tapStove(st.id);
+    }
     // characters first (front-most wins)
     let best: { id: string; kind: 'w' | 'c'; depth: number } | null = null;
     const consider = (id: string, kind: 'w' | 'c') => {
@@ -422,8 +441,14 @@ export class JointScene extends Phaser.Scene {
   private syncCustomer(c: Customer, dt: number) {
     const v = this.ensureChar(c.id, c.type);
     const p = iso(c.x, c.y);
-    const seated = c.state === 'waiting' || c.state === 'eating';
-    v.root.setPosition(p.x, p.y + (seated ? -4 : 0)).setDepth(depthOf(c.x, c.y) + (seated ? -1 : 5));
+    const seated = (c.state === 'waiting' || c.state === 'eating') && c.path.length === 0;
+    if (seated) {
+      const seat = this.ctl.state.furniture.find((f) => f.id === c.seatId);
+      const off = seat?.side === 1 ? PROP_META.bench_r : PROP_META.bench_l;
+      p.x += off.dx;
+      p.y += off.dy - PROP_META.seatZ + 16;
+    }
+    v.root.setPosition(p.x, p.y).setDepth(depthOf(c.x, c.y) + (seated ? 3 : 5));
     v.body.scaleX = c.facing;
     v.body.rotation = 0;
     v.body.y = 0;
@@ -452,7 +477,7 @@ export class JointScene extends Phaser.Scene {
     this.ctl.update(dt);
     const s = this.ctl.state;
     if (this.furnViews.size !== s.furniture.length || [...this.furnViews.keys()].some((id) => !s.furniture.find((f) => f.id === id))) this.rebuildFurniture();
-    for (const f of s.furniture) this.furnViews.get(f.id)?.setTint(f.locked ? 0x777777 : 0xffffff).setAlpha(f.locked ? 0.75 : 1);
+    for (const f of s.furniture) this.furnViews.get(f.id)?.setTint(f.locked ? 0x8a8a8a : 0xffffff);
 
     const alive = new Set<string>();
     for (const w of s.workers) {

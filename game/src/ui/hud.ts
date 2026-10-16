@@ -72,6 +72,7 @@ export class Hud {
   private lastCash = -1;
   private lastSauce = -1;
   private lastTut = -1;
+  private lastStructure = '';
 
   constructor(private ctl: Controller) {
     this.root = document.getElementById('hud')!;
@@ -226,6 +227,8 @@ export class Hud {
     const card = this.el.card;
     if (!sel) {
       card.classList.add('hidden');
+      this.root.classList.remove('card-open');
+      this.lastStructure = '';
       return;
     }
     let html = '';
@@ -233,19 +236,19 @@ export class Hud {
       const w = s.workers.find((x) => x.id === sel.id);
       if (!w) return this.ctl.select(null);
       const f = w.energy / w.stats.energy;
+      const resting = w.state === 'resting' || w.state === 'toRest';
       let state = WORKER_STATE[w.state];
       if (w.state === 'cooking') {
         const st = s.stoves.find((x) => x.id === w.stoveId);
         if (st?.dish) state = `Cooking ${DISH_BY_ID[st.dish].name} · ${fmtTime((st.doneAt ?? 0) - s.now)}`;
       }
-      const resting = w.state === 'resting' || w.state === 'toRest';
-      const warn = w.kind === 'zombie' && f <= attackThreshold(w.stats.patience) + 0.1 ? ' ⚠️ about to bite!' : '';
+      const warn = w.kind === 'zombie' && !resting && f <= attackThreshold(w.stats.patience) + 0.1 ? ' ⚠️ about to bite!' : '';
       html = `
         <div class="row"><div class="portrait"><img src="${headUrl(charIdFor(w))}" alt=""/></div>
         <div style="flex:1"><h3>${w.name}</h3><div class="sub">${w.kind === 'you' ? 'Patient Zero · the Boss' : `${CUSTOMER_BY_ID[w.type].name}, ex-customer`}</div>
-        <div class="bar"><i style="width:${f * 100}%;background:${energyColor(f)}"></i></div>
-        <div class="state">Energy ${Math.floor(w.energy)}/${w.stats.energy}${warn}</div></div></div>
-        <div class="state">${state}</div>
+        <div class="bar"><i data-live="ebar" style="width:${f * 100}%;background:${energyColor(f)}"></i></div>
+        <div class="state" data-live="etext">Energy ${Math.floor(w.energy)}/${w.stats.energy}${warn}</div></div></div>
+        <div class="state" data-live="state">${state}</div>
         <div class="chips"><span class="chip">SPD ${w.stats.speed}</span><span class="chip">PWR ${w.stats.power}</span><span class="chip">TIPS ${w.stats.tips}</span><span class="chip">FOCUS ${w.stats.focus}</span><span class="chip">PATIENCE ${w.stats.patience}</span></div>
         <div class="actions">
           ${resting ? `<button class="btn blue" data-a="wake">Back to work</button>` : `<button class="btn blue" data-a="rest" ${w.state === 'cooking' ? 'disabled' : ''}>Rest 💤</button>`}
@@ -265,7 +268,7 @@ export class Hud {
       html = `
         <div class="row"><div class="portrait"><img src="${headUrl(c.type)}" alt=""/></div>
         <div style="flex:1"><h3>${def.name}</h3><div class="sub">${c.state === 'eating' ? 'Chowing down' : c.state === 'waiting' ? 'Waiting for food' : 'Walking in'}</div>
-        ${c.state === 'waiting' ? `<div class="bar"><i style="width:${(c.waitLeft / 50) * 100}%;background:${energyColor(c.waitLeft / 50)}"></i></div>` : ''}</div>
+        ${c.state === 'waiting' ? `<div class="bar"><i data-live="wait" style="width:${(c.waitLeft / 50) * 100}%;background:${energyColor(c.waitLeft / 50)}"></i></div>` : ''}</div>
         <div class="portrait" title="Zombie form"><img src="${headUrl(`${c.type}_z`)}" alt=""/></div></div>
         <div class="chips"><span class="chip">SPD ${def.stats.speed}</span><span class="chip">PWR ${def.stats.power}</span><span class="chip">TIPS ${def.stats.tips}</span><span class="chip">FOCUS ${def.stats.focus}</span><span class="chip">PATIENCE ${def.stats.patience}</span></div>
         <div class="actions"><button class="btn infect" data-a="infect" ${full ? 'disabled' : ''}>INFECT · ${costTxt}</button></div>
@@ -279,7 +282,7 @@ export class Hud {
       else if (st.status === 'cooking' && st.dish) {
         const d = DISH_BY_ID[st.dish];
         const p = 1 - ((st.doneAt ?? 0) - s.now) / d.cookSec;
-        body = `<div class="state">Cooking ${d.name} · ${fmtTime((st.doneAt ?? 0) - s.now)} left</div><div class="bar"><i style="width:${p * 100}%;background:#ff8a1f"></i></div>`;
+        body = `<div class="state" data-live="cook">Cooking ${d.name} · ${fmtTime((st.doneAt ?? 0) - s.now)} left</div><div class="bar"><i data-live="cbar" style="width:${p * 100}%;background:#ff8a1f"></i></div>`;
       } else if (st.status === 'reserved') body = `<div class="state">The cook is on the way…</div>`;
       else body = `<div class="state">Empty. Tap a cook (YOU or a zombie), then this ${st.kind}.</div>`;
       html = `<h3>${name}</h3><div class="sub">Station</div>${body}`;
@@ -291,7 +294,30 @@ export class Hud {
         .join('');
       html = `<h3>What should ${w?.kind === 'you' ? 'you' : w?.name ?? 'they'} cook?</h3><div class="sub">${st.kind === 'grill' ? 'Rusty Grill' : 'Barrel Smoker'}</div>${rows}`;
     }
-    card.innerHTML = `<button class="x" data-a="close" aria-label="Close">✕</button>${html}`;
+    const full = `<button class="x" data-a="close" aria-label="Close">✕</button>${html}`;
+    // Only rebuild when the card's structure changes; otherwise patch the live bars/text in place,
+    // so buttons are never swapped out from under a finger mid-tap.
+    const tpl = document.createElement('template');
+    tpl.innerHTML = full;
+    const live = [...tpl.content.querySelectorAll<HTMLElement>('[data-live]')].map((n) => {
+      const v = { k: n.dataset.live!, text: n.textContent ?? '', style: n.getAttribute('style') ?? '' };
+      n.textContent = '';
+      n.removeAttribute('style');
+      return v;
+    });
+    const structure = `${sel.kind}:${tpl.innerHTML}`;
+    this.root.classList.add('card-open');
+    if (structure === this.lastStructure && !card.classList.contains('hidden')) {
+      for (const v of live) {
+        const n = card.querySelector<HTMLElement>(`[data-live="${v.k}"]`);
+        if (!n) continue;
+        if (n.textContent !== v.text) n.textContent = v.text;
+        if ((n.getAttribute('style') ?? '') !== v.style) n.setAttribute('style', v.style);
+      }
+      return;
+    }
+    this.lastStructure = structure;
+    card.innerHTML = full;
     card.classList.remove('hidden');
     card.querySelectorAll<HTMLElement>('[data-a]').forEach((b) => {
       b.onclick = () => this.action(b.dataset.a!);
