@@ -1,0 +1,186 @@
+import { DISH_BY_ID } from './data';
+import { GOALS, type GoalDef } from './catalog';
+import { isInside, key } from './grid';
+import type { GameState, Pet } from './state';
+import { addToCounter, addXp, blockedTiles, furnById, itemOf, move, rand, setPath, stars, zombies } from './sim';
+
+// ---------- goals (the clipboard) ----------
+
+export function goalComplete(s: GameState, id: string): boolean {
+  const z = zombies(s).length;
+  const st = stars(s);
+  const beat = (r: string) => (s.rivals[r]?.wins ?? 0) > 0;
+  switch (id) {
+    case 'cook1':
+      return Object.keys(s.stats.cooked).length > 0;
+    case 'serve10':
+      return s.stats.served >= 10;
+    case 'infect1':
+      return s.stats.infected >= 1;
+    case 'buydecor':
+      return s.stats.purchases >= 1;
+    case 'zombies2':
+      return z >= 2;
+    case 'wall1':
+      return s.walls.length >= 2;
+    case 'level3':
+      return s.level >= 3;
+    case 'raid1':
+      return beat('chuck');
+    case 'study1':
+      return s.stats.studied >= 1;
+    case 'stars2':
+      return st >= 2;
+    case 'expand1':
+      return s.roomN > 8;
+    case 'smoker':
+      return (s.stats.cooked.pork ?? 0) > 0;
+    case 'money1':
+      return s.furniture.some((f) => itemOf(f).kind === 'moneymaker');
+    case 'zombies4':
+      return z >= 4;
+    case 'raid2':
+      return beat('hank');
+    case 'theme1':
+      return s.ownedThemes.length > 1;
+    case 'pet1':
+      return s.pets.length > 0;
+    case 'stars3':
+      return st >= 3;
+    case 'rare1':
+      return s.stats.infectedRare >= 1;
+    case 'raid3':
+      return beat('vera');
+    case 'fryer':
+      return (s.stats.cooked.rings ?? 0) > 0;
+    case 'zombies7':
+      return z >= 7;
+    case 'raid4':
+      return beat('crunch');
+    case 'stars4':
+      return st >= 4;
+    case 'raid5':
+      return beat('snob');
+    case 'stars5':
+      return st >= 5;
+  }
+  return false;
+}
+
+/** The next three unclaimed goals, in order. */
+export function activeGoals(s: GameState): (GoalDef & { done: boolean })[] {
+  return GOALS.filter((g) => !s.goalsDone.includes(g.id))
+    .slice(0, 3)
+    .map((g) => ({ ...g, done: goalComplete(s, g.id) }));
+}
+
+export function claimGoal(s: GameState, id: string): string | null {
+  const g = GOALS.find((x) => x.id === id);
+  if (!g || s.goalsDone.includes(id)) return 'Already claimed.';
+  if (!activeGoals(s).some((x) => x.id === id)) return 'Finish the earlier goals first.';
+  if (!goalComplete(s, id)) return 'Not done yet!';
+  s.goalsDone.push(id);
+  s.cash += g.reward.cash ?? 0;
+  s.sauce += g.reward.sauce ?? 0;
+  if (g.reward.xp) addXp(s, g.reward.xp);
+  return null;
+}
+
+// ---------- the fridge ----------
+
+export function serveFromFridge(s: GameState, index: number): string | null {
+  const it = s.fridge[index];
+  if (!it) return 'Nothing there.';
+  const err = addToCounter(s, it.dish, it.servings);
+  if (err) return err;
+  s.fridge.splice(index, 1);
+  return null;
+}
+
+/** Studying a stolen dish teaches you its recipe (and uses it up), like the original's fridge. */
+export function studyFromFridge(s: GameState, index: number): string | null {
+  const it = s.fridge[index];
+  if (!it) return 'Nothing there.';
+  const d = DISH_BY_ID[it.dish];
+  if (d.source !== 'raid') return 'You already know how to make this one. Serve it instead!';
+  if (s.recipes.includes(d.id)) return 'Already in your cookbook. Serve it instead!';
+  s.recipes.push(d.id);
+  s.stats.studied++;
+  s.fridge.splice(index, 1);
+  return null;
+}
+
+// ---------- money-makers ----------
+
+export function payoutReady(s: GameState, furnitureId: string): boolean {
+  const f = furnById(s, furnitureId);
+  return !!f && f.payoutAt !== undefined && s.now >= f.payoutAt;
+}
+
+export function collectPayout(s: GameState, furnitureId: string): number {
+  const f = furnById(s, furnitureId);
+  const def = f && itemOf(f);
+  if (!f || !def?.payout || !payoutReady(s, furnitureId)) return 0;
+  s.cash += def.payout.cash;
+  s.stats.earned += def.payout.cash;
+  f.payoutAt = s.now + def.payout.everySec;
+  s.events.push({ t: 'payout', furnitureId, amount: def.payout.cash });
+  return def.payout.cash;
+}
+
+// ---------- pets ----------
+
+function syncPets(s: GameState) {
+  for (const f of s.furniture) {
+    const def = itemOf(f);
+    if (def.kind !== 'pethouse' || !def.pet) continue;
+    if (s.pets.some((p) => p.homeId === f.id)) continue;
+    s.pets.push({ id: `p${s.nextId++}`, type: def.pet, homeId: f.id, x: f.x + 1, y: f.y, path: [], speed: 0, facing: 1, nextAction: s.now + 5, state: 'roam' });
+  }
+  s.pets = s.pets.filter((p) => s.furniture.some((f) => f.id === p.homeId));
+}
+
+function updatePet(s: GameState, p: Pet, dt: number) {
+  if (p.state === 'raiding') return;
+  move(p, dt);
+  if (s.now < p.nextAction || p.path.length) return;
+  if (p.state === 'sniff') {
+    // the Zombie Pug sniffs out loose change, like a furry metal detector
+    const amount = 15 + Math.floor(rand(s) * 40);
+    s.cash += amount;
+    s.stats.earned += amount;
+    s.events.push({ t: 'petFind', petId: p.id, amount });
+    p.state = 'roam';
+    p.nextAction = s.now + 2;
+    return;
+  }
+  const blocked = blockedTiles(s);
+  for (let i = 0; i < 6; i++) {
+    const x = Math.floor(rand(s) * s.roomN);
+    const y = Math.floor(rand(s) * s.roomN);
+    if (blocked.has(key(x, y)) || !isInside(x, y, s.roomN)) continue;
+    setPath(s, p, { x, y }, p.type === 'pug' ? 1.6 : 2.4);
+    break;
+  }
+  if (p.type === 'pug' && rand(s) < 0.12) {
+    p.state = 'sniff';
+    p.nextAction = s.now + 3;
+  } else p.nextAction = s.now + 4 + rand(s) * 6;
+}
+
+// ---------- daily raid items ----------
+
+export function today(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+export function refreshDaily(s: GameState, day = today()) {
+  if (s.graves.day !== day) s.graves = { day, green: 5, red: 5 };
+}
+
+export function updateProgress(s: GameState, dt: number) {
+  syncPets(s);
+  for (const p of s.pets) updatePet(s, p, dt);
+}
+

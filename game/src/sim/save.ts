@@ -1,5 +1,5 @@
 import { catchUp } from './sim';
-import { SAVE_VERSION, createInitialState, type GameState } from './state';
+import { createInitialState, migrate, type GameState } from './state';
 
 export const SAVE_KEY = 'zombsbbq.save.v1';
 
@@ -21,8 +21,8 @@ export function deserialize(raw: string | null, nowMs: number): { state: GameSta
   if (!raw) return { state: createInitialState(Math.floor(nowMs) % 2147483647), offlineSec: 0, offlineCash: 0 };
   try {
     const file = JSON.parse(raw) as SaveFile;
-    if (!file?.state || file.state.version !== SAVE_VERSION) throw new Error('version');
-    const state = file.state;
+    const state = migrate(file?.state);
+    if (!state) throw new Error('version');
     state.events = [];
     const offlineSec = Math.max(0, (nowMs - file.savedAt) / 1000);
     const offlineCash = offlineSec > 5 ? catchUp(state, offlineSec) : 0;

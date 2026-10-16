@@ -26,10 +26,10 @@ const grill = (s: GameState) => s.stoves.find((x) => x.kind === 'grill')!;
 
 describe('grid', () => {
   it('only lets you through the back wall at the door', () => {
-    expect(edgeBlocked(DOOR_X, 0, DOOR_X, -1)).toBe(false);
-    expect(edgeBlocked(DOOR_X - 1, 0, DOOR_X - 1, -1)).toBe(true);
-    expect(edgeBlocked(0, 3, -1, 3)).toBe(true);
-    const p = findPath({ x: 1, y: -2 }, { x: 1, y: 1 }, new Set())!;
+    expect(edgeBlocked(DOOR_X, 0, DOOR_X, -1, 8)).toBe(false);
+    expect(edgeBlocked(DOOR_X - 1, 0, DOOR_X - 1, -1, 8)).toBe(true);
+    expect(edgeBlocked(0, 3, -1, 3, 8)).toBe(true);
+    const p = findPath({ x: 1, y: -2 }, { x: 1, y: 1 }, new Set(), 8)!;
     expect(p).not.toBeNull();
     expect(p.some((pt) => pt.x === DOOR_X && pt.y === 0)).toBe(true);
   });
@@ -59,11 +59,11 @@ describe('cooking (tap cook, then stove; burns if left too long)', () => {
     expect(grill(s).status).toBe('empty');
   });
 
-  it('refuses locked stations and dishes above your level', () => {
+  it('refuses the wrong station, dishes above your level and unstudied raid recipes', () => {
     const s = createInitialState(7);
-    const smoker = s.stoves.find((x) => x.kind === 'smoker')!;
-    expect(startCooking(s, you(s).id, smoker.id, 'pork')).toMatch(/level 4/);
+    expect(startCooking(s, you(s).id, grill(s).id, 'pork')).toMatch(/smoker/);
     expect(startCooking(s, you(s).id, grill(s).id, 'wings')).toMatch(/level 3/);
+    expect(startCooking(s, you(s).id, grill(s).id, 'chili')).toMatch(/raid/);
   });
 });
 

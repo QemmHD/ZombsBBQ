@@ -1,15 +1,20 @@
 import {
+  DECOR_STARS,
   CUSTOMERS,
   CUSTOMER_BY_ID,
   DISH_BY_ID,
+  LEVEL_CAP,
   TUNING,
   attackThreshold,
   crewCapForLevel,
+  spawnWeight,
   walkSpeed,
   xpToNext,
 } from './data';
-import { DOOR_X, ROOM_N, findPath, key, type Pt } from './grid';
+import { DIR_STEP, ITEM_BY_ID, THEME_BY_ID, type ItemDef } from './catalog';
+import { DOOR_X, findPath, isInside, key, type Pt } from './grid';
 import { makeWorker, type Customer, type Furniture, type GameState, type Mover, type Stove, type Worker } from './state';
+import { updateProgress } from './progress';
 
 // ---------- helpers ----------
 
@@ -21,7 +26,9 @@ export function rand(s: GameState): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-const furnById = (s: GameState, id: string) => s.furniture.find((f) => f.id === id);
+export const itemOf = (f: Furniture): ItemDef => ITEM_BY_ID[f.item];
+export const furnById = (s: GameState, id: string) => s.furniture.find((f) => f.id === id);
+export const furnAt = (s: GameState, x: number, y: number) => s.furniture.find((f) => f.x === x && f.y === y);
 
 export function blockedTiles(s: GameState): Set<string> {
   const b = new Set<string>();
@@ -29,46 +36,57 @@ export function blockedTiles(s: GameState): Set<string> {
   return b;
 }
 
-function isFree(x: number, y: number, blocked: Set<string>): boolean {
-  return !blocked.has(key(x, y)) && x >= -4 && y >= -4;
+const N4 = [
+  { x: 0, y: 1 },
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: -1 },
+];
+
+/** Tile a worker stands on to use a counter or stove: the first free in-room neighbor. */
+export function accessTile(s: GameState, f: Furniture, blocked = blockedTiles(s)): Pt {
+  for (const d of N4) {
+    const c = { x: f.x + d.x, y: f.y + d.y };
+    if (isInside(c.x, c.y, s.roomN) && !blocked.has(key(c.x, c.y)) && !(c.x === DOOR_X && c.y === 0)) return c;
+  }
+  return { x: f.x + 1, y: f.y };
 }
 
-/** Tile a worker stands on to use a piece of furniture. */
-export function accessTile(s: GameState, f: Furniture): Pt {
-  const blocked = blockedTiles(s);
-  const cands =
-    f.kind === 'counter'
-      ? [{ x: f.x + 1, y: f.y }]
-      : [
-          { x: f.x, y: f.y + 1 },
-          { x: f.x + 1, y: f.y },
-          { x: f.x - 1, y: f.y },
-          { x: f.x, y: f.y - 1 },
-        ];
-  return cands.find((c) => isFree(c.x, c.y, blocked) && c.x >= 0 && c.y >= 0 && c.x < ROOM_N && c.y < ROOM_N) ?? cands[0];
+/** A seat is usable when it faces an adjacent table that takes seats on that side. */
+export function seatTable(s: GameState, seat: Furniture): Furniture | undefined {
+  if (itemOf(seat).kind !== 'seat' || !seat.dir) return undefined;
+  const st = DIR_STEP[seat.dir];
+  const t = furnAt(s, seat.x + st.x, seat.y + st.y);
+  if (!t || itemOf(t).kind !== 'table') return undefined;
+  const sides = itemOf(t).seatSides;
+  return !sides || sides.includes(seat.dir) ? t : undefined;
+}
+
+export function validSeats(s: GameState): Furniture[] {
+  return s.furniture.filter((f) => seatTable(s, f));
 }
 
 function seatNeighbor(s: GameState, seat: Furniture): Pt {
   const blocked = blockedTiles(s);
+  const st = DIR_STEP[seat.dir!];
   const cands = [
-    { x: seat.x, y: seat.y + 1 },
-    { x: seat.x, y: seat.y - 1 },
-    { x: seat.x + seat.side!, y: seat.y },
+    { x: seat.x + st.y, y: seat.y + st.x },
+    { x: seat.x - st.y, y: seat.y - st.x },
+    { x: seat.x - st.x, y: seat.y - st.y },
   ];
-  return cands.find((c) => isFree(c.x, c.y, blocked)) ?? cands[0];
+  return cands.find((c) => !blocked.has(key(c.x, c.y)) && isInside(c.x, c.y, s.roomN + 1)) ?? cands[0];
 }
 
-function setPath(s: GameState, m: Mover, goal: Pt, speed: number): boolean {
-  const p = findPath({ x: m.x, y: m.y }, goal, blockedTiles(s));
+export function setPath(s: GameState, m: Mover, goal: Pt, speed: number): boolean {
+  const p = findPath({ x: m.x, y: m.y }, goal, blockedTiles(s), s.roomN);
   if (!p) return false;
-  // snap to tile so paths stay on the grid
   m.path = p;
   m.speed = speed;
   return true;
 }
 
 /** Advance along the path; returns true when the path is finished. */
-function move(m: Mover, dt: number): boolean {
+export function move(m: Mover, dt: number): boolean {
   let budget = m.speed * dt;
   while (m.path.length && budget > 0) {
     const t = m.path[0];
@@ -78,6 +96,7 @@ function move(m: Mover, dt: number): boolean {
     if (d > 0.001) {
       const sdx = dx - dy; // screen-space horizontal direction in iso
       if (Math.abs(sdx) > 0.01) m.facing = sdx > 0 ? 1 : -1;
+      m.back = dx + dy < -0.01; // moving up the screen = walking away from the camera
     }
     if (d <= budget) {
       m.x = t.x;
@@ -90,59 +109,85 @@ function move(m: Mover, dt: number): boolean {
       budget = 0;
     }
   }
+  if (!m.path.length) m.back = false;
   return m.path.length === 0;
 }
 
-function faceTowards(m: Mover, x: number, y: number) {
+export function faceTowards(m: Mover, x: number, y: number) {
   const sdx = x - m.x - (y - m.y);
   if (Math.abs(sdx) > 0.01) m.facing = sdx > 0 ? 1 : -1;
-}
-
-export function stars(s: GameState): number {
-  const service = 0.5 + (s.ratingPts / 100) * 4.5;
-  const decor = 1 + decorPoints(s) / 20;
-  return Math.max(0.5, Math.floor(Math.min(service, decor, 5) * 2) / 2);
+  m.back = x - m.x + (y - m.y) < -0.01;
 }
 
 export function decorPoints(s: GameState): number {
-  const pts: Record<string, number> = { table: 3, bench: 1, counter: 1, fridge: 2, plant: 4, keg: 3, grill: 1, smoker: 2 };
-  return s.furniture.reduce((a, f) => a + (f.locked ? 0 : pts[f.kind] ?? 0), 0);
+  let pts = 0;
+  for (const f of s.furniture) pts += itemOf(f).decor;
+  for (const w of s.walls) pts += ITEM_BY_ID[w.item]?.decor ?? 0;
+  pts += THEME_BY_ID[s.theme]?.decor ?? 0;
+  return pts;
 }
 
-function addRating(s: GameState, d: number) {
-  s.ratingPts = Math.max(0, Math.min(100, s.ratingPts + d));
+/** Stars your decor can support (half-star steps). */
+export function decorStars(s: GameState): number {
+  const pts = decorPoints(s);
+  let st = 1;
+  for (let i = 1; i < DECOR_STARS.length; i++) if (pts >= DECOR_STARS[i]) st = 1 + i * 0.5;
+  return st;
+}
+
+/** Stars your service earns: happy yellow faces push it up, frowns and bites drag it down. */
+export function serviceStars(s: GameState): number {
+  return 0.5 + (s.ratingPts / 100) * 4.5;
+}
+
+/** Star rating: the lower of service and decor, in half stars (like the original's awning). */
+export function stars(s: GameState): number {
+  return Math.max(0.5, Math.floor(Math.min(serviceStars(s), decorStars(s), 5) * 2) / 2);
+}
+
+/** Feed one customer outcome into the rolling service rating (100 = happy, 0 = angry). */
+export function addRating(s: GameState, outcome: number, weight = 1) {
+  for (let i = 0; i < weight; i++) s.ratingPts += (outcome - s.ratingPts) * TUNING.ratingRate;
+  s.ratingPts = Math.max(0, Math.min(100, s.ratingPts));
 }
 
 export function addXp(s: GameState, amount: number) {
+  if (s.level >= LEVEL_CAP) return;
   s.xp += amount;
-  while (s.xp >= xpToNext(s.level)) {
+  while (s.level < LEVEL_CAP && s.xp >= xpToNext(s.level)) {
     s.xp -= xpToNext(s.level);
     s.level++;
     s.crewCap = Math.max(s.crewCap, crewCapForLevel(s.level));
-    for (const f of s.furniture) if (f.kind === 'smoker' && s.level >= 4) f.locked = false;
     s.events.push({ t: 'levelup', level: s.level });
   }
+  if (s.level >= LEVEL_CAP) s.xp = 0;
 }
 
-const spawnPoint = (s: GameState): Pt => ({ x: rand(s) < 0.5 ? DOOR_X + 4 : DOOR_X - 4, y: -2 });
+export const spawnPoint = (s: GameState): Pt => ({ x: rand(s) < 0.5 ? DOOR_X + 4 : DOOR_X - 4, y: -2 });
 
 export const zombies = (s: GameState) => s.workers.filter((w) => w.kind === 'zombie');
+export const atWork = (w: Worker) => w.state !== 'raiding' && w.state !== 'down';
 
-// ---------- player actions (all validate and return an error string or null) ----------
+export function dishAvailable(s: GameState, dishId: string): boolean {
+  const d = DISH_BY_ID[dishId];
+  if (!d) return false;
+  return d.source === 'raid' ? s.recipes.includes(dishId) : d.level <= s.level;
+}
+
+// ---------- player actions (validate and return an error string or null) ----------
 
 export function startCooking(s: GameState, workerId: string, stoveId: string, dishId: string): string | null {
   const w = s.workers.find((x) => x.id === workerId);
   const st = s.stoves.find((x) => x.id === stoveId);
   const dish = DISH_BY_ID[dishId];
   if (!w || !st || !dish) return 'Nope.';
-  const f = furnById(s, st.furnitureId)!;
-  if (f.locked) return `The ${st.kind} unlocks at level 4.`;
+  if (!atWork(w)) return `${w.name} is ${w.state === 'down' ? 'still reanimating' : 'out on a raid'}.`;
   if (st.status !== 'empty') return 'That station is busy.';
   if (dish.station !== st.kind) return `${dish.name} needs the ${dish.station}.`;
-  if (dish.level > s.level) return `Unlocks at level ${dish.level}.`;
+  if (!dishAvailable(s, dishId)) return dish.source === 'raid' ? 'Steal this recipe in a raid first!' : `Unlocks at level ${dish.level}.`;
   if (s.cash < dish.cost) return 'Not enough cash!';
   if (w.state === 'cooking') return `${w.name} is already cooking.`;
-  if (w.state === 'resting' && w.energy < w.stats.energy * 0.5) return `${w.name} is too tired.`;
+  if (w.state === 'resting' && w.energy < w.stats.energy * 0.5) return `${w.name} is too tired. Let them nap or refill with Brain Sauce.`;
   releaseJob(s, w);
   s.cash -= dish.cost;
   st.status = 'reserved';
@@ -151,10 +196,11 @@ export function startCooking(s: GameState, workerId: string, stoveId: string, di
   w.stoveId = st.id;
   w.pendingDish = dish.id;
   w.state = 'toStove';
-  if (!setPath(s, w, accessTile(s, f), walkSpeed(w.stats.speed))) w.path = [];
+  if (!setPath(s, w, accessTile(s, furnById(s, st.furnitureId)!), walkSpeed(w.stats.speed))) w.path = [];
   return null;
 }
 
+/** Move a finished dish to the counter (tap the food), or scrape off a burnt one. */
 export function plateDish(s: GameState, stoveId: string): string | null {
   const st = s.stoves.find((x) => x.id === stoveId);
   if (!st) return 'Nope.';
@@ -164,14 +210,19 @@ export function plateDish(s: GameState, stoveId: string): string | null {
     return null;
   }
   if (st.status !== 'done' || !st.dish) return null;
-  const dish = DISH_BY_ID[st.dish];
-  const slot = s.counter.find((c) => c.dish === dish.id) ?? s.counter.find((c) => !c.dish || c.servings <= 0);
-  if (!slot) return 'The counter is full!';
-  slot.dish = dish.id;
-  slot.servings += dish.servings;
+  const err = addToCounter(s, st.dish, DISH_BY_ID[st.dish].servings);
+  if (err) return err;
   st.status = 'empty';
   st.dish = undefined;
   st.doneAt = st.burnAt = undefined;
+  return null;
+}
+
+export function addToCounter(s: GameState, dishId: string, servings: number): string | null {
+  const slot = s.counter.find((c) => c.dish === dishId && c.servings > 0) ?? s.counter.find((c) => !c.dish || c.servings <= 0);
+  if (!slot) return 'The counter is full! Buy another counter in the Shop.';
+  slot.dish = dishId;
+  slot.servings += servings;
   return null;
 }
 
@@ -184,7 +235,7 @@ export function infectCost(s: GameState, c: Customer): { cash: number; sauce: nu
 export function infect(s: GameState, customerId: string): string | null {
   const c = s.customers.find((x) => x.id === customerId);
   if (!c || !['entering', 'waiting', 'eating'].includes(c.state)) return 'Too late, they left!';
-  if (zombies(s).length >= s.crewCap) return `Crew is full (${s.crewCap}/${s.crewCap}). Level up for more!`;
+  if (zombies(s).length >= s.crewCap) return `Crew is full (${s.crewCap}/${s.crewCap}). Level up for more slots!`;
   const cost = infectCost(s, c);
   if (s.cash < cost.cash) return 'Not enough cash!';
   if (s.sauce < cost.sauce) return 'Not enough Brain Sauce!';
@@ -198,24 +249,28 @@ export function infect(s: GameState, customerId: string): string | null {
   return null;
 }
 
+/** Lawn spots in front of the joint where tired (and KO'd) zombies sprawl out. */
+export function lawnSpot(s: GameState, w: Worker): Pt {
+  const n = s.roomN;
+  const taken = new Set(s.workers.filter((o) => o.restSpot && o !== w).map((o) => key(o.restSpot!.x, o.restSpot!.y)));
+  const blocked = blockedTiles(s);
+  for (let i = 0; i < 2 * n; i++) {
+    const cand = i < n ? { x: n + (i % 2), y: 1 + Math.floor(i / 2) * 2 } : { x: 1 + ((i - n) % n), y: n + 1 };
+    const k = key(cand.x, cand.y);
+    if (!taken.has(k) && !blocked.has(k)) return cand;
+  }
+  return { x: n, y: 1 };
+}
+
 export function rest(s: GameState, workerId: string): string | null {
   const w = s.workers.find((x) => x.id === workerId);
   if (!w) return 'Nope.';
+  if (!atWork(w)) return `${w.name} is ${w.state === 'down' ? 'still reanimating' : 'out on a raid'}.`;
   if (w.state === 'cooking') return `${w.name} is busy cooking.`;
   releaseJob(s, w);
-  // sprawl out on the front lawn, like the original
-  const taken = new Set(s.workers.filter((o) => o.restSpot && o !== w).map((o) => key(o.restSpot!.x, o.restSpot!.y)));
-  let spot: Pt = { x: ROOM_N, y: 1 };
-  for (let i = 0; i < 16; i++) {
-    const cand = i < 8 ? { x: ROOM_N + (i % 2), y: 1 + Math.floor(i / 2) * 2 } : { x: 1 + (i - 8), y: ROOM_N + 1 };
-    if (!taken.has(key(cand.x, cand.y))) {
-      spot = cand;
-      break;
-    }
-  }
-  w.restSpot = spot;
+  w.restSpot = lawnSpot(s, w);
   w.state = 'toRest';
-  setPath(s, w, spot, walkSpeed(w.stats.speed));
+  setPath(s, w, w.restSpot, walkSpeed(w.stats.speed));
   return null;
 }
 
@@ -230,13 +285,32 @@ export function wake(s: GameState, workerId: string) {
   }
 }
 
+/** Let a zombie go to make room for a better one. They lurch off into the sunset. */
+export function fireZombie(s: GameState, workerId: string): string | null {
+  const w = s.workers.find((x) => x.id === workerId);
+  if (!w) return 'Nope.';
+  if (w.kind === 'you') return "You can't fire yourself, Boss.";
+  if (w.state === 'raiding') return `${w.name} is out on a raid.`;
+  if (w.state === 'cooking') return `${w.name} is busy cooking. Wait until the food is done.`;
+  releaseJob(s, w);
+  s.workers = s.workers.filter((x) => x.id !== workerId);
+  for (const st of s.stoves) if (st.cookId === workerId && st.status === 'reserved') st.status = 'empty';
+  return null;
+}
+
 export function refill(s: GameState, workerId: string): string | null {
   const w = s.workers.find((x) => x.id === workerId);
   if (!w) return 'Nope.';
+  if (w.state === 'raiding') return `${w.name} is out on a raid.`;
   if (s.sauce < 1) return 'Not enough Brain Sauce!';
-  if (w.energy >= w.stats.energy) return `${w.name} is already full of beans. And brains.`;
+  if (w.state !== 'down' && w.energy >= w.stats.energy) return `${w.name} is already full of beans. And brains.`;
   s.sauce -= 1;
   w.energy = w.stats.energy;
+  if (w.state === 'down') {
+    w.state = 'idle';
+    w.downUntil = undefined;
+    w.restSpot = undefined;
+  }
   if (w.state === 'resting' || w.state === 'toRest') wake(s, w.id);
   return null;
 }
@@ -247,7 +321,7 @@ function daydreamInterval(s: GameState, w: Worker): number {
   return TUNING.daydreamBaseSec * w.stats.focus * (0.5 + rand(s));
 }
 
-function releaseJob(s: GameState, w: Worker) {
+export function releaseJob(s: GameState, w: Worker) {
   if (w.job) {
     const slot = s.counter.find((c) => c.id === w.job!.slotId);
     if (slot && (slot.dish === w.job.dish || !slot.dish || slot.servings <= 0)) {
@@ -264,6 +338,7 @@ function releaseJob(s: GameState, w: Worker) {
       st.status = 'empty';
       if (st.dish) s.cash += DISH_BY_ID[st.dish].cost;
       st.dish = undefined;
+      st.cookId = undefined;
     }
     w.stoveId = undefined;
   }
@@ -286,10 +361,10 @@ function leave(s: GameState, c: Customer, mood: 'happy' | 'angry', fast = false)
   c.state = fast ? 'fleeing' : 'leaving';
   c.seatId = undefined;
   if (mood === 'happy') {
-    addRating(s, TUNING.ratingHappy);
+    addRating(s, 100);
     s.stats.happy++;
   } else {
-    addRating(s, fast ? 0 : TUNING.ratingAngry);
+    if (!fast) addRating(s, 0);
     s.stats.angry++;
   }
   s.events.push({ t: 'face', x: c.x, y: c.y, happy: mood === 'happy' });
@@ -298,26 +373,27 @@ function leave(s: GameState, c: Customer, mood: 'happy' | 'angry', fast = false)
 
 function freeSeats(s: GameState): Furniture[] {
   const taken = new Set(s.customers.filter((c) => c.seatId).map((c) => c.seatId));
-  return s.furniture.filter((f) => f.kind === 'bench' && !taken.has(f.id));
+  return validSeats(s).filter((f) => !taken.has(f.id));
 }
 
 function spawnCustomers(s: GameState, dt: number) {
   s.spawnCooldown -= dt;
   if (s.spawnCooldown > 0) return;
   // the original: roughly 1 customer inside per half-star of rating, +1
-  const target = 1 + Math.round(stars(s) * 2);
+  const st = stars(s);
+  const target = 1 + Math.round(st * 2);
   const present = s.customers.filter((c) => ['entering', 'waiting', 'eating'].includes(c.state)).length;
   s.spawnCooldown = 3 + rand(s) * 5;
   if (present >= target) return;
-  const st = stars(s);
   const pool = CUSTOMERS.filter((d) => d.minLevel <= s.level && d.minStars <= st);
   // gentle anti-streak: recently seen types are less likely, so the crowd stays varied
-  const recent = (s.recentTypes ??= []);
+  const recent = s.recentTypes;
   const w = (id: string, base: number) => base * (recent.includes(id) ? 0.25 : 1);
-  let r = rand(s) * pool.reduce((a, d) => a + w(d.id, d.weight), 0);
-  const def = pool.find((d) => (r -= w(d.id, d.weight)) < 0) ?? pool[0];
+  let r = rand(s) * pool.reduce((a, d) => a + w(d.id, spawnWeight(d, st)), 0);
+  const def = pool.find((d) => (r -= w(d.id, spawnWeight(d, st))) < 0) ?? pool[0];
   recent.push(def.id);
   if (recent.length > 2) recent.shift();
+  if (!s.seen[def.id]) s.seen[def.id] = 'met';
   const at = spawnPoint(s);
   const c: Customer = {
     id: `c${s.nextId++}`,
@@ -341,16 +417,26 @@ function spawnCustomers(s: GameState, dt: number) {
   }
   const seat = seats[Math.floor(rand(s) * seats.length)];
   c.seatId = seat.id;
-  setPath(s, c, { x: seat.x, y: seat.y }, walkSpeed(4));
+  if (!setPath(s, c, { x: seat.x, y: seat.y }, walkSpeed(4))) {
+    c.seatId = undefined;
+    c.state = 'turnedAway';
+    setPath(s, c, { x: DOOR_X, y: 1 }, walkSpeed(4));
+  }
 }
 
 function updateCustomer(s: GameState, c: Customer, dt: number) {
   switch (c.state) {
     case 'entering': {
+      const seat = c.seatId ? furnById(s, c.seatId) : undefined;
+      if (!seat || !seatTable(s, seat)) {
+        // their seat got moved or sold out from under them
+        leave(s, c, 'angry');
+        break;
+      }
       if (move(c, dt)) {
         c.state = 'waiting';
-        const seat = furnById(s, c.seatId!);
-        if (seat) faceTowards(c, seat.x - seat.side!, seat.y);
+        const t = seatTable(s, seat)!;
+        faceTowards(c, t.x, t.y);
       }
       break;
     }
@@ -387,6 +473,9 @@ function updateCustomer(s: GameState, c: Customer, dt: number) {
         w.facing = c.facing;
         s.workers.push(w);
         s.stats.infected++;
+        const tier = CUSTOMER_BY_ID[c.type].tier;
+        if (tier !== 'common' && tier !== 'uncommon') s.stats.infectedRare++;
+        s.seen[c.type] = 'infected';
         s.events.push({ t: 'infected', workerId: w.id });
         markGone(c);
       }
@@ -435,6 +524,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
       if (w.kind === 'zombie' && s.now >= w.nextDaydream) {
         w.state = 'daydream';
         w.daydreamEnd = s.now + TUNING.daydreamMaxSec * (0.5 + rand(s) * 0.5);
+        s.events.push({ t: 'daydream', workerId: w.id });
         break;
       }
       const job = findServeJob(s, w);
@@ -446,13 +536,16 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         job.customer.serverId = w.id;
         w.state = 'toCounter';
         setPath(s, w, accessTile(s, furnById(s, slot.furnitureId)!), walkSpeed(w.stats.speed));
-      }
+      } else if (!isInside(Math.round(w.x), Math.round(w.y), s.roomN) && !w.path.length) {
+        // wandered outside (e.g. after a nap): head back in
+        setPath(s, w, { x: DOOR_X - 1, y: 2 }, walkSpeed(w.stats.speed));
+      } else move(w, dt);
       break;
     }
     case 'toStove': {
       if (move(w, dt)) {
         const st = s.stoves.find((x) => x.id === w.stoveId);
-        if (!st || !w.pendingDish) {
+        if (!st || !w.pendingDish || st.status !== 'reserved') {
           w.state = 'idle';
           break;
         }
@@ -463,6 +556,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         st.doneAt = s.now + dish.cookSec;
         w.state = 'cooking';
         w.pendingDish = undefined;
+        s.events.push({ t: 'cookStart', stoveId: st.id });
       }
       break;
     }
@@ -516,7 +610,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         faceTowards(w, c.x, c.y);
         s.events.push({ t: 'bite', x: c.x, y: c.y, workerId: w.id, customerId: c.id });
         s.stats.bites++;
-        addRating(s, TUNING.ratingAttack);
+        addRating(s, 0, TUNING.ratingAttackWeight);
         w.energy = Math.min(max, w.energy + TUNING.biteEnergyGain);
         w.state = 'idle';
         w.targetId = undefined;
@@ -528,7 +622,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
       if (move(w, dt)) w.state = 'resting';
       break;
     case 'resting': {
-      const keg = s.furniture.some((f) => f.kind === 'keg') ? TUNING.kegMultiplier : 1;
+      const keg = s.furniture.some((f) => itemOf(f).kind === 'keg') ? TUNING.kegMultiplier : 1;
       w.energy = Math.min(max, w.energy + TUNING.restRegenPerSec * keg * dt);
       if (w.energy >= max) wake(s, w.id);
       break;
@@ -536,16 +630,27 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
     case 'daydream':
       if (s.now >= (w.daydreamEnd ?? 0)) wake(s, w.id);
       break;
+    case 'down':
+      if (s.now >= (w.downUntil ?? 0)) {
+        w.state = 'idle';
+        w.downUntil = undefined;
+        w.restSpot = undefined;
+        w.energy = Math.max(w.energy, max * 0.3);
+      }
+      break;
+    case 'raiding':
+      break;
   }
 }
 
 function updateStove(s: GameState, st: Stove) {
   if (st.status === 'cooking' && s.now >= (st.doneAt ?? Infinity)) {
     const dish = DISH_BY_ID[st.dish!];
-    st.status = 'done';
-    st.burnAt = s.now + dish.cookSec * TUNING.burnFactor + 15;
-    addXp(s, dish.xp);
     const f = furnById(s, st.furnitureId)!;
+    st.status = 'done';
+    st.burnAt = s.now + dish.cookSec * TUNING.burnFactor * (f.keepWarm ? TUNING.keepWarmFactor : 1) + TUNING.burnGraceSec;
+    addXp(s, dish.xp);
+    s.stats.cooked[dish.id] = (s.stats.cooked[dish.id] ?? 0) + 1;
     s.events.push({ t: 'xp', x: f.x, y: f.y, amount: dish.xp });
     s.events.push({ t: 'dishDone', stoveId: st.id });
     const cook = s.workers.find((w) => w.id === st.cookId);
@@ -567,6 +672,7 @@ export const TUTORIAL = [
   "Now give a customer a little nibble: tap one, then INFECT. (This one's on the house!)",
   'Your first zombie! Tap them, then tap the Grill to make them cook.',
   'Watch the Energy bars. Tired zombies bite customers! Tap a zombie → REST.',
+  'You got the hang of it, Boss. Check the clipboard for goals, and hit the Shop to fix this dump up.',
 ];
 
 function updateTutorial(s: GameState, dt: number) {
@@ -588,12 +694,18 @@ function updateTutorial(s: GameState, dt: number) {
       if (zombies(s).length > 0) s.tut = 5;
       break;
     case 5:
-      if (s.stoves.some((st) => st.cookId && s.workers.find((w) => w.id === st.cookId)?.kind === 'zombie' && st.status !== 'empty'))
-        s.tut = 6;
+      if (s.stoves.some((st) => st.cookId && s.workers.find((w) => w.id === st.cookId)?.kind === 'zombie' && st.status !== 'empty')) s.tut = 6;
       break;
     case 6:
       s.tutTimer += dt;
-      if (s.tutTimer > 45 || s.workers.some((w) => w.state === 'resting' || w.state === 'toRest')) s.tut = 7;
+      if (s.tutTimer > 45 || s.workers.some((w) => w.state === 'resting' || w.state === 'toRest')) {
+        s.tut = 7;
+        s.tutTimer = 0;
+      }
+      break;
+    case 7:
+      s.tutTimer += dt;
+      if (s.tutTimer > 20) s.tut = 8;
       break;
   }
 }
@@ -605,6 +717,7 @@ export function tick(s: GameState, dt: number) {
   for (const c of s.customers) updateCustomer(s, c, dt);
   s.customers = s.customers.filter((c) => c.x !== GONE);
   for (const w of s.workers) updateWorker(s, w, dt);
+  updateProgress(s, dt);
   updateTutorial(s, dt);
   if (s.events.length > 200) s.events.splice(0, s.events.length - 200);
 }
@@ -612,11 +725,10 @@ export function tick(s: GameState, dt: number) {
 /** Offline catch-up: fast-forward in coarse steps, capped like the design says. */
 export function catchUp(s: GameState, seconds: number): number {
   const total = Math.min(Math.max(0, seconds), TUNING.offlineCapSec);
-  const step = 1;
   let left = total;
   const cash0 = s.cash;
   while (left > 0) {
-    const d = Math.min(step, left);
+    const d = Math.min(1, left);
     tick(s, d);
     left -= d;
   }

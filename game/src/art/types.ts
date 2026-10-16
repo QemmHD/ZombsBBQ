@@ -22,6 +22,15 @@ export interface ArtAsset {
 
 /** Cutout-puppet character: separate parts animated by tweens (bob, arm swing, shamble). */
 export type PartName = 'legL' | 'legR' | 'torso' | 'armL' | 'armR' | 'head';
+/** Four-legged rig (pets, guard dogs): B = back legs, F = front legs. */
+export type QuadPartName = 'legBL' | 'legBR' | 'body' | 'tail' | 'legFL' | 'legFR' | 'head';
+
+/**
+ * Expression heads that replace the 'head' part for comedic beats. Same pivot/placement as the
+ * normal head. Humans: scream (bitten/fleeing), happy (eating, paying), shock (watching an infection).
+ * Zombies: chomp (biting, mouth wide open), sleep (resting, eyes shut + drool), dazed (KO'd in raids).
+ */
+export type FaceName = 'scream' | 'happy' | 'shock' | 'chomp' | 'sleep' | 'dazed';
 
 export interface CharPart {
   key: string;
@@ -38,8 +47,17 @@ export interface CharPart {
 
 export interface CharArt {
   id: string;
+  /** 'biped' uses PartName parts; 'quad' uses QuadPartName parts. Defaults to biped. */
+  rig?: 'biped' | 'quad';
   /** Parts in back-to-front draw order for a character facing down-right (front 3/4 view). */
   parts: CharPart[];
+  /**
+   * Bipeds: the same rig seen from behind (walking up-left / up-right, i.e. away from the camera),
+   * in back-to-front draw order. Same part names and pivots as `parts`. The scene mirrors it for direction.
+   */
+  backParts?: CharPart[];
+  /** Expression heads (keys `char_<id>_face_<name>`), placed exactly like the 'head' part. */
+  faces?: Partial<Record<FaceName, CharPart>>;
   /** Total height in world units (for name tags / bubbles placement). */
   height: number;
 }
