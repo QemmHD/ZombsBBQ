@@ -20,7 +20,8 @@ Each phase ends with a **gate**: don't move on until it's true.
 7. ★ Pathfinding on the grid; grey-box "customers" walk in, sit, leave.
 8. ★ One station + one dish: cook timer → counter with servings.
 9. ★ Zombie server AI: fetch dish → deliver → customer pays (coins pop).
-10. ★ Hunger + lunge + Nap Coffin.
+10. ★ Energy + Patience + attack-a-customer + Rest (face-plant / lawn nap) + daydreaming.
+10b. ★ YOU (Patient Zero) as a cook; tap-cook-then-stove assignment; dish burning at 2× cook time.
 11. ★ Infect a customer → becomes a zombie.
 12. Grey-box raid: 1 lane, 3 zombie types, 2 defenses, a 90 s timer.
 13. Save/load to local JSON; offline progress catch-up.
@@ -30,7 +31,7 @@ Each phase ends with a **gate**: don't move on until it's true.
 
 ## Phase 2: Art pipeline & vertical slice (Week 9–18)
 15. ★ Lock the art style using the concept art in `art/concepts/` (refine, get feedback).
-16. ★ Build the **shared humanoid Spine rig**; animate idle/walk/walk_carry/sit/eat/infect/hungry/lunge.
+16. ★ Build the **shared humanoid Spine rig**; animate idle/walk/walk_carry/sit/eat/infect/tired/attack/rest-faceplant/daydream.
 17. ★ Final art for 6 customers + their zombie forms, the starter crew (Gus, Nell…), and the Burnt Shack + Texas Roadhouse themes (~40 decor items).
 18. ★ HUD and menus per the mockup: awning bar, side buttons, shop, recipe book, crew screen.
 19. ★ The juice pass: particles, coin fly-to-HUD, popups, squash & stretch, haptics, SFX.

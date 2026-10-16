@@ -71,8 +71,10 @@ Bones: root, hip, torso, head, jaw, eyeL/eyeR (lid slots), armL/R (upper, lower,
 | happy / pay | 0.6 s | Hop + coin burst. |
 | angry / leave | 0.8 s | Steam from head, stomp out. |
 | infect (customer) | 1.6 s | Shiver → skin tint lerp to green → eyes pop → little "thriller" dance. |
-| hungry | loop | Drool drip, stomach growl wiggle. |
-| lunge (zombie) | 1.0 s | Anticipation crouch → leap with stretch → customer flees with a cartoon dust cloud. |
+| tired | loop | Low Energy: drool drip, slouch, red Energy bar flashing. |
+| daydream | loop | Stares into space, thought bubble (brain/steak), sways. |
+| rest | loop | Flops face-down on a table or sprawls on the lawn, "Zzz" bubbles. |
+| attack (zombie) | 1.0 s | Anticipation crouch → leap with stretch → customer flees with a cartoon dust cloud. |
 | attack / hit / KO (raids) | short | KO = dizzy stars, then they sink into the ground and get picked up later. |
 | cheer | 1.0 s | Victory pose for raid win screen. |
 

@@ -39,7 +39,7 @@ Game (Unity)
 │   ├── Pathfinding        A* on the tile grid (custom; grids are small)
 │   ├── Stations/Dishes    cook timers, servings, Keep-Warm, Perfect Bark
 │   ├── CustomerSpawner    rating-driven arrival, seating, patience
-│   ├── ZombieAI           state machine: Idle → Fetch → Deliver → Hungry → Rest/Lunge
+│   ├── ZombieAI           state machine: Idle → Cook/Fetch → Deliver → Daydream → Tired → Rest | Attack
 │   └── RatingSystem       decor/menu/service/incidents → stars
 ├── Raids
 │   ├── RaidSim            deterministic lane battle (fixed timestep, seedable)

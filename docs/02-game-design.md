@@ -31,10 +31,10 @@ Everything that made Zombie Café funny is in, mapped to Zombs BBQ:
 | Original gag | In Zombs BBQ | Where it shows up |
 |---|---|---|
 | **Your waiters are zombies, and the customers don't seem to mind.** | Same. Customers happily eat ribs served by a drooling corpse. Some only complain about the slow service. | Core joint |
-| **Tired zombies attack the customers.** | **HANGRY** zombies lunge at a guest: a cartoon chase around the tables, the customer screams and flees, the stars wobble. Nurses and cops react (the cop "arrests" the zombie and it sulks for 10 s). | Hunger system §3.3 |
+| **Tired zombies attack the customers.** | When a zombie's Energy drops below its **Patience**, it lunges at a guest: a cartoon chase around the tables, the customer screams and flees, the stars wobble. Nurses and cops react (the cop "arrests" the zombie and it sulks for 10 s). | Energy system §3.3 |
 | **Any customer can be infected, and keeps their outfit as a zombie.** | Same, with an **infection dance** cutscene. Every zombie keeps their human outfit, torn and green, plus one gag detail: the food critic's notepad reads "BRAINS 5/5", the lumberjack's axe is stuck in his own hat, the cheerleader's pom-pom is a brain. | §3.3, art bible |
-| **"YOU": the lone human chef in the room**, with your own health bar. | You're the only living employee, with a customizable avatar (hard hat, apron, hats). Zombies *never* bite you because they respect the boss, but a hungry one will sniff you and get shooed away. Tap yourself for Photo/Info/Chef. | Joint, avatar |
-| **Zombies crash face-down on tables, or sprawl on the lawn to rest.** | Exhausted zombies face-plant into tables or the lawn with "Zzz" bubbles. Unhired zombie applicants crawl on the grass outside groaning "joooob". | Hunger/rest, curb |
+| **"YOU" look human, but you're the one doing the infecting.** In the original you start as the only human-looking chef: you cook the first dish yourself, then infect your first customer, and that customer becomes your first cook. From then on you infect more and more customers to build your crew. | **You are Patient Zero.** You look like a normal (slightly pale) cook with a bandage on your arm, and you have an Energy bar like everyone else. You cook, serve and infect. Your first infection becomes your first cook, and every zombie after that comes from *you*. The zombies call you "Boss" and never bite you. Tap yourself for **Photo / Info / Chef** (Chef sends you to cook at a stove). | Joint, FTUE §5, avatar |
+| **Zombies crash face-down on tables, or sprawl on the lawn to rest.** | Exhausted zombies face-plant into tables or the lawn with "Zzz" bubbles. Unhired zombie applicants crawl on the grass outside groaning "joooob". | Energy/rest, curb |
 | **"CLOSED" at night, zombies sleeping on the sidewalk.** | Flip the sign to **CLOSED**: zombies line up on the sidewalk and snooze (Zzz). Dishes don't spoil while closed (a vacation mode). | Joint |
 | **Gross recipe names.** | Brain Burger, Finger-Lickin' Wings (literally), Pulled Pork(ish), Eyeball Kebabs, Toe-fu Skewers, Spleen Beans, Liver-and-Let-Die, Mystery Meatloaf. | Menu §3.1 |
 | **Pun-named rival restaurants** ("Jane Wayne's Mess Hall"). | Every raid target is a pun: *Chuck Wagon's Chow Hall*, *Big Hank's Burger Barn*, *Vegan Vera's Salad Fortress*, *Colonel Crunch's Chicken Shack*, *Le Snob Bistro*, *Crust Me Pizzeria*. | Raid map §3.6 |
@@ -57,11 +57,13 @@ Everything that made Zombie Café funny is in, mapped to Zombs BBQ:
 
 ### 2.1 Minute-to-minute (the "shift")
 ```
-Tap smoker → pick dish → (optional) timing tap for "Perfect Bark" bonus
-   → dish cooks (timer) → tap to plate onto counter
-   → zombie waiters auto-serve customers → coins/XP pop above tables
-   → watch zombie Hunger → feed / send to nap coffin before they bite someone
-   → handle special requests (a customer bubble: "Extra sauce!") for tips
+Tap a cook (YOU or a zombie) → tap a stove → pick a dish (pay its cost)
+   → (optional) timing tap for "Perfect Bark" bonus → dish cooks on a real-time timer
+   → tap the finished dish → it moves to the serving counter with a serving count
+   → zombie waiters auto-serve customers → happy (yellow) / angry (blue) faces, coins & XP pop
+   → watch Energy bars → let tired zombies rest before they attack a customer
+   → tap daydreaming zombies to snap them back to work
+   → infect a happy customer → new crew member
 ```
 
 ### 2.2 Session (the "day")
@@ -96,7 +98,15 @@ Level up → unlock recipes, stations, expansions, themes
 | Pit Oven (2×2) | Lv 20 | Long feasts (8–24 h) | Huge payout, big XP |
 | Neon Taco Truck | Lv 30 (event) | Event dishes | Parks outside the joint |
 
-**Dishes** have: cost, cook time, servings, sell price per serving, XP, and the station they need. Recipes are unlocked by **level** (bought with cash), **raids** (stolen), or **events**.
+**Who cooks (same as the original):** a stove does nothing by itself. Tap a cook (**YOU** or any zombie), then tap a stove. The cook walks over, picks a dish and cooks it, and burns Energy while doing it. Better cooks (high Speed) work faster. Two cooks can stand on one floor tile between two stoves, the original's well-known space-saving trick, and we keep it on purpose.
+
+**Dishes** have: cost, cook time, servings, sell price per serving, XP, and the station they need. Cooking keeps going while the app is closed.
+
+**Cookbooks:** recipes are grouped in themed cookbooks, as in the original (which had 21 cookbooks and 320 recipes, 100+ of them only from raids). A cookbook unlocks by **buying its themed station**, the way the original's pizza oven unlocked the Mafia recipes. Zombs BBQ launch cookbooks: *Backyard Basics* (Rusty Grill), *Smokehouse* (Barrel Smoker), *Fry Shack* (Deep Fryer), *Mad Sauces* (Sauce Cauldron), *Feast of the Dead* (Pit Oven), *Raid Cookbook* (only from raids), plus event cookbooks such as *Graveyard Grill* and *Vampire Cookout* (Staked Steak-style puns).
+
+**Fridge:** dishes you **loot in raids go to your Fridge**. From there you can serve them for free, or "study" them to **unlock that recipe** permanently. This is the original's raid-for-recipes loop.
+
+**Finish now:** tap a cooking stove and press Finish to spend Brain Sauce and complete it instantly (as Toxin did in the original).
 
 Starter menu (sample balance, tune in the spreadsheet):
 
@@ -113,7 +123,10 @@ Design rule: **short timers are lower profit per hour but higher XP per hour; lo
 
 **Perfect Bark (optional skill moment):** when you start a smoker dish, a quick ring-timing tap appears. Hit the green zone for a **+15% servings** "Perfect" or **+5%** "Good". Missing it costs nothing. You can turn it off in settings (auto = "Good").
 
-**Spoilage (gentle):** finished dishes left on a station longer than their cook time turn "Crispy" and lose 25% of servings, never 100%. Each station has one free Keep-Warm slot. This keeps the "come back on time" tension without cruelty.
+**Burning (faithful, with a safety net):** as in the original, a finished dish left on the stove **burns once it has sat for its full cook time again** (finish at 4 h → it burns at 8 h), and a burned dish is lost along with its cost. That "come back on time" tension is part of the feel, so we keep it, and add modern safety nets:
+- A local push notification when the dish is ready, and another at 75% of the burn window.
+- The first 3 burns are forgiven during the tutorial week.
+- A **Keep-Warm Lamp** station upgrade adds +50% to the burn window.
 
 ### 3.2 Customers
 
@@ -129,6 +142,7 @@ Customers arrive based on **Star Rating**, **Seats** and **Curb Appeal** (outsid
 | Cheerleader | ★3 | ×1.3 | Boosts the joint's Vibe while seated |
 | Food Critic | ★3.5 | ×2.0 | Rates your joint: great review = a rush of customers for 1 h |
 | Influencer | ★4 | ×1.5 | Films your joint; your decor score matters ×2 |
+| Boxer | ★3 | ×1.2 | Premium infect (Brain Sauce); a top raid fighter, like the original's 15-Toxin Boxer |
 | Rival Chef (spy) | ★4.5 | ×1.0 | Tries to steal a recipe. Your bouncer catches them for a reward |
 | Celebrity (event) | ★5 | ×5.0 | Rare, limited-time zombie form |
 
@@ -136,37 +150,35 @@ Customers arrive based on **Star Rating**, **Seats** and **Curb Appeal** (outsid
 
 ### 3.3 Zombie crew (the heart of the game)
 
-**Getting zombies:** tap a seated, happy customer, then **Infect** (costs cash scaled by rarity; Grandma ≈ $1k, Critic ≈ $25k). A short transformation animation plays: the customer convulses, turns green, eyes pop yellow, and they do a little dance. Every customer type has a unique zombie form. Rare zombies also come from raids, events and the Grill Pass.
+**Where zombies come from: YOU.** You are Patient Zero. You look human, but every zombie in the joint was infected by you. Tap a customer who has finished eating, then tap **Infect**. The customer shivers, turns green, their eyes pop yellow, and they do a little dance. They keep their outfit (torn and green) and join the crew. Your very first infection, in the tutorial, becomes your **first cook**. After that you keep infecting to grow the crew.
 
-**Crew slots:** start at 4 (like the original's "4/4"), grow with level and the "Coffin Rack" decor up to 20+.
+**Infection cost (like the original):** common customers cost **cash** (e.g. Construction Worker $250); special customers cost **Brain Sauce** (the original's Cop cost 1 Toxin and its Boxer 15 Toxin). Customers you meet in the tutorial are **free**. Every customer type has its own zombie form. Rare and parody zombies also come from raids, events and the Grill Pass.
 
-**Zombie stats**
+**Crew cap:** shown on the HUD as `4/4`, like the original. The cap grows with level (to about 13 at level 47, matching the original's max-level shot of `12/13`), and with crew-slot purchases, up to 20+.
+
+**Zombie stats (the original's six, kept as-is):**
 | Stat | Effect |
 |---|---|
-| **Speed** | Walk/serve speed |
-| **Hunger tank** | How long before they get "snacky" |
-| **Charm** | Tip bonus when they serve |
-| **Brawn** | Raid HP & damage |
-| **Trait** | One special perk, e.g. *Butterfingers* (drops plates, funny but bad), *Neat Freak* (cleans spills), *Showman* (Vibe +) |
+| **Energy** | The red bar. It drains while cooking or serving, and refills while resting. |
+| **Speed** | Walk, serve and cook speed. |
+| **Power** | Fighting strength in raids. |
+| **Tips** | Tip income vs. meal income. Tips 10 ≈ $1 in tips per $5 of food. |
+| **Focus** | How rarely they **daydream**. Low Focus = stops working to stare into space more often. |
+| **Patience** | How low their Energy can go before they **attack a customer**. Patience 1 snaps at about 20% Energy; Patience 10 holds out until about 2%. |
+| *Trait (new)* | One fun perk, e.g. *Butterfingers* (drops plates), *Neat Freak* (cleans spills), *Showman* (Vibe +). |
 
-**Roles** (assign by dragging a zombie onto a station or the door):
-- **Server:** carries dishes to tables (core role).
-- **Pitmaster:** stands at a station, cooking time −10–30%.
-- **Bouncer:** guards the door: catches spies, defends during enemy raids.
-- **Raider:** sent out on raids (reserved while out).
+**Jobs:** any zombie can do any job, as in the original. Tap a zombie, then tap a stove to make them **cook**. Unassigned zombies automatically **serve** whenever a customer is waiting. In raids they fight. New for Zombs BBQ: an optional **Bouncer** post at the door that catches spies and defends in PvP.
 
-**Hunger (modernized Energy)**
-- Working drains Hunger. At 25% the zombie gets a ⚠ drool icon and slows down.
-- At 0% the zombie **lunges at a customer** (comedy chase animation; customer flees, Star Rating dips a little, customer loses patience). It never kills progress or loses items.
-- **Ways to refill:**
-  1. **Nap Coffin** decor: zombies auto-rest there (free, takes time). This is the main free method.
-  2. **Brain Snack** items: cooked at the grill like a dish (cheap). This turns feeding into part of the cooking loop.
-  3. **Auto-Feeder** upgrade (Lv 15): feeds idle zombies from your Brain Snack stock.
-  4. **Brain Sauce** (soft currency): instant full refill, a convenience only.
+**Daydreaming:** low-Focus zombies randomly stop and daydream (a thought bubble with a brain or a steak). Tap them to snap them back to work. If one gets too bored, it may wander toward a customer.
 
-That makes the original's best joke (zombies eat customers) a fun thing to manage instead of a paywall.
+**Energy & attacks (the original's signature gag):**
+- Working drains Energy. When it drops below the zombie's **Patience** threshold, the zombie **attacks a customer**: a cartoon lunge, the customer screams and flees with a blue frowny face, and your star rating drops.
+- **Resting:** tap a tired zombie and choose **Rest**. They flop down **face-first on a table or sprawl on the lawn outside with "Zzz"** (exactly like the original's screenshots) and recover over time.
+- **Brain Sauce Keg** (the original's Toxin Barrel): decor that **doubles Energy recovery** for resting zombies.
+- **Brain Sauce:** instantly refills a zombie's Energy (the original's Toxin refill).
+- *New:* **Brain Snacks**, cheap items you cook on the grill to feed a zombie a partial refill, which gives free players another option.
 
-**Mutations (late game, Lv 25+):** combine 2 duplicate zombies plus Brain Sauce to mutate: a new color variant, +1 star rarity and a stat boost. Mutations are purely earned and never sold directly.
+**Mutations (new, late game, Lv 25+):** combine 2 duplicate zombies plus Brain Sauce to mutate: a new color variant, +1 rarity and a stat boost. Mutations are earned only, never sold.
 
 ### 3.4 Star Rating & Vibe
 
@@ -176,40 +188,52 @@ Star Rating (0.5–5★) is recalculated every 10 minutes:
 - **Service** (average wait time, requests filled): 25%
 - **Incidents** (zombie lunges, spills): −15% max
 
+**Faces (from the original):** every customer shows a **happy yellow face** (raises rating) or a **frowning blue face** (lowers it) when they leave. Frowns come from long waits, no free seat, no food on the counter, or a zombie attack. A customer who arrives when every seat is taken **leaves unhappy**, so you need enough seats *and* enough dishes on the counter.
+
 Higher stars bring more customers, better customer types and bigger tips. The awning at the top of the HUD shows the stars (like the original).
 
 ### 3.5 Decorating
 
 - **Isometric 2:1 grid.** Items have footprints (1×1, 1×2, 2×2…), and can be rotated (4 directions where art allows), moved, stored and sold back (50%).
-- **Categories:** Tables, Seating, Stations, Counters, Walls, Floors, Wall hangings, Lighting, Plants, Novelties (jukebox, pool table, dartboard, mechanical bull), Outdoor (fences, grills, neon signs), Coffins (crew rest).
+- **Categories:** Tables, Seating, Stations, Counters, Walls, Floors, Wall hangings, Lighting, Plants, Novelties (jukebox, pool table, dartboard, mechanical bull), Outdoor (fences, grills, neon signs), Brain Sauce Keg (faster rest).
+- **Wall decor counts:** as in the original, wall hangings (bottles, signs, skulls) raise popularity **without using floor space** that tables need. Veteran players will look for this.
 - **Themes** (sets with a set bonus for 5+ pieces): *Burnt Shack* (start), *Texas Roadhouse*, *50s Diner*, *Tiki Luau*, *Graveyard Garden*, *Neon Night*, *Mad Scientist Lab*, *Haunted Victorian*. Late-game shots of the original (Western saloon, cherry-blossom café) show how much players love this.
 - **Expansions:** 8×8 at start → 30×30 max, bought with cash and gated by level. Outdoor patio and a parking lot food-truck spot.
 - **Edit mode:** pinch-zoom, drag to move, a "ghost" placement preview with green/red footprint, undo/redo, and a "Store all" button.
 - **Photo Mode:** hides the HUD and adds filters and frames, so players can share their joint.
 
-### 3.6 Raids (modernized)
+### 3.6 Raids
 
-Raids are **asynchronous PvP plus PvE**. They're short (≤ 2 min), skillful and funny.
+**Classic raid flow (faithful to the original):**
+1. **Pick a target:** tap a rival joint on the map (an NPC pun joint, a neighbor or a friend).
+2. **Choose your team:** zombies **and pets**. The deploy tray shows counts like `14/14` zombies and `1/6` pets, like the original's raid screen.
+3. **Line up:** your horde stands in single file on the sidewalk outside the rival's fence, each with a health bar and a red **"!"**. Send zombies one at a time, or hit **Send All Zombies**.
+4. **Command:** during the raid, **tap where you want them to attack**: a defender, the fence, or **the serving counter to steal a dish**.
+5. **The staff swarm:** the moment violence starts, every rival staff member rushes your zombies.
+6. **The Head Chef (raid boss):** comes out once most of the joint is cleared. **Defeat the Head Chef to win the raid.** Killing them fast, with several zombies at once, raises the chance of a rare **Brain Sauce** drop (the original's rare Toxin vial drop).
+7. **Retreat:** tap the **white truce flag** (top-left) to pull out at any time and keep what you've stolen so far.
 
-**Targets**
-- **Raid Map (PvE campaign):** a road-trip map of rival joints across a ruined America, with 9 chapters at launch and a boss joint per chapter: *Chuck Wagon's Chow Hall*, *Big Hank's Burger Barn*, *Vegan Vera's Salad Fortress*, *Sushi Samurai*, *Colonel Crunch's Chicken Shack*, *Le Snob Bistro*, *Taco Titan*, *Crust Me Pizzeria*, *The Golden Spork* (final). Each awards stars (1–3) and a **signature recipe**.
-- **Neighbors (PvP):** other players' joints, defended by their saved layout and assigned Bouncers. You get matched by Raid Power. The defender gets a 6 h shield after being hit and a revenge button.
-- **Friends:** a "Friendly Food Fight" with no losses, for fun and quests.
+**Raid items (the original's tombstones, renamed):**
+| Item | Effect | Limit |
+|---|---|---|
+| **Green Grave Marker** | Boosts every raider's health before the attack | 5 uses/day, recharges at midnight |
+| **Red Grave Marker** | Temporarily raises attack power (zombies flash red) | 5 uses/day, recharges at midnight |
+| **Healing Headstone** | Restores Energy to every zombie and pet in the raid over a few seconds, without interrupting fighting | Consumable |
+| **Summon Stone: Big Foot-Long** | Summons a giant hot-dog Sasquatch zombie ally (the original's Zombie Yeti) | Up to 3 active, bought with Brain Sauce |
 
-**How a raid plays**
-1. **Pick squad:** up to 8 zombies (crew-slot limited); a power estimate vs the target.
-2. **Scout:** see the defenses (fence, turrets, guards) before you commit.
-3. **Deploy:** drag zombies onto one of 2–3 **lanes** (sidewalk, back alley, parking lot) and choose the timing. Zombies shamble toward the joint and fight automatically.
-4. **Abilities (tap):** *BBQ Sauce Bomb* (AoE slow), *Brain Bait* (pulls defenders), *Horde Howl* (speed buff). They run on cooldowns, and you equip 2.
-5. **Win condition:** break into the kitchen within the timer. Loot scales with damage %.
+**Raid pets:** zombie dogs (Rot-weiler), werewolves (Werewoof), and a set of 5 **Grill-Bots** that **combine into one giant robot, "Mega Grillatron"**, when all 5 are on the team. That last one is a nod to the original's Amtron robot pets.
 
-**Defenses** (placed in your own joint's yard; they also decorate it):
-- *Picket Fence* → *Spiked Barricade* (HP walls)
-- *Bug Zapper Tower* (single target), *Sprinkler of Holy Water* (area), *Grease Trap* (slow), *Guard Dog* (fast melee), *Human Chef with Spatula* (NPC defender), *Bouncer zombies* (yours).
+**Loot:**
+- Guaranteed: **cash** and **dishes** (looted dishes go to your Fridge, where you serve them or unlock the recipe).
+- Rare: **Brain Sauce**, **rare Raid-Cookbook recipes**, decor blueprints, and "captured customers" (rare types you can infect).
 
-**Loot:** cash, Brain Sauce, **recipe fragments** (5 = full recipe), decor blueprints, and "captured customers" (rare types you can infect).
-
-**Raid damage to zombies:** injured raiders return "Patched Up" (bandaged look, 1 h rest or Brain Sauce). They are never permanently lost.
+**Modern upgrades on top:**
+- **Raid Map (PvE campaign):** a road trip across a ruined America, with 9 chapters at launch and a boss joint per chapter: *Chuck Wagon's Chow Hall*, *Big Hank's Burger Barn*, *Vegan Vera's Salad Fortress*, *Sushi Samurai*, *Colonel Crunch's Chicken Shack*, *Le Snob Bistro*, *Taco Titan*, *Crust Me Pizzeria*, *The Golden Spork* (final). Each awards 1–3 stars and a **signature recipe**.
+- **Neighbors (PvP):** other players' joints, defended by their saved layout, their staff, and Bouncer zombies. Matchmaking uses Raid Power. A defender gets a 6 h shield after a hit, plus a revenge button.
+- **Friends:** a "Friendly Food Fight" with no losses.
+- **Scout** before committing to see the defenders and Head Chef level.
+- **Defenses** you place in your own yard (they double as decor): *Picket Fence* → *Spiked Barricade* (the wooden spike fence in the original raid screen), *Bug Zapper Tower*, *Sprinkler of Holy Water*, *Grease Trap*, *Guard Dog*.
+- **KO, not death:** knocked-out zombies show dizzy stars, sink into the ground, and come home "Patched Up" (bandaged, needing rest). They are never permanently lost.
 
 ### 3.7 Pets
 
@@ -239,7 +263,7 @@ Unlock at Lv 10. One active pet roams the joint: *Zombie Pug* (finds coins), *Tw
 | Currency | Icon | Earned | Spent on | Sold? |
 |---|---|---|---|---|
 | **Cash** ($) | gold coin | Serving dishes, raids, quests | Cooking, recipes, decor, infect, expansions | Small packs only |
-| **Brain Sauce** | glowing green jar | Raids, daily quests, level-ups, achievements, Undead Chicken, rewarded ads | Instant Hunger refills, timer skips, mutations, premium decor | Yes, but always earnable |
+| **Brain Sauce** | glowing green jar | 5 to start (like the original's 5 vials), rare Head Chef drops in raids, a **10-day cooking streak** reward (the original's "Frequent Fryer"), friend gifts, daily quests, level-ups, achievements, Undead Chicken, rewarded ads | Instant Energy refills, special infections (e.g. Boxer), Finish-now on stoves, raid summons, mutations, premium decor | Yes, but always earnable |
 | **XP** | — | Cooking, serving, raids | Level-ups (unlocks) | No |
 | **Event tokens** | per event | Event dishes/raids | Event shop | No |
 
@@ -250,7 +274,7 @@ Unlock at Lv 10. One active pet roams the joint: *Zombie Pug* (finds coins), *Tw
 | 30 min | 5 | 1★ | 4/4 | First raid won, Smoker unlocked |
 | Day 1 end | 8 | 1.5★ | 5 | First expansion, Fryer |
 | Day 3 | 12 | 2.5★ | 7 | Sauces, Chapter 2 boss |
-| Day 7 | 16 | 3★ | 9 | Crews, Auto-Feeder, first event |
+| Day 7 | 16 | 3★ | 9 | Crews, Brain Sauce Keg, first event |
 | Day 30 | 26 | 4★ | 14 | Mutations, 3rd theme |
 | Day 90 | 40+ | 4.5–5★ | 18+ | Endgame decorating, crew raids |
 
@@ -268,15 +292,18 @@ Level cap at launch: **50** (raised by updates). XP curve: `xp_to_next(L) = roun
 
 ## 5. First-time user experience (first 10 minutes)
 
-1. **Cold open (cutscene, 20 s):** a rainy night. You, a laid-off line cook, find an abandoned roadside BBQ shack. The radio says "…outbreak…". Your first customer stumbles in. It's a zombie, and it just wants ribs.
-2. **Tap the grill** → cook a Charred Hot Dog (10 s timer in the tutorial).
-3. Meet **Gus**, a zombie pitmaster who "applies for the job" by groaning. He's your first crew member.
-4. Serve 3 customers → coins burst → buy your first table.
-5. A customer gets bored → **infect** them (guided) → Nurse Nell joins.
-6. Gus gets hungry → he lunges at a customer (the joke!) → you learn to feed him a Brain Snack.
-7. A rival biker gang raids *you*: a tiny scripted defense, introduces raids.
-8. **Revenge raid** on their lean-to: you win, steal the *Brain Burger* recipe.
-9. Name your joint → reward: Barrel Smoker → the tutorial ends with a long cook running so the player **wants to come back**.
+The tutorial follows the original's order (cook → counter → serve → infect your first cook), narrated by **Gus, the Zombie Union Rep**. He's a grumpy zombie chef in a stained apron, and he's this game's version of the original's union-rep narrator, who invented Toxin. Ours invented Brain Sauce.
+
+1. **Cold open (20 s):** a rainy night. You, a down-on-your-luck cook with a suspicious bandage on your arm, find an abandoned roadside BBQ shack. The radio says "…outbreak…". Gus shambles in waving a union card: "You look human. You ain't. Let's get cookin', Boss."
+2. **Select your chef, then the stove:** tap **YOU**, then the Rusty Grill. You cook a Charred Hot Dog (10 s timer in the tutorial).
+3. **Tap the food** to move it to the serving counter, then tap the counter to serve. The first customer walks in.
+4. The customer eats and shows a happy yellow face; coins and XP pop.
+5. **Infect your first cook:** Gus says "Now give 'em a little nibble." Tap the customer, then **Infect**. It's free in the tutorial. The infection dance plays, and they become **your first cook**. Tap them, then the grill, and they start cooking.
+6. **Infect a second customer**, who becomes a waiter. The crew reaches `2/4`.
+7. **Energy lesson:** your cook's Energy drops into the red, they **attack a customer**, the customer flees with a blue frowny face, and a star wobbles. Gus: "Union mandates naps." Tap → **Rest**, and the cook flops face-down on a table with "Zzz".
+8. **Brain Sauce lesson:** you have 5 starting jars (the original gave 5 Toxin vials). Use one to refill a zombie instantly.
+9. **First raid:** a tiny scripted raid on *Chuck Wagon's Chow Hall*. Send your zombies, tap the counter to steal a dish, beat the Head Chef. The stolen dish goes to your Fridge, and you study it to unlock the **Brain Burger** recipe.
+10. **Name your joint.** Reward: the Barrel Smoker. The tutorial ends with a long cook running, so the player **wants to come back**.
 
 ---
 
