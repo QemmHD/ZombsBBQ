@@ -340,7 +340,8 @@ export class Puppet {
       this.body.rotation = zombie && pose === 'walk' ? Math.sin(this.phase * 0.5) * 0.05 : 0;
       this.body.y = 0;
     }
-    this.body.x = pose === 'shiver' ? (Math.random() - 0.5) * 2.4 : 0;
+    // a body lying down is centred on its spot (it pivots at the feet, so slide it back half a body)
+    this.body.x = pose === 'shiver' ? (Math.random() - 0.5) * 2.4 : pose === 'lie' ? Math.sign(this.body.scaleX || 1) * this.height * 0.4 : 0;
   }
 
   private poseQuad(view: View, pose: Pose) {
