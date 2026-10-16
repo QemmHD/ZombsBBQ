@@ -44,6 +44,8 @@ export class RaidScene extends Phaser.Scene {
   private t = 0;
   /** diners just eaten: when, so the body stays down under the feasting zombie for a moment */
   private eatenAt = new Map<string, number>();
+  /** bone piles left where diners were eaten (original: 10 s, then a 3 s fade) */
+  private bones: { img: Phaser.GameObjects.Image; t0: number }[] = [];
   private seenEvents = 0;
   private drag: {
     x: number;
@@ -342,6 +344,17 @@ export class RaidScene extends Phaser.Scene {
     this.t += dt;
     const r = this.ctl.raid;
     this.followAction(dt);
+    // bone piles: fade in as the body goes, lie there 10 s, fade out over 3 s
+    this.bones = this.bones.filter((b) => {
+      const age = this.t - b.t0;
+      const a = age < 1.8 ? Phaser.Math.Clamp((age - 1.4) / 0.4, 0, 1) : age < 11.8 ? 1 : 1 - (age - 11.8) / 3;
+      b.img.setAlpha(Math.max(0, a));
+      if (a <= 0 && age > 2) {
+        b.img.destroy();
+        return false;
+      }
+      return true;
+    });
     this.door?.update(
       dt,
       this.t,
@@ -353,9 +366,9 @@ export class RaidScene extends Phaser.Scene {
       const v = this.view(u);
       // an eaten diner drops and lies there while the zombie feasts, then fades away
       const eatenFor = this.t - (this.eatenAt.get(u.id) ?? -99);
-      const corpse = u.state === 'gone' && eatenFor < 2.4;
+      const corpse = u.state === 'gone' && eatenFor < 1.8;
       const gone = u.state === 'gone' && !corpse;
-      v.holder.setVisible(!gone).setAlpha(corpse ? Math.min(1, (2.4 - eatenFor) / 0.6) : 1);
+      v.holder.setVisible(!gone).setAlpha(corpse ? Math.min(1, (1.8 - eatenFor) / 0.4) : 1);
       if (gone) continue;
       // seated only when actually on the chair (a walk-in who screams in the doorway is standing)
       const onChair = !!u.home && Math.abs(u.x - u.home.x) < 0.05 && Math.abs(u.y - u.home.y) < 0.05;
@@ -504,6 +517,8 @@ export class RaidScene extends Phaser.Scene {
       }
       case 'eat': {
         this.eatenAt.set(e.customer, this.t);
+        const bp = iso(e.x, e.y);
+        this.bones.push({ img: propImage(this, `bones_pile_${this.bones.length % 3}`, bp.x, bp.y).setDepth(moverDepth(e.x, e.y, -2)).setAlpha(0).setScale(1.3 / TEX_S), t0: this.t });
         const p = iso(e.x, e.y);
         // the text rides above the head and the cash pops beside the body, so they don't print over each other
         this.floatText(p.x, p.y - 125, `CHOMP! +$${e.cash}`, '#D9C25A', 14);

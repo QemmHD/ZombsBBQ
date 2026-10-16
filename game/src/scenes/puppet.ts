@@ -169,8 +169,9 @@ export class Puppet {
       J.legL = [-0.22, 0.28]; // braced
       J.legR = [0.18, 0.08];
     } else if (pose === 'feast') {
-      J.legL = [-0.15, 0.3];
-      J.legR = [0.1, 0.2];
+      // crouched over the body: thighs forward, knees folded, hips dropped (worked out below)
+      J.legL = [-0.95, 1.5];
+      J.legR = [-0.65, 1.1];
     }
     // ----- arms and head -----
     switch (pose) {
@@ -210,10 +211,10 @@ export class Puppet {
       }
       case 'feast':
         // original feast: bent over a body, head dipping twice a loop, hand to mouth
-        lean = 20 * D;
+        lean = 38 * D;
         J.armL = [-21 * D - Math.max(0, s) * 12 * D, -Math.max(0, Math.sin(this.phase * 2)) * 69 * D];
         J.armR = [28 * D, -40 * D];
-        headRot = -Math.abs(Math.sin(this.phase)) * 14 * D;
+        headRot = Math.abs(Math.sin(this.phase)) * 14 * D; // dipping into the meal
         break;
       case 'sit':
         // original sit: forearms flat on the table edge (80° / 95°)
@@ -235,7 +236,7 @@ export class Puppet {
       case 'hit':
         // original hit: the head snaps back 44°, the torso rocks back 9°
         lean = -9 * D;
-        headRot = 30 * D;
+        headRot = -30 * D; // snapped back (negative tips the head away from the facing side)
         J.armL = [-28 * D, 0];
         J.armR = [-6 * D, -40 * D];
         break;
@@ -318,8 +319,8 @@ export class Puppet {
     if (lean) {
       const hx = 0;
       const hy = -this.hipY;
-      const cs = Math.cos(-lean);
-      const sn = Math.sin(-lean);
+      const cs = Math.cos(lean);
+      const sn = Math.sin(lean);
       for (const k of ['torso', 'head', 'armL', 'armR', 'armL2', 'armR2']) {
         const q = P[k];
         if (!q) continue;
@@ -327,7 +328,7 @@ export class Puppet {
         const dy = q.y - hy;
         q.x = hx + dx * cs - dy * sn;
         q.y = hy + dx * sn + dy * cs;
-        q.rotation -= lean;
+        q.rotation += lean;
       }
     }
     // seen from behind, a sitter's legs are tucked under the table, out of sight behind the body
@@ -338,10 +339,20 @@ export class Puppet {
       this.body.y = -6;
     } else {
       this.body.rotation = zombie && pose === 'walk' ? Math.sin(this.phase * 0.5) * 0.05 : 0;
-      this.body.y = 0;
+      this.body.y = pose === 'feast' ? this.crouchDrop(B, J.legL, J.legR) : 0;
     }
     // a body lying down is centred on its spot (it pivots at the feet, so slide it back half a body)
     this.body.x = pose === 'shiver' ? (Math.random() - 0.5) * 2.4 : pose === 'lie' ? Math.sign(this.body.scaleX || 1) * this.height * 0.4 : 0;
+  }
+
+  /** How far the hips sink when the legs bend (so the feet stay on the floor): the standing leg
+   * length minus the bent leg's height, for the shallower of the two legs. */
+  private crouchDrop(B: View['base'], l: [number, number], r: [number, number]): number {
+    if (!B.legL || !B.legL2) return 0;
+    const T = B.legL2.y - B.legL.y; // hip → knee
+    const S = -B.legL2.y; // knee → sole
+    const h = ([a, b]: [number, number]) => T * Math.cos(a) + S * Math.cos(a + b);
+    return Math.max(0, T + S - Math.max(h(l), h(r)));
   }
 
   private poseQuad(view: View, pose: Pose) {

@@ -965,15 +965,30 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         s.stats.bites++;
         addRating(s, 0, TUNING.ratingAttackWeight);
         w.energy = Math.min(max, w.energy + TUNING.biteEnergyGain);
-        w.state = 'idle';
         w.targetId = undefined;
-        leave(s, c, 'angry', true, false);
+        // original: the zombie eats them right there (its feast), leaving a pile of bones on the floor
+        dropServer(s, c);
+        s.events.push({ t: 'eaten', x: c.x, y: c.y, workerId: w.id, customerId: c.id, type: c.type });
+        s.stats.angry++;
+        c.state = 'leaving';
+        c.seatId = undefined;
+        c.tableId = undefined;
+        c.path = [];
+        c.x = GONE;
+        w.state = 'feasting';
+        w.feastEnd = s.now + TUNING.feastSec;
         // everyone else panics and runs out screaming without paying (original)
         s.events.push({ t: 'panic' });
         for (const o of s.customers) if (o !== c && (o.state === 'waiting' || o.state === 'eating' || o.state === 'entering')) leave(s, o, 'angry', true, false);
       }
       break;
     }
+    case 'feasting':
+      if (s.now >= (w.feastEnd ?? 0)) {
+        w.state = 'idle';
+        w.feastEnd = undefined;
+      }
+      break;
     case 'toRest':
       if (move(w, dt)) w.state = 'resting';
       break;

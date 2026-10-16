@@ -249,6 +249,8 @@ export const TUNING = {
   /** each Toxic Barrel adds this much to the rest recharge rate (they stack) */
   kegBonus: 0.6,
   biteEnergyGain: 20,
+  /** a zombie who catches a customer eats them on the spot for this long before getting back to work */
+  feastSec: 3,
   daydreamBaseSec: 100, // original: focus 1 ~ every 100 s
   daydreamMaxSec: 25,
   offlineCapSec: 8 * 3600,

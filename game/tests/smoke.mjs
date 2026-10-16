@@ -84,8 +84,11 @@ const tapWorld = async (wx, wy, scene) => {
 };
 const tapActor = async (id) => {
   const pos = await page.evaluate((id) => {
+    // tap the middle of the body, the way a player would
     const a = window.zbbq.game.scene.getScene('joint').actors.get(id);
-    return a ? { x: a.holder.x, y: a.holder.y - 30 } : null;
+    if (!a) return null;
+    const b = a.puppet?.root.getBounds();
+    return b ? { x: b.centerX, y: b.centerY } : { x: a.holder.x, y: a.holder.y - 50 };
   }, id);
   check(!!pos, `actor ${id} on screen`);
   if (pos) await tapWorld(pos.x, pos.y);

@@ -25,6 +25,7 @@ import {
   type GameState,
   type Pet,
   type Worker,
+  TUNING,
 } from '../sim';
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
@@ -69,6 +70,9 @@ export class JointScene extends Phaser.Scene {
   ctl!: Controller;
   ready = false;
   private actors = new Map<string, Actor>();
+  /** eaten customers: the body lies there while the zombie feasts, then a bone pile (original: 10 s, then a 3 s fade) */
+  private remains: { body: Phaser.GameObjects.Container | null; bones: Phaser.GameObjects.Image; t0: number }[] = [];
+  private bonesN = 0;
   private staticLayer: Phaser.GameObjects.GameObject[] = [];
   private furnViews = new Map<string, Phaser.GameObjects.Image[]>();
   private wallViews = new Map<string, Phaser.GameObjects.Image>();
@@ -480,17 +484,20 @@ export class JointScene extends Phaser.Scene {
     // characters: whoever's body is closest to the finger wins (front-most only breaks ties), so a
     // zombie half-hidden behind a customer is still easy to grab
     let best: { id: string; kind: 'w' | 'c' | 'p'; score: number } | null = null;
+    // hit-test against each puppet's drawn bounds (standing, seated or lying), so a seated diner's
+    // folded body and a taller standing figure in front of them are judged by what's actually on screen
     const consider = (id: string, kind: 'w' | 'c' | 'p') => {
       const a = this.actors.get(id);
       if (!a?.puppet || !a.holder.visible) return;
-      const lying = Math.abs(a.puppet.body.rotation) > 0.5;
-      const hw = lying ? 44 : 24;
-      const top = lying ? 34 : a.puppet.height + 8;
-      if (Math.abs(wx - a.holder.x) < hw && wy < a.holder.y + 8 && wy > a.holder.y - top) {
-        const cy = a.holder.y - (lying ? 12 : a.puppet.height * 0.45);
-        const score = (wx - a.holder.x) ** 2 + ((wy - cy) * 0.7) ** 2 - a.holder.depth * 1e-6;
-        if (!best || score < best.score) best = { id, kind, score };
-      }
+      const b = a.puppet.root.getBounds();
+      const pad = 6;
+      if (wx < b.left - pad || wx > b.right + pad || wy < b.top - pad || wy > b.bottom + pad) return;
+      // distance to the body's centre line, measured relative to its size: being well inside a small
+      // seated figure beats grazing the edge of a big one standing in front
+      const nx = (wx - b.centerX) / Math.max(12, b.width / 2);
+      const ny = (wy - b.centerY) / Math.max(12, b.height / 2);
+      const score = nx * nx * 1.6 + ny * ny - a.holder.depth * 1e-7;
+      if (!best || score < best.score) best = { id, kind, score };
     };
     for (const w of s.workers) if (w.state !== 'raiding') consider(w.id, 'w');
     for (const c of s.customers) if (c.state !== 'leaving' && c.state !== 'fleeing' && c.state !== 'infecting' && c.state !== 'turnedAway') consider(c.id, 'c');
@@ -706,6 +713,7 @@ export class JointScene extends Phaser.Scene {
     const serveT = this.t - (a.serveAt ?? -9);
     let pose: Parameters<Puppet['pose']>[0] = 'idle';
     if ((w.state === 'resting' || w.state === 'down') && !moving) pose = 'lie';
+    else if (w.state === 'feasting') pose = 'feast';
     else if (serveT < 0.5) pose = 'serve';
     else if (moving) pose = w.state === 'hunting' ? 'run' : 'walk';
     else if (w.state === 'cooking') pose = 'cook';
@@ -715,7 +723,7 @@ export class JointScene extends Phaser.Scene {
       carry: pose !== 'serve' && (w.state === 'carrying' || w.state === 'carryDish' || w.state === 'carryPlate'),
       attackT: pose === 'serve' ? serveT : undefined,
     });
-    const face = this.t < a.faceUntil ? a.face : w.state === 'resting' ? 'sleep' : w.state === 'down' ? 'dazed' : w.state === 'hunting' ? 'chomp' : undefined;
+    const face = this.t < a.faceUntil ? a.face : w.state === 'resting' ? 'sleep' : w.state === 'down' ? 'dazed' : w.state === 'hunting' || w.state === 'feasting' ? 'chomp' : undefined;
     pup.setFace(face as never);
     a.shadow.setVisible(pose !== 'lie').setScale(1);
     // what they're carrying: a plate of food to a table, a pot from the stove, or dirty plates
@@ -901,8 +909,52 @@ export class JointScene extends Phaser.Scene {
         this.tablePlates.get(id)?.destroy();
         this.tablePlates.delete(id);
       }
+    this.updateRemains();
     this.updateStations(dt);
     this.updateEdit();
+  }
+
+  /** A customer eaten where they stood: their body drops (dazed, flat on the floor) under the feasting
+   * zombie, then gives way to a pile of bones that lies there 10 s and fades over 3 s (original). */
+  private dropRemains(x: number, y: number, charId: string) {
+    const p = iso(x, y);
+    // on the floor: under anyone standing on that tile
+    const floor = moverDepth(x, y, -2);
+    const bones = this.img(`bones_pile_${this.bonesN++ % 3}`, p.x, p.y).setDepth(floor).setAlpha(0);
+    bones.setScale(1.3 / TEX_S);
+    let body: Phaser.GameObjects.Container | null = null;
+    const art = charLoaded(this, charId) ? charArt(charId) : null;
+    if (art) {
+      const pup = new Puppet(this, art);
+      pup.setFacing(Math.random() < 0.5 ? 1 : -1);
+      pup.pose('lie', 0);
+      pup.setFace('dazed' as never);
+      body = this.add.container(p.x, p.y, [pup.root]).setDepth(floor + 1);
+    }
+    this.remains.push({ body, bones, t0: this.t });
+  }
+
+  private updateRemains() {
+    const feast = TUNING.feastSec;
+    this.remains = this.remains.filter((r) => {
+      const age = this.t - r.t0;
+      // the body crossfades into bones as the zombie finishes
+      const swap = Phaser.Math.Clamp((age - feast + 0.4) / 0.4, 0, 1);
+      if (r.body) {
+        r.body.setAlpha(1 - swap);
+        if (swap >= 1) {
+          r.body.destroy();
+          r.body = null;
+        }
+      }
+      const fade = age > feast + 10 ? 1 - (age - feast - 10) / 3 : 1;
+      r.bones.setAlpha(Math.max(0, Math.min(swap, fade)));
+      if (fade <= 0) {
+        r.bones.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   private updateStations(dt: number) {
@@ -1088,6 +1140,14 @@ export class JointScene extends Phaser.Scene {
       case 'xp': {
         const p = iso(e.x, e.y);
         this.floatText(p.x, p.y - 100, `+${e.amount} XP`, '#9CC4C8');
+        break;
+      }
+      case 'eaten': {
+        // the victim falls out of their seat, onto the floor at the zombie's feet (not hidden under the
+        // table), and that's where the bones end up
+        const z = s.workers.find((w) => w.id === e.workerId);
+        const k = 0.55;
+        this.dropRemains(z ? z.x + (e.x - z.x) * k : e.x, z ? z.y + (e.y - z.y) * k : e.y, e.type);
         break;
       }
       case 'bite': {

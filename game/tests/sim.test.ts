@@ -240,6 +240,26 @@ describe('energy, patience, biting, resting outside, levels', () => {
     expect(s.customers.filter((c) => c.state === 'waiting' || c.state === 'eating')).toHaveLength(0);
   });
 
+  it('the zombie eats its victim on the spot (feast) and leaves a bone pile behind, then gets back up', () => {
+    const { s, z } = withZombie();
+    z.energy = 1;
+    z.nextDaydream = Infinity;
+    let eaten: { t: string; customerId?: string; x?: number; y?: number } | undefined;
+    for (let i = 0; i < 800 && !eaten; i++) {
+      s.events.length = 0;
+      tick(s, 0.25);
+      eaten = s.events.find((e) => e.t === 'eaten') as typeof eaten;
+    }
+    expect(eaten).toBeDefined();
+    expect(z.state).toBe('feasting');
+    // the victim is gone (no fleeing, no paying): only bones are left, which the scene draws
+    tick(s, 0.1);
+    expect(s.customers.some((c) => c.id === eaten!.customerId)).toBe(false);
+    // the feast lasts a few seconds, then it's back to work
+    for (let i = 0; i < (TUNING.feastSec + 0.5) / 0.25; i++) tick(s, 0.25);
+    expect(z.state).not.toBe('feasting');
+  });
+
   it('resting zombies walk out the door and nap on the sidewalk, then come back in', () => {
     const { s, z } = withZombie();
     z.energy = 30;

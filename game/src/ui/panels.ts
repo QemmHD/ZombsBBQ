@@ -98,6 +98,7 @@ const STATUS: Record<WorkerState, string> = {
   toPlate: 'Clearing a table',
   carryPlate: 'Dumping plates in the sink',
   hunting: 'HANGRY! Hunting a snack',
+  feasting: 'Feasting on a customer',
   toRest: 'Off for a nap',
   resting: 'Napping outside',
   daydream: 'Daydreaming about brains',

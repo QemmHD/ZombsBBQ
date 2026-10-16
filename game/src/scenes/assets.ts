@@ -23,6 +23,7 @@ import { buildSpecial } from '../art3/special';
 import { buildOutdoor } from '../art3/outdoor';
 import { buildDishes } from '../art3/dishes';
 import { buildFx } from '../art3/fx';
+import { buildBones } from '../art3/bones';
 import { buildUi3 } from '../art3/ui3';
 import { buildChar3 } from '../art3/chars';
 import { buildRaidChar3 } from '../art3/chars/raidcast';
@@ -41,7 +42,7 @@ const ui = new Map<string, ArtAsset>();
 const chars = new Map<string, CharArt | null>();
 
 /** Always rasterized at boot: the lot itself and the small in-world FX. */
-const EAGER = /^(grass|sidewalk|road|kerb|lane|drain|manhole|oil|puddle|crack_road|wall_|door_|floor_|stain_|floorcrack_|rat$|roach$|fx_|face_|bubble_|plate_|grill_flames|fryer_bubbles|pot_burnt)/;
+const EAGER = /^(grass|sidewalk|road|kerb|lane|drain|manhole|oil|puddle|crack_road|wall_|door_|floor_|stain_|floorcrack_|rat$|roach$|fx_|face_|bubble_|plate_|bones_|grill_flames|fryer_bubbles|pot_burnt)/;
 
 function safe<T>(f: () => T, fallback: T): T {
   try {
@@ -54,7 +55,7 @@ function safe<T>(f: () => T, fallback: T): T {
 
 export function initArt() {
   if (props.size) return;
-  for (const build of [buildGround, buildRoom, buildKitchen, buildFurniture, buildDecor, buildWallItems, buildSpecial, buildOutdoor, buildDishes, buildFx, buildRaidMap3])
+  for (const build of [buildGround, buildRoom, buildKitchen, buildFurniture, buildDecor, buildWallItems, buildSpecial, buildOutdoor, buildDishes, buildFx, buildBones, buildRaidMap3])
     for (const a of safe(build, [])) props.set(a.key, a);
   for (const a of [...safe(buildProps, []), ...safe(buildRaidProps, [])]) if (!props.has(a.key)) legacy.set(a.key, a);
   for (const a of safe(buildUiIcons, [])) ui.set(a.key, a);
@@ -290,6 +291,8 @@ export function loadRaidProps(scene: Phaser.Scene): Promise<void> {
 }
 
 const charLoads = new Map<string, Promise<boolean>>();
+/** characters whose every texture has finished (or failed) rasterizing */
+const charsReady = new Set<string>();
 /** Rasterize a character's parts, back parts and faces. Resolves false if there's no art. */
 export function loadChar(scene: Phaser.Scene, id: string): Promise<boolean> {
   let p = charLoads.get(id);
@@ -297,12 +300,18 @@ export function loadChar(scene: Phaser.Scene, id: string): Promise<boolean> {
   const art = charArt(id);
   if (!art) return Promise.resolve(false);
   const parts: CharPart[] = [...art.parts, ...(art.backParts ?? []), ...Object.values(art.faces ?? {}).filter((x): x is CharPart => !!x)];
-  p = Promise.all(parts.map((pt) => addTexture(scene, pt.key, pt.svg, pt.w, pt.h))).then(() => true);
+  p = Promise.all(parts.map((pt) => addTexture(scene, pt.key, pt.svg, pt.w, pt.h))).then(() => {
+    charsReady.add(id);
+    return true;
+  });
   charLoads.set(id, p);
   return p;
 }
 
 export function charLoaded(scene: Phaser.Scene, id: string): boolean {
   const art = charArt(id);
-  return !!art && art.parts.every((p) => scene.textures.exists(p.key));
+  // every view: a puppet built while its back view or faces are still rasterizing would show the
+  // missing-texture placeholder the moment it turns away or pulls a face
+  const all = [...(art?.parts ?? []), ...(art?.backParts ?? []), ...Object.values(art?.faces ?? {}).filter((x): x is CharPart => !!x)];
+  return !!art && (charsReady.has(id) || all.every((p) => scene.textures.exists(p.key)));
 }

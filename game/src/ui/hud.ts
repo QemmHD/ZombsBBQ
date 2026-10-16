@@ -56,6 +56,7 @@ const WORKER_STATE: Record<Worker['state'], string> = {
   toPlate: 'Clearing a dirty plate',
   carryPlate: 'Taking plates to the sink',
   hunting: 'HANGRY! Going for a customer!',
+  feasting: 'Eating a customer. Gross.',
   toRest: 'Off for a nap',
   resting: 'Napping on the sidewalk… Zzz',
   daydream: 'Daydreaming about brains… (tap to snap out of it)',

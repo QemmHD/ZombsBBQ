@@ -66,6 +66,7 @@ export type WorkerState =
   | 'toPlate'
   | 'carryPlate'
   | 'hunting'
+  | 'feasting'
   | 'toRest'
   | 'resting'
   | 'daydream'
@@ -93,6 +94,8 @@ export interface Worker extends Mover {
   job?: WorkerJob;
   targetId?: string;
   restSpot?: Pt;
+  /** a feasting zombie gets back up at this time */
+  feastEnd?: number;
   daydreamEnd?: number;
   nextDaydream: number;
   /** raid KO: back on their feet at this sim time */
@@ -174,6 +177,8 @@ export type GameEvent =
   | { t: 'xp'; x: number; y: number; amount: number }
   | { t: 'bite'; x: number; y: number; workerId: string; customerId: string }
   | { t: 'panic' }
+  /** a customer eaten where they stood (the scene drops the body, then a pile of bones) */
+  | { t: 'eaten'; x: number; y: number; workerId: string; customerId: string; type: string }
   | { t: 'infected'; workerId: string }
   | { t: 'levelup'; level: number }
   | { t: 'zombieLevel'; workerId: string; level: number }
