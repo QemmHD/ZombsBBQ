@@ -4,6 +4,7 @@
  * opens rips onto green skin and adds stains.
  */
 import type { Body, Ctx, Paint } from './rig';
+import { elbowAt, kneeAt } from './rig';
 import {
   INK, LW, LI, LF, f, ellD, fill, line, outl, circ, inside, shade, speck, hatch, grime, fold, stain, rip, drip,
   limb, tube, jag, rnd, mix, dk, lt, fadeV, smooth, stitch, tone,
@@ -381,6 +382,11 @@ export function boxingGlove(c: Ctx, h: Pt, col: Tone): string {
 // ---------------------------------------------------------------- arms
 export type Sleeve = 'long' | 'short' | 'none' | 'rolled' | 'cap';
 
+/** Hands and hand props are drawn this much bigger than authored (chunky cartoon mitts). */
+export const HAND_S = 1.45;
+/** Hand props are drawn this much bigger than authored. */
+export const PROP_S = 1.18;
+
 export interface HandItem {
   /** paint under the fist (shafts passing behind the hand) */
   under?: (c: Ctx, h: Pt) => string;
@@ -388,7 +394,7 @@ export interface HandItem {
   over?: (c: Ctx, h: Pt) => string;
   /** hand pose */
   fist?: boolean;
-  /** extent relative to the fist centre (for the part's image box) */
+  /** extent relative to the fist centre, before HAND_S (for the part's image box) */
   box?: [number, number, number, number];
 }
 
@@ -402,7 +408,7 @@ export interface ArmSpec {
   glove?: Tone;
   /** boxing gloves instead of hands */
   boxing?: Tone;
-  /** forearm covering (long gloves, sleeves of an undershirt) */
+  /** forearm covering (long gloves) */
   forearm?: Tone;
   watch?: string;
   wristband?: string;
@@ -411,98 +417,123 @@ export interface ArmSpec {
   /** items per side: L (screen-left, near in the front view) / R */
   itemL?: HandItem;
   itemR?: HandItem;
-  /** extra paint on the arm (bite marks, tattoos…), arm frame */
+  /** extra paint on the forearm (bite marks…), lower-arm frame, w = wrist */
   extra?: (c: Ctx, w: Pt) => string;
-  /** zombie: which side keeps its sleeve intact */
   stripes?: string;
 }
 
-export function armGeo(c: Ctx): { e: Pt; w: Pt; h: Pt; aw: number } {
-  const s = c.side;
-  const L = c.b.armLen;
-  const e: Pt = [s * 1.4 + 0.2, L * 0.5];
-  const w: Pt = [s * 2.2 + 0.7, L - 1.4];
-  return { e, w, h: [w[0] + 0.2, w[1] + 3.8], aw: c.b.armW };
+/** Wrist in the lower-arm frame (elbow at the origin). */
+export function wristAt(b: Body, side: -1 | 1): Pt {
+  return [side * 1.2, b.foreL];
+}
+/** Fist centre in the lower-arm frame. */
+export function handAt(b: Body, side: -1 | 1): Pt {
+  const w = wristAt(b, side);
+  return [w[0] + 0.3, w[1] + 3.8 * HAND_S];
 }
 
-export type ArmPaint = Paint & { items?: { L?: HandItem; R?: HandItem } };
-
-/** Hand (fist) centre in the arm frame. */
-export function handAt(armLen: number, side: -1 | 1): Pt {
-  return [side * 2.2 + 0.9, armLen + 2.4];
+function dim(c: Ctx, sil: string[]): string {
+  return c.near ? '' : `<g opacity="0.16">${sil.map((p) => fill(p, INK)).join('')}</g>`;
 }
 
-export function armPaint(spec: ArmSpec): ArmPaint {
-  const fn: ArmPaint = (c) => {
+export interface ArmSet {
+  up: Paint;
+  lo: Paint;
+  items: { L?: HandItem; R?: HandItem };
+}
+
+export function armPaint(spec: ArmSpec): ArmSet {
+  const A_ = (c: Ctx) => c.b.armW * (spec.bulk ?? 1);
+  const up: Paint = (c) => {
+    const { d, z, side, seed } = c;
+    const A = A_(c);
+    const E = elbowAt(c.b, side);
+    const T = spec.col;
+    const sk = c.sk;
+    const sil: string[] = [];
+    let s = '';
+    const skin = () => {
+      const p = limb([0, 0], E, A * 0.84, A * 0.78);
+      sil.push(p);
+      let t = shade(d, p, sk, { off: [-1, -1] });
+      if ((spec.bulk ?? 1) > 1.1 || c.b.armW > 12) t += line(`M${f(-A * 0.2)},${f(E[1] * 0.25)}q${f(A * 0.3)},${f(E[1] * 0.3)} 0,${f(E[1] * 0.55)}`, 0.6, sk.d, 'opacity="0.8"');
+      if (z) t += inside(d, p, fill(ellD(A * 0.15, E[1] * 0.6, A * 0.22, E[1] * 0.2), sk.d, 'opacity="0.3"'));
+      return t;
+    };
+    const torn = z ? 1.8 : 0;
+    if (spec.sleeve === 'long') {
+      const p = limb([0, 0], E, A, A * 0.92);
+      let inner = speck([-A, -A, A, E[1] + A], 12, [T.d, lt(T.b, 0.2)], seed + 7 + side, 0.25, 0.5, 0.35);
+      inner += fold(`M${f(-A * 0.3)},${f(E[1] * 0.35)}q${f(A * 0.25)},${f(E[1] * 0.25)} ${f(A * 0.05)},${f(E[1] * 0.5)}M${f(-A * 0.45)},${f(E[1] - 1)}q${f(A * 0.45)},1.4 ${f(A * 0.9)},0`, T.s, 0.7);
+      if (spec.stripes) inner += line(`M${f(side * A * 0.3)},0L${f(E[0] + side * A * 0.28)},${f(E[1])}`, 1.2, spec.stripes);
+      if (z) inner += rip(-A * 0.1, E[1] * 0.55, 1.8, 2.2, sk, seed + 3 + side);
+      s += shade(d, p, T, { inner });
+      sil.push(p);
+    } else {
+      s += skin();
+      if (spec.sleeve !== 'none') {
+        const endY = spec.sleeve === 'rolled' ? E[1] - 1.2 : spec.sleeve === 'cap' ? E[1] * 0.38 : E[1] * 0.66;
+        const sl = tube([0, 0], [E[0] * (endY / E[1]), endY], A + 0.4, A + 0.6, torn, seed + side + 3);
+        let inner = speck([-A, -A, A, endY], 10, [T.d, lt(T.b, 0.2)], seed + 9 + side, 0.25, 0.5, 0.35) + fold(`M${f(-A * 0.4)},${f(endY - 2.6)}q${f(A * 0.5)},1.2 ${f(A)},0`, T.s, 0.7);
+        if (spec.stripes) inner += line(`M${f(-A)},${f(endY - 1.8)}H${f(A)}`, 1.2, spec.stripes);
+        s += shade(d, sl, T, { inner });
+        if (spec.sleeve === 'rolled') s += shade(d, limb([-A * 0.55, endY - 0.6], [A * 0.55 + E[0], endY - 0.2], 3.2, 3.2), T, { lw: 1.1, k: 0 }) + line(`M${f(-A * 0.45)},${f(endY - 0.4)}h${f(A * 0.9)}`, 0.5, T.d);
+        sil.push(sl);
+      }
+    }
+    return s + dim(c, sil);
+  };
+  const lo: Paint = (c) => {
     const { d, z, side, seed, back } = c;
-    const { e, w, h, aw } = armGeo(c);
-    const bulk = spec.bulk ?? 1;
-    const A = aw * bulk;
+    const A = A_(c);
+    const W = wristAt(c.b, side);
+    const h = handAt(c.b, side);
+    const T = spec.col;
     const sk = c.sk;
     const item = side < 0 ? spec.itemL : spec.itemR;
     const sil: string[] = [];
     let s = '';
-    // bare skin arm
-    const up = limb([0, 0], e, A, A * 0.86);
-    const fo = limb(e, w, A * 0.86, A * 0.7);
-    const skinArm = () => {
-      let t = shade(d, fo, sk, { lw: 1.05, off: [-0.8, -0.8] }) + shade(d, up, sk, { lw: 1.05, off: [-0.9, -0.9] });
-      t += line(`M${f(e[0] - A * 0.3)},${f(e[1] - 0.4)}q${f(A * 0.3)},0.8 ${f(A * 0.6)},0`, 0.45, sk.d);
-      if (bulk > 1.2) t += line(`M${f(-A * 0.25)},${f(e[1] * 0.45)}q${f(A * 0.3)},${f(e[1] * 0.25)} ${f(A * 0.05)},${f(e[1] * 0.5)}`, 0.5, sk.d, 'opacity="0.8"');
-      if (z) t += inside(d, fo, fill(ellD(w[0] - 0.4, w[1] - 4, 1.4, 2.2), sk.d, 'opacity="0.35"') + line(`M${f(e[0])},${f(e[1] + 2)}q1,3 -0.4,6`, 0.35, sk.d, 'opacity="0.7"'));
-      sil.push(up, fo);
+    const skin = (fromY = 0) => {
+      const p = limb([0, fromY], W, A * 0.78, A * 0.6);
+      sil.push(p);
+      let t = shade(d, p, sk, { off: [-0.9, -0.9] });
+      t += line(`M${f(-A * 0.25)},1.2q${f(A * 0.25)},1 ${f(A * 0.5)},0`, 0.5, sk.d, 'opacity="0.7"');
+      if (z) t += inside(d, p, fill(ellD(W[0] - 0.4, W[1] * 0.6, A * 0.18, W[1] * 0.25), sk.d, 'opacity="0.35"') + line(`M0.6,${f(W[1] * 0.3)}q1,2.4 -0.4,4.6`, 0.4, sk.d, 'opacity="0.7"'));
       return t;
     };
-    const T = spec.col;
-    const torn = z ? 1.6 : 0;
-    switch (spec.sleeve) {
-      case 'long': {
-        const sl = tube([0, 0], [w[0], w[1] - (z && side > 0 ? 7 : 0.4)], A + 1.6, A + 0.4, torn, seed + side);
-        if (z && side > 0) s += skinArm();
-        if (spec.forearm) s += shade(d, fo, spec.forearm, { lw: 1 });
-        let inner = speck([-6, -3, 6, w[1]], 10, [T.d, lt(T.b, 0.2)], seed + 7 + side, 0.2, 0.4, 0.35);
-        inner += fold(`M${f(e[0] - A * 0.5)},${f(e[1] - 1.6)}q${f(A * 0.5)},1.4 ${f(A)},0.2M${f(e[0] - A * 0.4)},${f(e[1] + 1.2)}q${f(A * 0.4)},1 ${f(A * 0.8)},0`, T.s, 0.6);
-        inner += fold(`M${f(-A * 0.3)},3q${f(A * 0.2)},3 ${f(A * 0.1)},6`, T.s, 0.5, 0.6);
-        if (spec.stripes) inner += line(`M${f(side * A * 0.3)},0L${f(w[0] + side * A * 0.25)},${f(w[1])}`, 1, spec.stripes, 'opacity="0.9"');
-        if (spec.band && !z) inner += fill(`M-10,${f(w[1] - 3.4)}H10V${f(w[1] + 2)}H-10Z`, T.s, 'opacity="0.7"') + line(`M-10,${f(w[1] - 3.4)}H10`, 0.5, T.d);
-        if (z) inner += rip(e[0] - side * 0.2, e[1] + 1, 1.4, 1.8, sk, seed + 3 + side);
-        s += shade(d, sl, T, { lw: 1.1, inner });
-        if (spec.cuff && !(z && side > 0)) s += shade(d, tube([w[0] - 0.1, w[1] - 1.8], [w[0], w[1] + 0.2], A + 0.2, A + 0.1), { b: spec.cuff, s: dk(spec.cuff, 0.82), d: dk(spec.cuff, 0.6) }, { lw: 0.8, k: 0 });
-        sil.push(sl);
-        break;
-      }
-      case 'short':
-      case 'cap':
-      case 'rolled': {
-        s += skinArm();
-        const end: Pt = spec.sleeve === 'rolled' ? [e[0], e[1] + 0.6] : spec.sleeve === 'cap' ? [side * 0.6, 5] : [side * 0.9, 8.6];
-        const sl = tube([0, 0], end, A + 2, A + 1.8, torn, seed + side + 3);
-        let inner = speck([-6, -3, 6, end[1]], 8, [T.d, lt(T.b, 0.2)], seed + 9 + side, 0.2, 0.4, 0.35) + fold(`M${f(-A * 0.4)},${f(end[1] - 2.6)}q${f(A * 0.5)},1 ${f(A)},0`, T.s, 0.6);
-        if (spec.stripes) inner += line(`M${f(-A)},${f(end[1] - 1.6)}H${f(A)}`, 0.9, spec.stripes);
-        s += shade(d, sl, T, { lw: 1.1, inner });
-        if (spec.sleeve === 'rolled') s += shade(d, limb([end[0] - A * 0.62, end[1] - 0.6], [end[0] + A * 0.62, end[1] - 0.2], 2.6, 2.6), T, { lw: 0.9, k: 0 }) + line(`M${f(end[0] - A * 0.5)},${f(end[1] - 0.4)}h${f(A)}`, 0.4, T.d);
-        sil.push(sl);
-        break;
-      }
-      case 'none':
-        s += skinArm();
-        if (spec.forearm) s += shade(d, tube([e[0] + side * 0.1, e[1] - 2.4], w, A * 0.95, A * 0.78), spec.forearm, { lw: 1, off: [-0.6, -0.6] }) + line(`M${f(e[0] - A * 0.45)},${f(e[1] - 1.6)}h${f(A * 0.9)}`, 0.5, spec.forearm.d);
-        break;
+    if (spec.sleeve === 'long') {
+      const tornHere = z && side > 0;
+      if (tornHere) s += skin(W[1] * 0.3);
+      const end: Pt = tornHere ? [W[0] * 0.5, W[1] * 0.5] : [W[0], W[1] - 0.2];
+      const p = tube([0, 0], end, A * 0.92, A * 0.84, tornHere ? 1.8 : 0, seed + side);
+      let inner = speck([-A, -A, A, W[1]], 8, [T.d, lt(T.b, 0.2)], seed + 11 + side, 0.25, 0.5, 0.35);
+      inner += fold(`M${f(-A * 0.35)},${f(W[1] * 0.45)}q${f(A * 0.3)},1.2 ${f(A * 0.7)},0`, T.s, 0.7);
+      if (spec.stripes) inner += line(`M${f(side * A * 0.28)},0L${f(end[0] + side * A * 0.25)},${f(end[1])}`, 1.2, spec.stripes);
+      if (spec.band && !tornHere) inner += fill(`M-12,${f(W[1] - 3)}H12V${f(W[1] + 3)}H-12Z`, T.s, 'opacity="0.7"') + line(`M-12,${f(W[1] - 3)}H12`, 0.6, T.d);
+      s += shade(d, p, T, { inner });
+      if (spec.cuff && !tornHere) s += shade(d, tube([W[0], W[1] - 2.2], [W[0], W[1] + 0.4], A * 0.84, A * 0.82), { b: spec.cuff, s: dk(spec.cuff, 0.82), d: dk(spec.cuff, 0.6) }, { lw: 1, k: 0 });
+      sil.push(p);
+    } else {
+      s += skin();
+      if (spec.forearm) s += shade(d, tube([0, 0.6], W, A * 0.8, A * 0.64), spec.forearm, { off: [-0.6, -0.6] }) + line(`M${f(-A * 0.4)},1.4h${f(A * 0.8)}`, 0.6, spec.forearm.d);
     }
-    if (spec.extra) s += spec.extra(c, w);
-    if (spec.wristband) s += shade(d, tube([w[0], w[1] - 2.8], [w[0], w[1] + 0.4], A * 0.8, A * 0.78), { b: spec.wristband, s: dk(spec.wristband), d: dk(spec.wristband, 0.6) }, { lw: 0.8, k: 0 });
-    if (spec.watch && side < 0 && !back) s += outl(`M${f(w[0] - A * 0.45)},${f(w[1] - 2.4)}h${f(A * 0.9)}v2.2h${f(-A * 0.9)}Z`, spec.watch, 0.6);
-    if (item?.under) s += item.under(c, h);
-    if (spec.boxing) s += boxingGlove(c, h, spec.boxing);
-    else if (item?.fist) s += fist(c, h, spec.glove);
-    else s += hand(c, w, spec.glove);
-    sil.push(ellD(w[0], w[1] + 3.6, 3, 4.6));
-    if (item?.over) s += item.over(c, h);
-    if (!c.near) s += `<g opacity="0.16">${sil.map((p) => fill(p, INK)).join('')}</g>`;
-    return s;
+    if (spec.extra) s += spec.extra(c, W);
+    if (spec.wristband) s += shade(d, tube([W[0], W[1] - 3.2], [W[0], W[1] + 0.4], A * 0.66, A * 0.64), { b: spec.wristband, s: dk(spec.wristband), d: dk(spec.wristband, 0.6) }, { lw: 1, k: 0 });
+    if (spec.watch && side < 0 && !back) s += outl(`M${f(W[0] - A * 0.36)},${f(W[1] - 2.6)}h${f(A * 0.72)}v2.4h${f(-A * 0.72)}Z`, spec.watch, 0.7);
+    // the hand (and its prop) at HAND_S
+    let hs = '';
+    const hh: Pt = [W[0] + 0.3 / HAND_S, W[1] + 3.8];
+    const prop = (p: string) => `<g transform="translate(${f(hh[0])} ${f(hh[1])}) scale(${f(PROP_S / HAND_S)}) translate(${f(-hh[0])} ${f(-hh[1])})">${p}</g>`;
+    if (item?.under) hs += prop(item.under(c, hh));
+    if (spec.boxing) hs += boxingGlove(c, hh, spec.boxing);
+    else if (item?.fist) hs += fist(c, hh, spec.glove);
+    else hs += hand(c, [W[0], W[1]], spec.glove);
+    if (item?.over) hs += prop(item.over(c, hh));
+    s += `<g transform="translate(${f(W[0])} ${f(W[1])}) scale(${HAND_S}) translate(${f(-W[0])} ${f(-W[1])})">${hs}</g>`;
+    sil.push(ellD(h[0], h[1] - 0.4, 3 * HAND_S, 4.4 * HAND_S));
+    return s + dim(c, sil);
   };
-  fn.items = { L: spec.itemL, R: spec.itemR };
-  return fn;
+  return { up, lo, items: { L: spec.itemL, R: spec.itemR } };
 }
 
 // ---------------------------------------------------------------- legs & shoes
@@ -586,69 +617,118 @@ function shoeBack(c: Ctx, spec: LegSpec, x: number, y: number, kind: Shoe): stri
   return shade(d, sh, T, { lw: 1.05, off: [-0.6, -0.6], inner });
 }
 
-export function legPaint(spec: LegSpec): Paint {
-  return (c) => {
-    const { d, z, side, seed, back, b } = c;
-    const L = -b.hipY;
+export interface LegSet {
+  up: Paint;
+  lo: Paint;
+}
+
+/** Shoes are drawn this much bigger than authored. */
+const SHOE_S = 1.32;
+
+export function legPaint(spec: LegSpec): LegSet {
+  const up: Paint = (c) => {
+    const { d, z, side, seed, b } = c;
+    const K = kneeAt(b, side);
     const W = b.legW;
-    const ank: Pt = [side * 0.3, L - 4.2];
+    const T = spec.col;
     const sil: string[] = [];
     let s = '';
-    const bareFoot = z && spec.zBareSide === side;
-    const shoe: Shoe = bareFoot ? 'bare' : spec.shoe;
-    const skinLeg = (w1: number, w2: number, to: Pt = [ank[0], L - 1.6]) => {
-      const p = limb([0, 0], to, w1, w2);
+    const skin = (w1: number, w2: number) => {
+      const p = limb([0, 0], K, w1, w2);
       sil.push(p);
-      let t = shade(d, p, c.sk, { lw: 1.05, off: [-0.8, -0.8] });
-      t += line(`M${f(-w1 * 0.25)},${f(L * 0.52)}q${f(w1 * 0.3)},0.8 ${f(w1 * 0.5)},0`, 0.45, c.sk.d);
-      if (z) t += inside(d, p, fill(ellD(0.6, L * 0.62, 1.6, 2.4), c.sk.d, 'opacity="0.35"') + circ(-0.8, L * 0.4, 0.5, '#5A4A22'));
+      let t = shade(d, p, c.sk, { off: [-1, -1] });
+      if (z) t += inside(d, p, fill(ellD(1, K[1] * 0.6, w1 * 0.2, K[1] * 0.25), c.sk.d, 'opacity="0.35"'));
       return t;
     };
-    const T = spec.col;
     switch (spec.kind) {
       case 'pants': {
-        const hemY = L - (shoe === 'boot' ? 5.6 : 3.4);
-        const p = tube([0, 0], [ank[0], hemY - (z ? 1.4 : 0)], W, W - 0.6, z ? 1.6 : 0, seed + side * 5);
-        if (z) s += skinLeg(W - 2.4, W - 2.8, [ank[0], L - 2]);
-        let inner = speck([-6, 0, 6, L], 14, [T.d, lt(T.b, 0.2)], seed + 3 + side, 0.2, 0.45, 0.4);
-        inner += fold(`M${f(-W * 0.35)},${f(L * 0.45)}q${f(W * 0.35)},1 ${f(W * 0.7)},-0.2M${f(-W * 0.3)},${f(hemY - 3)}q${f(W * 0.3)},0.9 ${f(W * 0.6)},0`, T.s, 0.6);
-        inner += fold(`M${f(side * 0.6)},2V${f(L * 0.4)}`, T.s, 0.5, 0.6);
-        if (spec.stripe) inner += line(`M${f(side * W * 0.32)},0V${f(L)}`, 1, spec.stripe, 'opacity="0.9"');
-        if (spec.kneepad) inner += outl(`M${f(-W * 0.5)},${f(L * 0.45)}h${f(W)}v4.4h${f(-W)}Z`, spec.kneepad, 0.6);
-        if (z) inner += rip(side * 0.4, L * 0.5, 1.6, 1.8, c.sk, seed + side * 3) + grime([-6, L * 0.6, 6, L], 3, '#4A4028', seed + 4, 1.6, 0.35);
-        s += shade(d, p, T, { lw: 1.1, inner });
-        if (spec.cuffs && !z) s += shade(d, tube([ank[0], hemY - 1.8], [ank[0], hemY + 0.2], W - 0.4, W - 0.4), T, { lw: 0.8, k: 0 });
+        const p = limb([0, 0], K, W, W * 0.94);
+        let inner = speck([-W, -W, W, K[1] + W], 14, [T.d, lt(T.b, 0.2)], seed + 3 + side, 0.25, 0.5, 0.4);
+        inner += fold(`M${f(-W * 0.35)},${f(K[1] * 0.55)}q${f(W * 0.35)},1.2 ${f(W * 0.7)},-0.2M${f(side * 1)},1V${f(K[1] * 0.5)}`, T.s, 0.7);
+        if (spec.stripe) inner += line(`M${f(side * W * 0.32)},${f(-W)}V${f(K[1] + W)}`, 1.3, spec.stripe, 'opacity="0.9"');
+        if (z) inner += rip(-side * 1, K[1] * 0.5, 2, 2, c.sk, seed + side * 3);
+        s += shade(d, p, T, { inner });
         sil.push(p);
         break;
       }
       case 'shorts': {
-        s += skinLeg(W - 1.6, W - 2.8);
-        if (spec.sock) s += shade(d, tube([ank[0], L - 9], [ank[0], L - 2.4], W - 2.4, W - 2.6), spec.sock, { lw: 0.9, k: 0, inner: line(`M-6,${f(L - 7.8)}H6M-6,${f(L - 6.8)}H6`, 0.5, spec.stripe ?? spec.sock.d) });
-        const p = tube([0, 0], [side * 0.6, L * 0.42], W + 1.2, W + 1.6, z ? 1.4 : 0, seed + side);
-        let inner = speck([-7, 0, 7, L * 0.5], 8, [T.d, lt(T.b, 0.2)], seed + 6, 0.2, 0.4, 0.4) + fold(`M${f(-W * 0.4)},${f(L * 0.3)}q${f(W * 0.4)},1 ${f(W * 0.8)},0`, T.s, 0.6);
-        if (spec.stripe) inner += line(`M${f(side * W * 0.45)},0V${f(L)}`, 1.1, spec.stripe);
-        s += shade(d, p, T, { lw: 1.1, inner });
+        s += skin(W * 0.8, W * 0.74);
+        const p = tube([0, 0], [K[0] * 0.8, K[1] * 0.8], W + 1.2, W + 1.8, z ? 1.6 : 0, seed + side);
+        let inner = speck([-W, -W, W, K[1]], 8, [T.d, lt(T.b, 0.2)], seed + 6, 0.25, 0.5, 0.4) + fold(`M${f(-W * 0.4)},${f(K[1] * 0.45)}q${f(W * 0.4)},1 ${f(W * 0.8)},0`, T.s, 0.7);
+        if (spec.stripe) inner += line(`M${f(side * W * 0.45)},${f(-W)}V${f(K[1] + 2)}`, 1.4, spec.stripe);
+        s += shade(d, p, T, { inner });
         sil.push(p);
         break;
       }
-      case 'tights':
-      case 'skirtleg': {
-        const p = limb([0, 0], [ank[0], L - 1.6], W - 1, W - 2.6);
-        let inner = spec.kind === 'tights' ? fold(`M${f(-W * 0.3)},${f(L * 0.5)}q${f(W * 0.3)},0.8 ${f(W * 0.6)},0`, T.s, 0.5) : '';
-        if (spec.stripe) inner += line(`M${f(side * W * 0.3)},0V${f(L)}`, 0.9, spec.stripe);
-        if (z) inner += rip(0, L * 0.45, 1.6, 2, c.sk, seed + side * 7);
-        s += shade(d, p, spec.kind === 'tights' ? T : c.sk, { lw: 1.05, off: [-0.8, -0.8], inner });
+      case 'tights': {
+        const p = limb([0, 0], K, W * 0.86, W * 0.78);
+        let inner = fold(`M${f(-W * 0.3)},${f(K[1] * 0.5)}q${f(W * 0.3)},0.8 ${f(W * 0.6)},0`, T.s, 0.6);
+        if (spec.stripe) inner += line(`M${f(side * W * 0.3)},${f(-W)}V${f(K[1] + W)}`, 1.1, spec.stripe);
+        if (z) inner += rip(0, K[1] * 0.5, 1.8, 2, c.sk, seed + side * 7);
+        s += shade(d, p, T, { inner });
         sil.push(p);
         break;
       }
-      case 'bare':
-        s += skinLeg(W - 0.6, W - 2);
-        break;
+      default:
+        s += skin(W * 0.82, W * 0.74);
     }
-    s += back ? shoeBack(c, spec, ank[0] - side * 0.2, L, shoe) : shoeFront(c, spec, ank[0] + 0.6, L, shoe);
-    if (!c.near) s += `<g opacity="0.12">${sil.map((p) => fill(p, INK)).join('')}</g>`;
-    return s;
+    if (spec.kneepad) s += shade(d, limb([-W * 0.36, K[1] - 0.6], [W * 0.36, K[1] - 0.6], 4.6, 4.6), { b: spec.kneepad, s: dk(spec.kneepad), d: dk(spec.kneepad, 0.6) }, { lw: 1, k: 0 });
+    return s + dim(c, sil);
   };
+  const lo: Paint = (c) => {
+    const { d, z, side, seed, back, b } = c;
+    const L = -b.hipY - b.thighL;
+    const W = b.legW;
+    const bareFoot = z && spec.zBareSide === side;
+    const shoe: Shoe = bareFoot ? 'bare' : spec.shoe;
+    const shoeH = (shoe === 'boot' ? 7.2 : 4.8) * SHOE_S;
+    const T = spec.col;
+    const sil: string[] = [];
+    let s = '';
+    const skin = (w1: number, w2: number) => {
+      const p = limb([0, 0], [0, L - 2], w1, w2);
+      sil.push(p);
+      let t = shade(d, p, c.sk, { off: [-0.9, -0.9] });
+      if (z) t += inside(d, p, fill(ellD(0.8, L * 0.5, w1 * 0.2, L * 0.2), c.sk.d, 'opacity="0.35"') + circ(-1, L * 0.35, 0.6, '#5A4A22'));
+      return t;
+    };
+    switch (spec.kind) {
+      case 'pants': {
+        const hemY = L - shoeH + 2.4;
+        if (z) s += skin(W * 0.6, W * 0.56);
+        const p = tube([0, 0], [0, hemY - (z ? 1.6 : 0)], W * 0.94, W * 0.92, z ? 1.8 : 0, seed + side * 5);
+        let inner = speck([-W, -W, W, L], 10, [T.d, lt(T.b, 0.2)], seed + 13 + side, 0.25, 0.5, 0.4);
+        inner += fold(`M${f(-W * 0.3)},${f(hemY - 2.6)}q${f(W * 0.3)},1 ${f(W * 0.6)},0`, T.s, 0.7);
+        if (spec.stripe) inner += line(`M${f(side * W * 0.32)},${f(-W)}V${f(L)}`, 1.3, spec.stripe, 'opacity="0.9"');
+        if (z) inner += grime([-W, hemY - 6, W, hemY], 3, '#4A4028', seed + 4, 1.8, 0.35);
+        s += shade(d, p, T, { inner });
+        if (spec.cuffs && !z) s += shade(d, tube([0, hemY - 2.2], [0, hemY + 0.2], W * 0.96, W * 0.96), T, { lw: 1, k: 0 });
+        sil.push(p);
+        break;
+      }
+      case 'shorts': {
+        s += skin(W * 0.72, W * 0.6);
+        if (spec.sock) s += shade(d, tube([0, L - shoeH - 4.6], [0, L - shoeH + 2], W * 0.66, W * 0.62), spec.sock, { lw: 1, k: 0, inner: line(`M-9,${f(L - shoeH - 3.4)}H9M-9,${f(L - shoeH - 2.2)}H9`, 0.6, spec.stripe ?? spec.sock.d) });
+        break;
+      }
+      case 'tights': {
+        const p = limb([0, 0], [0, L - 2], W * 0.78, W * 0.64);
+        let inner = spec.stripe ? line(`M${f(side * W * 0.3)},${f(-W)}V${f(L)}`, 1.1, spec.stripe) : '';
+        if (z) inner += rip(0, L * 0.4, 1.6, 1.8, c.sk, seed + side * 9);
+        s += shade(d, p, T, { inner });
+        sil.push(p);
+        break;
+      }
+      default:
+        s += skin(W * 0.74, W * 0.6);
+        if (spec.sock) s += shade(d, tube([0, L - shoeH - 3.6], [0, L - shoeH + 2], W * 0.66, W * 0.62), spec.sock, { lw: 1, k: 0 });
+    }
+    const x = back ? -side * 0.2 : 0.6;
+    const sh = back ? shoeBack(c, spec, 0, 0, shoe) : shoeFront(c, spec, 0, 0, shoe);
+    s += `<g transform="translate(${f(x)} ${f(L)}) scale(${SHOE_S})">${sh}</g>`;
+    return s + dim(c, sil);
+  };
+  return { up, lo };
 }
 
 export { stitch, smooth, jag, mix, lt, dk, fadeV, LW, LI, LF, BLOOD, SLIME, SLIME_L, GREASE };

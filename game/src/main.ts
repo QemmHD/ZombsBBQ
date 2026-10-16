@@ -6,7 +6,7 @@ import { music, unlockAudio } from './game/sfx';
 import { Hud } from './ui/hud';
 import { JointScene } from './scenes/JointScene';
 import { RaidScene } from './scenes/RaidScene';
-import { artUrlStretch, initArt, measureCrops } from './scenes/assets';
+import { artUrlStretch, initArt, measureCrops, prewarmRaster } from './scenes/assets';
 import * as sim from './sim';
 import { openFridge } from './ui/panels';
 
@@ -44,6 +44,8 @@ const game = new Phaser.Game({
   scene: [],
 });
 game.scene.add('joint', JointScene, true, { ctl });
+// the raid map is a big painting: flatten it once, in the background, so the menu opens instantly
+game.events.once('joint-ready', () => setTimeout(() => prewarmRaster('map_bg', 1.25), 1200));
 
 function fit() {
   game.scale.resize(window.innerWidth * dpr(), window.innerHeight * dpr());

@@ -158,10 +158,10 @@ export function skullBack(c: Ctx, shape: HeadShape): string {
 }
 
 // ---------------------------------------------------------------- ears
-export const EAR_F: Pt = [-9.6, -72];
-export const EAR_B: Pt = [12.4, -72.4];
+export const EAR_F: Pt = [-18.2, -70.6];
+export const EAR_B: Pt = [14.4, -72];
 
-export function earFront(c: Ctx, x = EAR_F[0], y = EAR_F[1], s = 1): string {
+export function earFront(c: Ctx, x = EAR_F[0], y = EAR_F[1], s = 1.18): string {
   const { d, sk, z } = c;
   const o =
     `M${f(x + 2.4 * s)},${f(y - 4.6 * s)}C${f(x - 1.8 * s)},${f(y - 6.4 * s)} ${f(x - 4.6 * s)},${f(y - 3 * s)} ${f(x - 4 * s)},${f(y + 0.6 * s)}` +
@@ -328,6 +328,8 @@ export function brows(c: Ctx, pose: BrowPose): string {
   } else if (pose === 'skeptic') {
     fr = [11.6, -86.2, 18.6, -84, 2.4];
   }
+  n = [n[0] - 0.4, n[1] - 1.5, n[2], n[3] - 1.5, n[4]];
+  fr = [fr[0], fr[1] - 1.5, fr[2] + 0.4, fr[3] - 1.5, fr[4]];
   let s = '';
   for (const [x1, y1, x2, y2, a] of [n, fr]) {
     const p = browPath(x1, y1, x2, y2, th, th * 0.7, a);
@@ -579,7 +581,7 @@ export interface FaceOut {
 export function face(c: Ctx, e: Expr): string {
   const fc = c.L.face;
   const g = geo(fc.shape, e);
-  const es = fc.eyeS ?? 1;
+  const es = (fc.eyeS ?? 1) * 1.16;
   const [nx, ny] = EYE_N;
   const [fx, fy] = EYE_F;
   const rxN = 4.3 * es;
@@ -588,7 +590,7 @@ export function face(c: Ctx, e: Expr): string {
   const ryF = 4.6 * es;
   let s = '';
   if (!c.z) {
-    const base = { lid: fc.lid, bags: fc.bags, look: fc.look, lash: fc.lash, shadow: fc.shadow };
+    const base = { lid: fc.lid * 0.78, bags: fc.bags, look: fc.look, lash: fc.lash, shadow: fc.shadow };
     let eyes = '';
     let bpose: BrowPose = fc.brow === 'raised' ? 'skeptic' : 'rest';
     let mouth = '';
@@ -733,7 +735,8 @@ export function clumps(a: Pt, b: Pt, n: number, depth: number, seed = 1): string
 export function hairMass(c: Ctx, path: string, t: Tone, strands: string, sheen?: string): string {
   const { d, seed } = c;
   let inner = line(strands, 0.5, t.d, 'opacity="0.85"');
-  if (sheen) inner += fill(sheen, lt(t.b, 0.28), 'opacity="0.55"');
+  // a dull sheen on the front views only (from behind it read as a pale wedge)
+  if (sheen && !c.back) inner += fill(sheen, lt(t.b, 0.22), 'opacity="0.45"');
   inner += speck([-26, -110, 30, -40], 40, [t.d, lt(t.b, 0.2)], seed + 13, 0.2, 0.45, 0.4);
   return shade(d, path, t, { off: [-1.6, -1.6], inner });
 }

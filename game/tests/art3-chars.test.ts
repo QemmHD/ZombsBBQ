@@ -67,8 +67,8 @@ describe('art v3 joint characters (C1)', () => {
     expect(c).toBeTruthy();
     expect(c.id).toBe(id);
     expect(c.rig ?? 'biped').toBe('biped');
-    expect(c.height).toBeGreaterThan(70);
-    expect(c.height).toBeLessThan(135);
+    expect(c.height).toBeGreaterThan(80);
+    expect(c.height).toBeLessThan(140);
     expect(c.parts.map((p) => lastSeg(p.key))).toEqual(PART_ORDER3);
     for (const p of c.parts) expect(p.key).toBe(`char_${id}_${lastSeg(p.key)}`);
     expect(c.backParts).toBeDefined();
@@ -84,6 +84,16 @@ describe('art v3 joint characters (C1)', () => {
       checkSvg(p);
       expect(p.y).toBeLessThan(0);
     }
+    // lower limb segments hang below their upper segment, close to it (rest pose, chained by pivots)
+    const by = (n: string) => c.parts.find((p) => lastSeg(p.key) === n)!;
+    for (const [up, lo] of [['armL', 'armL2'], ['armR', 'armR2'], ['legL', 'legL2'], ['legR', 'legR2']]) {
+      const u = by(up);
+      const l = by(lo);
+      expect(l.y, `${id} ${lo} below ${up}`).toBeGreaterThan(u.y + 6);
+      expect(l.y - u.y).toBeLessThan(18);
+      expect(Math.abs(l.x - u.x)).toBeLessThan(4);
+    }
+    expect(by('legL2').y).toBeLessThan(0);
   });
 
   it.each(CHAR3_IDS)('%s has its expression faces placed exactly like the head', (id) => {
@@ -114,7 +124,7 @@ describe('art v3 joint characters (C1)', () => {
     }
     expect(new Set(keys).size).toBe(keys.length);
     const humans = CHAR3_IDS.filter((i) => !isZombie(i)).length;
-    expect(keys.length).toBe(CHAR3_IDS.length * 12 + humans * HUMAN_FACES3.length + (CHAR3_IDS.length - humans) * ZOMBIE_FACES3.length);
+    expect(keys.length).toBe(CHAR3_IDS.length * 20 + humans * HUMAN_FACES3.length + (CHAR3_IDS.length - humans) * ZOMBIE_FACES3.length);
   });
 
   it('keeps the rig proportions (hips below shoulders below neck, L on the left, big heads)', () => {
@@ -125,10 +135,10 @@ describe('art v3 joint characters (C1)', () => {
       expect(by('armL').x).toBeLessThan(0);
       expect(by('armR').x).toBeGreaterThan(0);
       expect(by('legL').x).toBeLessThan(by('legR').x);
-      // neck at roughly 52-58% of the height: the head is ~45% of the figure
+      // the original's construction: the head takes the top ~52-58% of the figure (neck at ~42-48%)
       const neckFrac = -by('head').y / c.height;
-      expect(neckFrac, c.id).toBeGreaterThan(0.4);
-      expect(neckFrac, c.id).toBeLessThan(0.62);
+      expect(neckFrac, c.id).toBeGreaterThan(0.33);
+      expect(neckFrac, c.id).toBeLessThan(0.5);
     }
   });
 

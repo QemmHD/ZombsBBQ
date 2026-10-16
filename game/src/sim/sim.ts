@@ -20,6 +20,11 @@ import { stealingRivals } from './rivals';
 
 // ---------- helpers ----------
 
+/** How fast a crew member walks: their Speed stat, and zombies shuffle a bit slower than YOU. */
+export function workerSpeed(w: Worker): number {
+  return walkSpeed(w.stats.speed) * (w.kind === 'zombie' ? TUNING.zombieWalkMult : 1);
+}
+
 export function rand(s: GameState): number {
   // mulberry32, state kept in the save so runs are reproducible
   let t = (s.rng = (s.rng + 0x6d2b79f5) >>> 0);
@@ -220,7 +225,7 @@ export function startCooking(s: GameState, workerId: string, stoveId: string, di
     w.stoveId = st.id;
     w.pendingDish = undefined;
     w.state = 'toStove';
-    setPath(s, w, at, walkSpeed(w.stats.speed));
+    setPath(s, w, at, workerSpeed(w));
     return null;
   }
   if (st.status !== 'empty') return 'That stove is busy.';
@@ -241,7 +246,7 @@ export function startCooking(s: GameState, workerId: string, stoveId: string, di
   w.stoveId = st.id;
   w.pendingDish = dish.id;
   w.state = 'toStove';
-  if (!setPath(s, w, at, walkSpeed(w.stats.speed))) w.path = [];
+  if (!setPath(s, w, at, workerSpeed(w))) w.path = [];
   return null;
 }
 
@@ -278,7 +283,7 @@ export function plateDish(s: GameState, stoveId: string, workerId?: string): str
   w.job = { kind: 'dish', stoveId: st.id };
   w.state = 'toPickup';
   st.carrierId = w.id;
-  setPath(s, w, at, walkSpeed(w.stats.speed));
+  setPath(s, w, at, workerSpeed(w));
   return null;
 }
 
@@ -387,7 +392,7 @@ export function rest(s: GameState, workerId: string): string | null {
   releaseJob(s, w);
   w.restSpot = outsideSpot(s, w);
   w.state = 'toRest';
-  setPath(s, w, w.restSpot, walkSpeed(w.stats.speed));
+  setPath(s, w, w.restSpot, workerSpeed(w));
   return null;
 }
 
@@ -536,7 +541,8 @@ function spawnCustomers(s: GameState, dt: number) {
   if (!validSeats(s).length) return;
   const present = s.customers.filter((c) => ['entering', 'waiting', 'eating', 'turnedAway'].includes(c.state)).length;
   // rivals you've left alone too long are poaching your customers
-  s.spawnCooldown = (5 + rand(s) * 6) * (1 + 0.25 * stealingRivals(s).length);
+  const gap = TUNING.arrivalSlowSec - (TUNING.arrivalSlowSec - TUNING.arrivalFastSec) * s.rating;
+  s.spawnCooldown = gap * (0.75 + rand(s) * 0.5) * (1 + 0.25 * stealingRivals(s).length);
   if (present >= target) return;
   const pool = CUSTOMERS.filter((d) => d.minLevel <= s.level && d.minStars <= st);
   // gentle anti-streak: recently seen types are less likely, so the crowd stays varied
@@ -636,7 +642,7 @@ function updateCustomer(s: GameState, c: Customer, dt: number) {
           const seat = c.seatId ? furnById(s, c.seatId) : undefined;
           const spot = seat ? tableAccess(s, seat) : null;
           if (spot) w.path = [spot];
-          w.speed = walkSpeed(w.stats.speed);
+          w.speed = workerSpeed(w);
         }
         c.tableId = undefined;
         markGone(c);
@@ -705,7 +711,7 @@ function nearestCounterTile(s: GameState, from: Pt): { f: Furniture; at: Pt } | 
 
 /** Waiting customers first, oldest first; then dirty plates. */
 function findJob(s: GameState, w: Worker): boolean {
-  const speed = walkSpeed(w.stats.speed);
+  const speed = workerSpeed(w);
   const waiting = s.customers.filter((c) => c.state === 'waiting' && !c.serverId).sort((a, b) => a.waitLeft - b.waitLeft);
   if (waiting.length) {
     const food = nearestCounterWithFood(s, w);
@@ -748,7 +754,7 @@ function kegCount(s: GameState): number {
 
 function updateWorker(s: GameState, w: Worker, dt: number) {
   const max = maxEnergy(w);
-  const speed = walkSpeed(w.stats.speed);
+  const speed = workerSpeed(w);
   const r = room(s);
   switch (w.state) {
     case 'idle': {

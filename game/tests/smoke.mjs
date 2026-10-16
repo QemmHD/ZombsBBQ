@@ -380,9 +380,13 @@ await page.evaluate(() => {
   const { ctl, sim } = window.zbbq;
   const s = ctl.state;
   for (const w of s.workers) if (w.kind === 'zombie') (w.energy = sim.maxEnergy(w)), (w.state = 'idle'), (w.path = []);
-  s.xp = sim.xpToNext(s.level) - 5; // the raid win will level us up mid-raid
   sim.buyAndPlace(s, 'tombstone_str', s.roomW + 1, 2);
+  for (let i = 0; i < 5; i++) ctl.update(0.1); // let any level-up from the purchase land first
+  s.xp = sim.xpToNext(s.level) - 5; // the raid win will level us up mid-raid
 });
+await ff(1);
+await wait(400);
+while (await modalOpen()) await closeModal();
 const lvBefore = await page.evaluate(() => window.zbbq.ctl.state.level);
 await tapSel('[data-k="map"]', 'raid map');
 await wait(400);

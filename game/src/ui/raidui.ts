@@ -1,4 +1,4 @@
-import { MAP_LAYOUT } from '../art';
+import { MAP3_LAYOUT } from '../art3/raidmap3';
 import {
   DISH_BY_ID,
   ITEM_BY_ID,
@@ -25,7 +25,7 @@ import {
   type RivalId,
 } from '../sim';
 import { music, sfx } from '../game/sfx';
-import { artUrl, headUrl } from '../scenes/assets';
+import { artUrl, headUrl, rasterOrSvg } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import type { Hud } from './hud';
 import { bindActions, energyColor, esc, icon, priceHtml, starsHtml } from './dom';
@@ -33,10 +33,7 @@ import { bindActions, energyColor, esc, icon, priceHtml, starsHtml } from './dom
 // ---------- the road-trip map ----------
 
 /** Where each pin stands on the map (1600×900). */
-const PIN: Record<string, { x: number; y: number }> = {
-  ...MAP_LAYOUT,
-  boss: { x: 1380, y: 770 },
-};
+const PIN: Record<string, { x: number; y: number }> = MAP3_LAYOUT;
 
 export function openMap(hud: Hud) {
   const s = hud.ctl.state;
@@ -58,7 +55,7 @@ export function openMap(hud: Hud) {
     .join('');
   const home = PIN.home;
   const m = hud.openModal(
-    `<div class="map-wrap"><img class="map-bg" src="${artUrl('map_bg')}" alt="Road trip map"/>
+    `<div class="map-wrap"><img class="map-bg" src="${rasterOrSvg('map_bg')}" alt="Road trip map"/>
       <div class="map-pin home" style="left:${(home.x / 1600) * 100}%;top:${(home.y / 900) * 100}%"><img src="${artUrl('map_home')}" alt=""/><span class="pin-label">YOUR JOINT</span></div>
       ${pins}</div>
       ${thieves.size ? `<p class="small warn">${[...thieves].map((id) => esc(rivalName(s, id))).join(', ')} ${thieves.size > 1 ? 'are' : 'is'} stealing your customers! Raid them to put a stop to it.</p>` : ''}`,

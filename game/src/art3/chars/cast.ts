@@ -5,6 +5,7 @@
 import type { Body, BodyKind, Ctx, Expr, FaceSpec, Look, Paint } from './rig';
 import { BODIES } from './rig';
 import { shirtTorso, jacketTorso, armPaint, legPaint, torsoD } from './body';
+import type { ArmSet, LegSet } from './body';
 import * as H from './hair';
 import type { HairSet } from './hair';
 import * as W from './wear';
@@ -28,9 +29,8 @@ interface Def {
   earHidden?: boolean;
   torso: Paint;
   torsoBox?: [number, number, number, number];
-  arm: Paint;
-  armBox?: (side: -1 | 1) => [number, number, number, number];
-  leg: Paint;
+  arm: ArmSet;
+  leg: LegSet;
   legBox?: [number, number, number, number];
   headBox?: [number, number, number, number];
   faceUnder?: (c: Ctx, e: Expr) => string;
@@ -52,7 +52,6 @@ function mk(o: Def): Look {
     torso: o.torso,
     torsoBox: o.torsoBox,
     arm: o.arm,
-    armBox: o.armBox,
     leg: o.leg,
     legBox: o.legBox,
     headBox: o.headBox,
@@ -104,7 +103,7 @@ function biteMark(c: Ctx, w: Pt): string {
 const EYE_N: Pt = [3.4, -76.2];
 
 /** White earbuds with wires (teen). */
-const earbuds: Paint = (_c) => outl(ellD(-8.6, -70.6, 1.3, 1.3), '#D8D4C8', 0.6) + line('M-8.4,-69.4Q-8,-62 -4,-56', 0.9) + line('M-8.4,-69.4Q-8,-62 -4,-56', 0.45, '#D8D4C8');
+const earbuds: Paint = (_c) => outl(ellD(-17.4, -70, 1.5, 1.5), '#D8D4C8', 0.6) + line('M-17,-68.6Q-14,-61 -6,-55', 0.9) + line('M-17,-68.6Q-14,-61 -6,-55', 0.45, '#D8D4C8');
 /** Shiner around the near eye (boxer). */
 const blackEye = (c: Ctx) => (c.z ? '' : fill(ellD(EYE_N[0] + 0.2, EYE_N[1] + 0.4, 6.4, 6.4), '#4A3A5A', 'opacity="0.45"') + fill(ellD(EYE_N[0] + 0.4, EYE_N[1] + 2.6, 5, 3), '#5A3A4A', 'opacity="0.35"'));
 const bandaid = (c: Ctx) => outl('M11.4,-75.6L17.4,-73.2L16.6,-71.2L10.6,-73.6Z', '#B89A78', 0.6) + line('M13.4,-74.4l0.2,0.2M14.6,-73.8l0.2,0.2', 0.6, '#7A5A3A') + (c.z ? stain(14, -73, 1, BLOOD, c.seed, 0.8, 0) : '');
@@ -123,7 +122,7 @@ const whistle = (_c: Ctx, e: Expr) =>
   e && e !== 'angry'
     ? line('M-6,-62Q2,-56 8,-56', 0.6, '#2A2A2A')
     : outl('M11.6,-62.6L18,-61.2L18.6,-59L12.4,-60Z', '#A8ACA8', 0.6) + outl(ellD(18.6, -59.4, 1.8, 1.6), '#A8ACA8', 0.6) + line('M11.6,-61.6Q4,-58 -2,-56', 0.6, '#2A2A2A');
-const hearingAid = (_c: Ctx) => outl('M-12.8,-74.6q-1.6,2 -0.6,4.4l1.2,-0.4q-0.6,-2 0.4,-3.6Z', '#B89A7A', 0.5) + line('M-9.8,-70.2l-0.4,1.6M-9,-70.6l0.2,1.4', 0.4, '#E0E0D8');
+const hearingAid = (_c: Ctx) => outl('M-22.4,-74q-1.6,2 -0.6,4.4l1.2,-0.4q-0.6,-2 0.4,-3.6Z', '#B89A7A', 0.5) + line('M-18.4,-69l-0.4,1.6M-17.6,-69.4l0.2,1.4', 0.4, '#E0E0D8');
 const chinWhiskers = (_c: Ctx) => line('M9,-55.4l-0.4,1.6M10.6,-55.4l0.2,1.6M12.4,-55.8l0.6,1.4', 0.4, '#3A3430');
 
 // ---------------------------------------------------------------- the cast
@@ -402,7 +401,6 @@ const boxer = mk({
   faceOver: bandaid,
   torso: seq(W.bareTorso({ pecs: true, abs: true }), (c) => W.beltBand(c, C.oxblood, '#C8C2AE')),
   arm: armPaint({ sleeve: 'none', col: C.oxblood, bulk: 1.05, boxing: tone('#7A1E26') }),
-  armBox: (_side) => [-10, -6, 12, 36],
   leg: legPaint({ kind: 'shorts', col: C.oxblood, stripe: '#C8C2AE', shoe: 'boot', shoeCol: C.black, sock: tone('#2A2724') }),
 });
 
@@ -467,7 +465,6 @@ const sumo = mk({
   torsoBox: [-26, -66, 30, 2],
   arm: armPaint({ sleeve: 'none', col: C.slate, bulk: 1 }),
   leg: legPaint({ kind: 'bare', col: C.slate, shoe: 'bare', shoeCol: C.slate }),
-  legBox: [-10, -7, 14, 23],
 });
 
 const influencer = mk({

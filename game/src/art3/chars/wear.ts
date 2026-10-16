@@ -35,7 +35,7 @@ export function glasses(kind: 'square' | 'round' | 'shades' | 'cat', frame: stri
       fL = `M${f(fx - 3.4)},${f(fy - h / 2 + lift)}H${f(fx + 4.4)}Q${f(fx + 4.6)},${f(fy + h / 2 + lift)} ${f(fx + 3.4)},${f(fy + h / 2 + lift)}H${f(fx - 2.6)}Q${f(fx - 3.6)},${f(fy + h / 2 + lift)} ${f(fx - 3.4)},${f(fy - h / 2 + lift)}Z`;
     }
     const w = kind === 'square' || kind === 'cat' ? 1.5 : 1.1;
-    let s = line(`M${f(nx - 5.4)},${f(ny - 1.6 + lift)}L-8,${f(-74.6 + lift * 0.5)}`, w, INK) + line(`M${f(nx - 5.4)},${f(ny - 1.6 + lift)}L-8,${f(-74.6 + lift * 0.5)}`, w * 0.5, frame);
+    let s = line(`M${f(nx - 5.4)},${f(ny - 1.6 + lift)}L-15.4,${f(-73 + lift * 0.5)}`, w, INK) + line(`M${f(nx - 5.4)},${f(ny - 1.6 + lift)}L-15.4,${f(-73 + lift * 0.5)}`, w * 0.5, frame);
     s += fill(nL, lc, lo) + fill(fL, lc, lo);
     if (!shade_) s += line(`M${f(nx - 3)},${f(ny - 2.6 + lift)}l2.4,-1.2M${f(fx - 1.4)},${f(fy - 2.6 + lift)}l1.8,-1`, 0.6, '#F0F0E6', 'opacity="0.7"');
     else s += line(`M${f(nx - 3.6)},${f(ny - 1.6 + lift)}l3.6,-1.6M${f(fx - 1.6)},${f(fy - 1.6 + lift)}l2.6,-1.2`, 0.7, '#8A8A84', 'opacity="0.8"');

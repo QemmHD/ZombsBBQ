@@ -19,7 +19,7 @@ import { ITEM_BY_ID, type Dir } from './catalog';
 import { DOOR_X, STREET_RUN, findPath, isInside, key, type Pt, type Room } from './grid';
 import { maxEnergy, type GameState, type Worker } from './state';
 import { addXp, addZombieXp, outsideSpot, releaseJob } from './sim';
-import { GEN_STEP, RIVAL_BY_ID, RIVAL_CLOSED_SEC, rivalGen, rivalReady, type RivalId } from './rivals';
+import { GEN_STEP, RIVAL_BY_ID, rivalClosedSec, rivalGen, rivalReady, type RivalId } from './rivals';
 
 export * from './rivals';
 
@@ -592,7 +592,7 @@ function damage(r: RaidState, from: RaidUnit, to: RaidUnit) {
     to.state = 'gone';
     from.state = 'eat';
     from.busyUntil = r.t + 1.4;
-    from.hp = Math.min(from.maxHp, from.hp + 10);
+    from.hp = Math.min(from.maxHp, from.hp + 5); // original: +5 per kill
     from.eats++;
     r.cashEaten += cash;
     r.events.push({
@@ -691,7 +691,7 @@ function updateHorde(r: RaidState, u: RaidUnit, dt: number) {
       face(u, c.x - u.x, c.y - u.y);
       c.servings = 0;
       r.stolen.push(c.dish);
-      u.busyUntil = r.t + 1.5;
+      u.busyUntil = r.t + 2; // original: swiping a dish takes 2 s
       u.state = 'steal';
       u.order = { kind: 'attack' };
       r.events.push({ t: 'steal', unit: u.id, dish: c.dish, x: u.x, y: u.y });
@@ -878,7 +878,7 @@ export function finishRaid(s: GameState, r: RaidState): RaidResult {
     prog.wins++;
     prog.stars = Math.max(prog.stars, out.stars);
     // wrecked: boarded up, then new management (a bit tougher, a bit richer)
-    prog.nextAt = s.now + RIVAL_CLOSED_SEC;
+    prog.nextAt = s.now + rivalClosedSec(prog.gen ?? 0);
     prog.gen = (prog.gen ?? 0) + (r.rival === 'boss' ? 0 : 1);
     s.stats.raidsWon++;
   } else {

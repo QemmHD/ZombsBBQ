@@ -115,8 +115,9 @@ export class RaidScene extends Phaser.Scene {
     // the shop sign, bolted over the door
     const sign = `rsign_${r.rival}`;
     if (hasProp(sign)) {
-      const a = wallAnchor('r', DOOR_X - 1);
-      propImage(this, sign, a.x - HW / 2, a.y - WALL_H * 0.66).setDepth(WALLS + DOOR_X * 10 + 4);
+      // spans the door's wall section and the next one, its lower edge just above the door frame
+      const a = wallAnchor('r', DOOR_X);
+      propImage(this, sign, a.x - HW / 2, a.y - 30 - 118).setDepth(WALLS + DOOR_X * 10 + 4);
     }
     for (const f of r.furniture) {
       const p = iso(f.x, f.y);

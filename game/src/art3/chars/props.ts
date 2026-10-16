@@ -177,21 +177,25 @@ export function axe(): HandItem {
 export function pompom(col: Tone): HandItem {
   return {
     fist: true,
-    box: [-8.5, -7.5, 8.5, 9.5],
+    box: [-8.5, -8, 8.5, 9.5],
     over: (c, h) => {
+      // a shaggy ball of streamers: outlined union of narrow strips, two tones, a few cut ends
       const r = rnd(c.seed + (c.side > 0 ? 3 : 7));
-      let s = '';
-      for (let k = 0; k < 16; k++) {
-        const a = (k / 16) * Math.PI * 2 + r() * 0.3;
-        const L = 5.4 + r() * 1.6;
-        s += line(`M${R(h, 0, 1)}L${R(h, Math.cos(a) * L, 1 + Math.sin(a) * L)}`, 1.6, INK) ;
+      const cx = h[0];
+      const cy = h[1] + 0.6;
+      const strips: string[] = [];
+      for (let k = 0; k < 22; k++) {
+        const a = (k / 22) * Math.PI * 2 + r() * 0.25;
+        const L = 5 + r() * 2.2;
+        const ex = cx + Math.cos(a) * L;
+        const ey = cy + Math.sin(a) * L;
+        strips.push(limb([cx + Math.cos(a) * 1.2, cy + Math.sin(a) * 1.2], [ex, ey], 2.2, 1.2));
       }
-      for (let k = 0; k < 16; k++) {
-        const a = (k / 16) * Math.PI * 2 + r() * 0.3;
-        const L = 5 + r() * 1.4;
-        s += line(`M${R(h, 0, 1)}L${R(h, Math.cos(a) * L, 1 + Math.sin(a) * L)}`, 1, k % 2 ? col.b : col.s);
-      }
-      if (c.z) s += circ(h[0] + 2, h[1] + 2, 1.4, BLOOD, 0.7);
+      let s = strips.map((p) => `<path d="${p}" fill="none" stroke="${INK}" stroke-width="1.5"/>`).join('');
+      s += strips.map((p, i) => fill(p, i % 3 === 0 ? col.s : i % 3 === 1 ? col.b : lt(col.b, 0.2))).join('');
+      s += fill(ellD(cx + 0.8, cy + 1, 3.6, 3.2), col.d, 'opacity="0.45"');
+      s += grime([cx - 6, cy - 6, cx + 6, cy + 6], 2, '#3A3020', c.seed + 5, 2, 0.25);
+      if (c.z) s += stain(cx + 1.6, cy + 1.6, 1.6, BLOOD, c.seed + 9, 0.7);
       return s;
     },
   };
@@ -200,10 +204,10 @@ export function pompom(col: Tone): HandItem {
 export function cane(): HandItem {
   return {
     fist: true,
-    box: [-5, -5, 5, 24],
+    box: [-5, -5, 5, 14],
     under: (_c, h) => {
-      const d = `M${R(h, -3.6, 0)}C${R(h, -3.6, -4.4)} ${R(h, 3.6, -4.4)} ${R(h, 3.4, 0)}L${R(h, 3, 22)}`;
-      return line(d, 2.4) + line(d, 1.3, '#7A5434') + line(`M${R(h, 2.4, 20)}h1.4`, 2, '#2A2420');
+      const d = `M${R(h, -3.6, 0)}C${R(h, -3.6, -4.4)} ${R(h, 3.6, -4.4)} ${R(h, 3.4, 0)}L${R(h, 3.1, 12.6)}`;
+      return line(d, 2.4) + line(d, 1.3, '#7A5434') + line(`M${R(h, 2.5, 11.4)}h1.4`, 2, '#2A2420');
     },
   };
 }

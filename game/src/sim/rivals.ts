@@ -160,7 +160,11 @@ export const ROAD = RIVALS.filter((r) => r.id !== 'boss');
 
 export const MAP_LEVEL = 2;
 /** A wrecked joint stays boarded up this long, then reopens under new management. */
-export const RIVAL_CLOSED_SEC = 60 * 60;
+export const RIVAL_CLOSED_SEC = 4 * 3600;
+/** Original: a wrecked joint reopens after 4 h, then 8, 12 and 18 h for later managements. */
+export function rivalClosedSec(gen: number): number {
+  return [4, 8, 12, 18][Math.min(3, Math.max(0, gen))] * 3600;
+}
 /** Leave an open rival alone this long and it starts poaching your customers. */
 export const NEGLECT_SEC = 8 * 3600;
 /** Each new management is this much tougher (and richer). */

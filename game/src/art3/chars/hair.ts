@@ -74,19 +74,19 @@ function capFront(o: CapO, seed: number): string {
 
 function capBack(o: { vol?: number; nape?: number; napeN?: number; topN?: number; topD?: number }, seed: number): string {
   const v = o.vol ?? 2.4;
-  const nape = o.nape ?? -61.4;
+  const nape = o.nape ?? -57.6;
   const rx = 20.8 + v;
   const ry = 21.6 + v;
   const n = o.topN ?? 0;
-  let dd = `M-17.8,${f(nape)}`;
-  dd += clumps([-17.8, nape], [10, nape - 1.4], o.napeN ?? 5, -2, seed);
-  dd += 'C10.6,-66 10.6,-73 12.6,-79';
+  let dd = `M-16.8,${f(nape)}`;
+  dd += clumps([-16.8, nape], [12, nape - 2.4], o.napeN ?? 7, -2.4, seed);
+  dd += 'C12.6,-66 12.8,-73 13.8,-79';
   dd += arcClumps(0.6, -78, rx, ry, -17, -198, n > 0 ? n + 3 : 8, n > 0 ? o.topD ?? 2.4 : 1, seed + 2);
-  dd += `C${f(0.6 - rx - 0.2)},-68 -20.6,${f(nape - 3)} -17.8,${f(nape)}Z`;
+  dd += `C${f(0.6 - rx - 0.2)},-68 -20.4,${f(nape - 4)} -16.8,${f(nape)}Z`;
   return dd;
 }
 
-/** Dark tapered clump shadows rising from an edge (hair texture). dir -1 = pointing up. */
+/** Dark tapered clump shadows rising from an edge (hair texture). Negative len points down. */
 export function wedges(pts: [number, number, number][], col: string, w = 1.6, dir = -1, lean = 0.3): string {
   let dd = '';
   for (const [x, y, len] of pts) dd += `M${f(x - w / 2)},${f(y)}Q${f(x + lean * len * 0.3)},${f(y + dir * len * 0.6)} ${f(x + lean * len)},${f(y + dir * len)}Q${f(x + lean * len * 0.5)},${f(y + dir * len * 0.5)} ${f(x + w / 2)},${f(y)}Z`;
@@ -94,17 +94,17 @@ export function wedges(pts: [number, number, number][], col: string, w = 1.6, di
 }
 
 /** Back-view fringe band around the back of the head at ear level (bald tops, hair under hats). */
-function horseshoeBack(top: number, seed: number, nape = -61.4, wisp = 1.6): string {
+function horseshoeBack(top: number, seed: number, nape = -57.8, wisp = 1.6): string {
   return (
-    `M10.2,${f(nape - 1.2)}C10.4,-68 10.6,-74 11.6,-78.6C12.6,${f(top + 4)} 14,${f(top + 2)} 15.6,${f(top + 1)}` +
+    `M12,${f(nape - 2.4)}C12.4,-66 12.6,-73 13.4,-78.6C14,${f(top + 4)} 14.8,${f(top + 2)} 15.8,${f(top + 1)}` +
     (wisp > 0
-      ? clumps([15.6, top + 1], [4, top + 3.6], 2, -wisp, seed) + clumps([4, top + 3.6], [-9, top + 3.4], 2, -wisp * 0.7, seed + 1) + clumps([-9, top + 3.4], [-19.4, top + 2], 2, -wisp, seed + 2)
+      ? clumps([15.8, top + 1], [4, top + 3.6], 2, -wisp, seed) + clumps([4, top + 3.6], [-9, top + 3.4], 2, -wisp * 0.7, seed + 1) + clumps([-9, top + 3.4], [-19.4, top + 2], 2, -wisp, seed + 2)
       : `Q-2,${f(top + 6.4)} -19.4,${f(top + 2)}`) +
-    `C-21,${f(top + 10)} -20.8,${f(nape - 5)} -17.6,${f(nape)}` + clumps([-17.6, nape], [10.2, nape - 1.2], 6, -1.3, seed + 3) + 'Z'
+    `C-21,${f(top + 10)} -20.6,${f(nape - 5)} -16.8,${f(nape)}` + clumps([-16.8, nape], [12, nape - 2.4], 7, -2.2, seed + 3) + 'Z'
   );
 }
 
-const NAPE_W: [number, number, number][] = [[-16, -61, 7], [-10, -60.4, 8], [-4, -60.4, 7], [2, -61, 8], [7, -61.4, 6], [-19, -72, 6]];
+const NAPE_W: [number, number, number][] = [[-15, -57.4, 7], [-9, -57, 9], [-3, -57.4, 7], [3, -58, 9], [8.6, -59, 6], [-19, -70, 6]];
 
 const STRANDS_F =
   'M8,-100Q2,-94 -1.6,-86.6M12,-99Q10,-93 7,-86.6M16,-97Q16,-92 14,-87.4M2,-101Q-6,-96 -10,-86M-6,-100Q-14,-94 -17,-82M-12,-97Q-19,-88 -19.4,-74';
@@ -112,7 +112,7 @@ const STRANDS_B =
   'M-3,-90Q-10,-84 -14,-66M-3,-90Q-2,-80 -4,-64M-3,-90Q6,-82 6,-66M-3,-90Q-14,-94 -19,-84M-3,-90Q4,-98 14,-94M-3,-90Q-6,-98 -12,-99';
 
 function whorl(t: Tone): string {
-  return line('M-3,-90q1.6,-1.4 0.2,-2.8q-2.4,-0.8 -3,1.6q-0.2,3.2 4.2,2.8', 0.55, t.d);
+  return line('M-4.6,-89q1.6,-3 4.4,-1.6M-2,-91.6q2.6,0.4 2.4,3', 0.55, t.d, 'opacity="0.8"');
 }
 
 // ---------------------------------------------------------------- styles
@@ -150,8 +150,8 @@ export function combover(t: Tone): HairSet {
       return s;
     },
     hairBack: (c) => {
-      const band = horseshoeBack(-84, c.seed, -61.4, 0);
-      let s = hairMass(c, band, t, 'M-19,-80Q-18,-70 -15,-63M-12,-80Q-11,-70 -8,-62M-4,-80Q-3,-70 -1,-62M4,-81Q5,-72 6,-63', 'M-20,-74Q-6,-71 9,-74Q-6,-73 -20,-72Z') + inside(c.d, band, wedges([[-16, -61, 7], [-10, -60.4, 8], [-4, -60.4, 7], [2, -61, 8], [7, -61.4, 6], [-18, -82, -5], [-8, -80, -6], [2, -80.6, -5], [12, -82, -5]], t.d, 1.8));
+      const band = horseshoeBack(-84, c.seed, -57.8, 0);
+      let s = hairMass(c, band, t, 'M-19,-80Q-18,-70 -15,-63M-12,-80Q-11,-70 -8,-62M-4,-80Q-3,-70 -1,-62M4,-81Q5,-72 6,-63', 'M-20,-74Q-6,-71 9,-74Q-6,-73 -20,-72Z') + inside(c.d, band, wedges([[-15, -57.4, 7], [-9, -57, 8], [-3, -57.4, 7], [3, -58, 8], [8.6, -59, 6], [-18, -82, -5], [-8, -80, -6], [2, -80.6, -5], [12, -82, -5]], t.d, 1.8));
       s += fill(ellD(-2, -94, 9, 3), lt(c.sk.b, 0.45), 'opacity="0.4"');
       for (const [x1, y1, x2, y2] of [[-18, -85, 18, -88], [-19, -88, 16, -93]]) s += line(`M${f(x1)},${f(y1)}Q0,${f(y2 - 6)} ${f(x2)},${f(y2)}`, 1.4) + line(`M${f(x1)},${f(y1)}Q0,${f(y2 - 6)} ${f(x2)},${f(y2)}`, 0.8, t.b);
       s += balding(c, band, [[-6, -70, 4, 3.4]]);
@@ -216,9 +216,9 @@ export function baldFringe(t: Tone): HairSet {
       return s;
     },
     hairBack: (c) => {
-      const band = horseshoeBack(-79, c.seed, -62, 0);
+      const band = horseshoeBack(-79, c.seed, -58, 0);
       let s = fill(ellD(-2, -93, 9, 3), lt(c.sk.b, 0.45), 'opacity="0.4"') + line('M-15,-76.6q-1.4,-2.6 0.4,-4.6M-7,-75.4q-0.6,-3 1.2,-4.4M3,-75.6q0.4,-3 2.6,-4M10.6,-77q1,-2.4 3,-3', 0.55, t.s);
-      s += hairMass(c, band, t, 'M-19,-78Q-18,-70 -15,-63M-12,-78Q-11,-70 -8,-62M-4,-77Q-3,-70 -1,-62M4,-78Q5,-72 6,-63') + inside(c.d, band, wedges([[-16, -61, 6], [-10, -60.4, 7], [-4, -60.4, 6], [2, -61, 7], [7, -61.4, 5]], t.d, 1.8));
+      s += hairMass(c, band, t, 'M-19,-78Q-18,-70 -15,-63M-12,-78Q-11,-70 -8,-62M-4,-77Q-3,-70 -1,-62M4,-78Q5,-72 6,-63') + inside(c.d, band, wedges([[-15, -57.4, 6], [-9, -57, 7], [-3, -57.4, 6], [3, -58, 7], [8.6, -59, 5]], t.d, 1.8));
       return s;
     },
   };
@@ -464,8 +464,8 @@ export function underHat(t: Tone, o: { shaggy?: boolean; nape?: number } = {}): 
       return hairMass(c, p, t, 'M-9,-84Q-12,-76 -12,-68M-15,-86Q-19,-78 -18,-68') + balding(c, p, [[-14, -78, 3, 3]]);
     },
     hairBack: (c) => {
-      const p = horseshoeBack(-93, c.seed, nape + 2, 0);
-      return hairMass(c, p, t, 'M-19,-80Q-18,-70 -15,-63M-12,-80Q-11,-70 -8,-62M-4,-80Q-3,-70 -1,-62M4,-81Q5,-72 6,-63', 'M-20,-76Q-6,-73 9,-76Q-6,-75 -20,-74Z') + inside(c.d, p, wedges([[-16, nape + 2.4, 7], [-10, nape + 3, 8], [-4, nape + 3, 7], [2, nape + 2.6, 8], [7, nape + 2, 6]], t.d, 1.8)) + balding(c, p, [[-4, -74, 4, 4]]);
+      const p = horseshoeBack(-93, c.seed, nape + 5, 0);
+      return hairMass(c, p, t, 'M-18,-84Q-19,-70 -15,-60M-10,-84Q-11,-70 -8,-59M-2,-84Q-3,-70 -1,-59M6,-84Q5,-72 6,-60') + inside(c.d, p, wedges([[-15, nape + 5.4, 7], [-9, nape + 5.8, 8], [-3, nape + 5.4, 7], [3, nape + 4.8, 8], [8.6, nape + 3.8, 6]], t.d, 1.8)) + balding(c, p, [[-4, -74, 4, 4]]);
     },
   };
 }

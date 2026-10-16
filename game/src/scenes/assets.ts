@@ -25,6 +25,7 @@ import { buildDishes } from '../art3/dishes';
 import { buildFx } from '../art3/fx';
 import { buildUi3 } from '../art3/ui3';
 import { buildChar3 } from '../art3/chars';
+import { buildRaidMap3 } from '../art3/raidmap3';
 
 /** Rasterization scale: textures are drawn bigger than world units so zoomed-in Retina stays crisp. */
 export const TEX_S = Math.min(3, Math.max(2, (window.devicePixelRatio || 1) * 1.1));
@@ -52,7 +53,7 @@ function safe<T>(f: () => T, fallback: T): T {
 
 export function initArt() {
   if (props.size) return;
-  for (const build of [buildGround, buildRoom, buildKitchen, buildFurniture, buildDecor, buildWallItems, buildSpecial, buildOutdoor, buildDishes, buildFx])
+  for (const build of [buildGround, buildRoom, buildKitchen, buildFurniture, buildDecor, buildWallItems, buildSpecial, buildOutdoor, buildDishes, buildFx, buildRaidMap3])
     for (const a of safe(build, [])) props.set(a.key, a);
   for (const a of [...safe(buildProps, []), ...safe(buildRaidProps, [])]) if (!props.has(a.key)) legacy.set(a.key, a);
   for (const a of safe(buildUiIcons, [])) ui.set(a.key, a);
@@ -106,6 +107,43 @@ export function artUrlStretch(key: string): string {
   u = a ? svgData(a.svg.replace(/^<svg /, '<svg preserveAspectRatio="none" ')) : '';
   urlCache.set(k, u);
   return u;
+}
+
+const rasters = new Map<string, Promise<string>>();
+/**
+ * Big, effect-heavy art (the raid map) as a flat PNG data URL, drawn once in the background:
+ * redrawing a huge SVG with blurs on every menu open stutters on phones.
+ */
+export function rasterUrl(key: string, scale = 1): Promise<string> {
+  let p = rasters.get(key);
+  if (p) return p;
+  const a = anyArt(key);
+  if (!a) return Promise.resolve('');
+  p = new Promise<string>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = Math.round(a.w * scale);
+      c.height = Math.round(a.h * scale);
+      const g = c.getContext('2d');
+      if (!g) return resolve(artUrl(key));
+      g.drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/jpeg', 0.86));
+    };
+    img.onerror = () => resolve(artUrl(key));
+    img.src = svgData(a.svg);
+  });
+  rasters.set(key, p);
+  return p;
+}
+
+/** The PNG version if it's ready, else the SVG. */
+export function rasterOrSvg(key: string): string {
+  return rasterDone.get(key) ?? artUrl(key);
+}
+const rasterDone = new Map<string, string>();
+export function prewarmRaster(key: string, scale = 1) {
+  void rasterUrl(key, scale).then((u) => u && rasterDone.set(key, u));
 }
 
 export function hasArt(key: string): boolean {

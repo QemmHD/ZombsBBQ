@@ -1,15 +1,16 @@
 /**
- * C1 rig: body presets, the `Look` description of a character and the part builder.
+ * C1 rig v2 — the original game's construction: a huge 3/4 head (~55% of the height, about twice
+ * the torso's width) on a small bullet-shaped torso, with stubby two-segment limbs.
  *
  * Authoring frame (world units, y up is negative): root (0,0) = between the feet. Standard adult:
- *   hips   (±5, -21)      legs hang from here to the soles at y = 0
- *   torso  pivot (0, -19) gumdrop body from the hips up to the shoulders (top ≈ -57)
- *   arms   (±9.4, -50)    shoulder pivots
- *   head   (0.5, -54)     neck pivot; the skull reaches ≈ -97, hair / hats above
- * The head is always authored in this standard frame and shifted to the body's neck; arms are
- * authored with the shoulder at the origin, legs with the hip at the origin.
+ *   hips      (±6.2, -21)   thigh down to the knee   (±6.2, -11)   shin + shoe down to the sole (0)
+ *   torso     pivot (0, -19)  bullet from y -50.5 (just under the chin) to -17
+ *   shoulders (±11, -44)    upper arm to the elbow   (±11.6, -32)  forearm + hand to ≈ -15
+ *   head      neck (1, -47) head drawn in the head frame (neck (0.5,-54)) scaled ×1.27; top ≈ -104
+ * Arms are authored with the shoulder (upper) or elbow (lower) at the origin, legs with the hip
+ * (upper) or knee (lower) at the origin; every segment hangs straight down (+y) in the rest pose.
  */
-import { Doc, f } from '../../art/svg';
+import { Doc } from '../../art/svg';
 import type { CharPart } from '../../art/types';
 import type { Tone, Pt } from './paint';
 
@@ -21,14 +22,22 @@ export interface Body {
   hipX: number;
   hipY: number;
   legW: number;
+  /** hip → knee */
+  thighL: number;
   shX: number;
   shY: number;
-  /** upper-arm width */
+  /** upper-arm (sleeve) width */
   armW: number;
-  /** shoulder → wrist length */
-  armLen: number;
+  /** shoulder → elbow */
+  upL: number;
+  /** elbow → wrist */
+  foreL: number;
+  /** neck pivot */
+  neckX: number;
   neckY: number;
-  /** torso top (shoulder dome) and bottom (seat) */
+  /** head scale over the standard head frame */
+  headS: number;
+  /** torso top (just under the chin) and bottom (seat) */
   tTop: number;
   tBot: number;
   /** torso half-widths at the shoulders / hips */
@@ -40,18 +49,29 @@ export interface Body {
   hunch: number;
 }
 
+const STD: Body = { s: 1, hipX: 5.8, hipY: -21, legW: 11.4, thighL: 10, shX: 11, shY: -44, armW: 9.4, upL: 12, foreL: 8.8, neckX: 1, neckY: -47, headS: 1.27, tTop: -50.5, tBot: -17, wTop: 9.4, wBot: 12.4, belly: 0, hunch: 0 };
+const B = (o: Partial<Body>): Body => ({ ...STD, ...o });
+
 export const BODIES = {
-  std: { s: 1, hipX: 5, hipY: -21, legW: 7.4, shX: 9.4, shY: -50, armW: 5, armLen: 25, neckY: -54, tTop: -57.5, tBot: -17, wTop: 9.6, wBot: 12.2, belly: 0, hunch: 0 },
-  slim: { s: 1, hipX: 4.6, hipY: -22, legW: 6.4, shX: 8.6, shY: -50.5, armW: 4.3, armLen: 25, neckY: -54.5, tTop: -58, tBot: -18, wTop: 8.4, wBot: 10.6, belly: 0, hunch: 0 },
-  stocky: { s: 1, hipX: 5.6, hipY: -21, legW: 8.2, shX: 10.8, shY: -50, armW: 5.8, armLen: 25, neckY: -54, tTop: -57.5, tBot: -16.5, wTop: 11, wBot: 13.6, belly: 1.6, hunch: 0 },
-  fat: { s: 1, hipX: 5.8, hipY: -20, legW: 8.6, shX: 10.6, shY: -50, armW: 5.8, armLen: 24.5, neckY: -54, tTop: -57.5, tBot: -15.5, wTop: 10.6, wBot: 15, belly: 4, hunch: 0 },
-  muscle: { s: 1.04, hipX: 5.4, hipY: -22, legW: 8.2, shX: 12.6, shY: -51, armW: 7.6, armLen: 25, neckY: -55, tTop: -59, tBot: -18, wTop: 13.8, wBot: 11, belly: 0, hunch: 0 },
-  sumo: { s: 1.06, hipX: 7.2, hipY: -19, legW: 10.4, shX: 13.4, shY: -50, armW: 7.8, armLen: 23, neckY: -55, tTop: -58, tBot: -13, wTop: 13.6, wBot: 19, belly: 5.5, hunch: 0 },
-  teen: { s: 0.93, hipX: 4.6, hipY: -22, legW: 6.6, shX: 8.8, shY: -50.5, armW: 4.4, armLen: 25.5, neckY: -54.5, tTop: -58, tBot: -17.5, wTop: 8.8, wBot: 11.4, belly: 0, hunch: 0 },
-  granny: { s: 0.87, hipX: 4.8, hipY: -20, legW: 6.6, shX: 9.2, shY: -49, armW: 4.6, armLen: 24, neckY: -52.5, tTop: -56, tBot: -16, wTop: 9.8, wBot: 13.4, belly: 1.2, hunch: 2 },
-  old: { s: 0.95, hipX: 4.8, hipY: -21, legW: 7, shX: 9.2, shY: -49.5, armW: 4.6, armLen: 25, neckY: -53, tTop: -56.5, tBot: -17, wTop: 9.4, wBot: 12, belly: 1.6, hunch: 2.2 },
+  std: STD,
+  slim: B({ hipX: 5.2, legW: 10, shX: 10.2, armW: 8.4, wTop: 8.4, wBot: 11, tBot: -17.6 }),
+  stocky: B({ hipX: 6.4, legW: 12.6, shX: 12.2, armW: 10.6, wTop: 10.8, wBot: 14, belly: 1.6 }),
+  fat: B({ hipX: 6.8, legW: 13, hipY: -20, thighL: 9.4, shX: 12.6, armW: 10.8, wTop: 11.2, wBot: 15.8, belly: 4, tBot: -16 }),
+  muscle: B({ s: 1.04, hipX: 6.4, legW: 12.6, shX: 14, armW: 13.6, wTop: 14.2, wBot: 12.6, upL: 12.4 }),
+  sumo: B({ s: 1.05, hipX: 8.4, hipY: -19.6, thighL: 9.2, legW: 15.4, shX: 14.6, armW: 13.6, wTop: 14.4, wBot: 20, belly: 6, tBot: -14 }),
+  teen: B({ s: 0.93, hipX: 5.2, legW: 10.2, shX: 10.2, armW: 8.6, wTop: 8.8, wBot: 11.4 }),
+  granny: B({ s: 0.87, hipX: 5.6, legW: 10.2, hipY: -20, thighL: 9.4, shX: 10.8, armW: 10, wTop: 10.6, wBot: 14.4, belly: 1.4, hunch: 2, neckY: -46, tTop: -49.5 }),
+  old: B({ s: 0.95, hipX: 5.6, legW: 10.8, shX: 10.8, armW: 9.2, wTop: 9.6, wBot: 12.6, belly: 1.8, hunch: 2.2, neckY: -46.4, tTop: -50 }),
 } satisfies Record<string, Body>;
 export type BodyKind = keyof typeof BODIES;
+
+/** Elbow / knee positions relative to the shoulder / hip (rest pose). */
+export function elbowAt(b: Body, side: -1 | 1): Pt {
+  return [side * 2.2, b.upL];
+}
+export function kneeAt(b: Body, side: -1 | 1): Pt {
+  return [side * 0.2, b.thighL];
+}
 
 export type Expr = 'scream' | 'happy' | 'shock' | 'angry' | 'eat' | 'chomp' | 'sleep' | 'dazed' | undefined;
 
@@ -73,6 +93,10 @@ export interface Ctx {
 }
 
 export type Paint = (c: Ctx) => string;
+export interface LimbSet {
+  up: Paint;
+  lo: Paint;
+}
 
 export type HeadShape = 'std' | 'square' | 'long' | 'round' | 'egg' | 'heart' | 'jowl' | 'small';
 export type NoseKind = 'big' | 'hook' | 'bulb' | 'pointy' | 'pug' | 'broken' | 'small' | 'long';
@@ -126,10 +150,10 @@ export interface Look {
   headBackOver?: Paint;
   torso: Paint;
   torsoBox?: [number, number, number, number];
-  /** arm painter (shoulder at origin, arm hangs down +y; `side` from ctx); `items` carry prop boxes */
-  arm: Paint & { items?: { L?: { box?: [number, number, number, number] }; R?: { box?: [number, number, number, number] } } };
-  armBox?: (side: -1 | 1) => [number, number, number, number];
-  leg: Paint;
+  /** arm painters: upper (shoulder at origin) and lower (elbow at origin); `items` carry prop boxes */
+  arm: LimbSet & { items?: { L?: { box?: [number, number, number, number] }; R?: { box?: [number, number, number, number] } } };
+  /** leg painters: upper (hip at origin) and lower (knee at origin, shoe at the bottom) */
+  leg: LimbSet;
   legBox?: [number, number, number, number];
   headBox?: [number, number, number, number];
   /** long hair covers the ears */
@@ -143,19 +167,19 @@ function r3(v: number): number {
 
 /**
  * Build one part. `box` and `pivot` are in the local authoring frame; the local frame maps to the
- * rig frame by p_rig = s * (p_local + t).
+ * rig frame by p_rig = k * p_local + o.
  */
-export function part(key: string, box: [number, number, number, number], pivot: Pt, s: number, t: Pt, body: (d: Doc) => string): CharPart {
+export function part(key: string, box: [number, number, number, number], pivot: Pt, k: number, o: Pt, body: (d: Doc) => string): CharPart {
   const d = new Doc(key);
   const inner = body(d);
-  const X0 = Math.floor(s * (box[0] + t[0]) * 2) / 2;
-  const Y0 = Math.floor(s * (box[1] + t[1]) * 2) / 2;
-  const X1 = Math.ceil(s * (box[2] + t[0]) * 2) / 2;
-  const Y1 = Math.ceil(s * (box[3] + t[1]) * 2) / 2;
+  const X0 = Math.floor((k * box[0] + o[0]) * 2) / 2;
+  const Y0 = Math.floor((k * box[1] + o[1]) * 2) / 2;
+  const X1 = Math.ceil((k * box[2] + o[0]) * 2) / 2;
+  const Y1 = Math.ceil((k * box[3] + o[1]) * 2) / 2;
   const w = X1 - X0;
   const h = Y1 - Y0;
-  const pvx = s * (pivot[0] + t[0]);
-  const pvy = s * (pivot[1] + t[1]);
-  const tr = s !== 1 || t[0] !== 0 || t[1] !== 0 ? `<g transform="scale(${f(s)}) translate(${f(t[0])} ${f(t[1])})">${inner}</g>` : inner;
+  const pvx = k * pivot[0] + o[0];
+  const pvy = k * pivot[1] + o[1];
+  const tr = k !== 1 || o[0] !== 0 || o[1] !== 0 ? `<g transform="translate(${+o[0].toFixed(4)} ${+o[1].toFixed(4)}) scale(${+k.toFixed(5)})">${inner}</g>` : inner;
   return { key, svg: d.build(w, h, tr, -X0, -Y0), w, h, px: r3(pvx - X0), py: r3(pvy - Y0), x: r3(pvx), y: r3(pvy) };
 }

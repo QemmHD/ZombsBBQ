@@ -466,3 +466,9 @@
   width: 34px;
   animation: pulse 1.2s infinite;
 }
+
+/* Gus's note is information only: taps go straight through it to the café underneath */
+.hint,
+.hint * {
+  pointer-events: none !important;
+}

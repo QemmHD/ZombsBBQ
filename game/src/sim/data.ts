@@ -162,11 +162,16 @@ export const TUNING = {
   startCash: 300,
   startSauce: 5, // the original also started you with 5 Toxin vials
   /** how long a seated customer waits for food before leaving unhappy */
-  customerWaitSec: 75,
-  eatSec: 12,
+  customerWaitSec: 60, // original: a minute, then they storm off
+  eatSec: 30, // original: half a minute at the table
   fleeSpeed: 3.0,
-  baseWalkSpeed: 1.0, // tiles/sec at speed 0
-  walkSpeedPerStat: 0.12,
+  baseWalkSpeed: 1.4, // tiles/sec at speed 0 (original: an average person walks ~1.9 tiles/s)
+  walkSpeedPerStat: 0.125,
+  /** zombies shuffle ~20% slower than the living (original) */
+  zombieWalkMult: 0.8,
+  /** customers turn up every 18 s at zero stars down to every 4.5 s at five (original) */
+  arrivalSlowSec: 18,
+  arrivalFastSec: 4.5,
   energyPerServe: 1.5,
   energyPerClear: 0.6,
   energyCookPerSec: 1 / 20, // original: cooks burn 1 energy / 20 s
