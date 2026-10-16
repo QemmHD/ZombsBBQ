@@ -24,7 +24,7 @@ import { music, sfx } from '../game/sfx';
 import { artUrl, headUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import type { Hud } from './hud';
-import { bindActions, energyColor, esc, fmt, icon, priceHtml, starsHtml } from './dom';
+import { bindActions, energyColor, esc, icon, priceHtml, starsHtml } from './dom';
 
 // ---------- the road-trip map ----------
 
@@ -131,6 +131,7 @@ function openSquad(hud: Hud, id: RivalId, picked?: Set<string>, pets?: Set<strin
 
 export class RaidUi {
   private built = '';
+  private endAt = 0;
   constructor(
     private hud: Hud,
     private el: HTMLElement,
@@ -182,7 +183,12 @@ export class RaidUi {
     q('rc').textContent = String(s.graves.red);
     q('hc').textContent = String(s.inventory.headstone);
     q('sc').textContent = String(s.inventory.summon);
-    if (r.phase !== 'fight' && !this.hud.ctl.raidResult) this.showResult();
+    if (r.phase === 'fight') this.endAt = 0;
+    else if (!this.hud.ctl.raidResult) {
+      // let the final KO / retreat play out for a beat before the results card
+      if (!this.endAt) this.endAt = performance.now();
+      else if (performance.now() - this.endAt > 1400) this.showResult();
+    }
   }
 
   private action(a: string) {
@@ -210,6 +216,8 @@ export class RaidUi {
     const ctl = this.hud.ctl;
     const res = ctl.endRaid();
     if (!res) return;
+    this.endAt = 0;
+    this.hud.clearToasts();
     const r = ctl.raid!;
     const def = RIVAL_BY_ID[r.rival];
     const title = res.result === 'won' ? 'VICTORY!' : res.result === 'retreat' ? 'RETREAT!' : 'DEFEAT!';
@@ -232,6 +240,5 @@ export class RaidUi {
       ctl.leaveRaid();
       music('joint');
     });
-    void fmt;
   }
 }

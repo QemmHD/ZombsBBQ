@@ -1,6 +1,6 @@
 import { ITEMS, ITEM_BY_ID, THEMES, buyCheck, buyTheme, expand, nextExpansion, ownedCount, sellFromStorage, type ItemDef, type StoreTab } from '../sim';
 import { sfx } from '../game/sfx';
-import { artUrl } from '../scenes/assets';
+import { artUrl, artUrlFit } from '../scenes/assets';
 import { furnKey, themeKeys } from '../scenes/JointScene';
 import type { Hud } from './hud';
 import { bindActions, esc, icon, priceHtml } from './dom';
@@ -23,6 +23,11 @@ export function itemArt(def: ItemDef): string {
   return furnKey(def.id, def.dirs?.[0]);
 }
 
+/** Thumbnail URL: wall hangings are cropped out of their wall-sized canvas. */
+export function itemThumb(def: ItemDef): string {
+  return def.kind === 'wall' ? artUrlFit(itemArt(def)) : artUrl(itemArt(def));
+}
+
 export function openStore(hud: Hud, tab: Tab = lastTab) {
   lastTab = tab;
   const s = hud.ctl.state;
@@ -31,7 +36,7 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
     const locked = def.level > s.level;
     const owned = ownedCount(s, def.id);
     return `<button class="item ${locked ? 'locked' : err ? 'dim' : ''}" data-a="buy" data-id="${def.id}">
-      <div class="item-art"><img src="${artUrl(itemArt(def))}" alt=""/></div>
+      <div class="item-art"><img src="${itemThumb(def)}" alt=""/></div>
       <b>${esc(def.name)}</b>
       <span class="item-meta">${locked ? `${icon('fx_lock', 'ico-s')} Lv ${def.level}` : priceHtml(def)}${def.decor ? ` <i class="decor">+${def.decor}★pts</i>` : ''}</span>
       ${owned ? `<span class="owned">×${owned}</span>` : ''}${extra}</button>`;
@@ -50,7 +55,7 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
       ? ids
           .map((id) => {
             const def = ITEM_BY_ID[id];
-            return `<div class="item"><div class="item-art"><img src="${artUrl(itemArt(def))}" alt=""/></div><b>${esc(def.name)}</b><span class="item-meta">×${s.storage[id]} stored</span>
+            return `<div class="item"><div class="item-art"><img src="${itemThumb(def)}" alt=""/></div><b>${esc(def.name)}</b><span class="item-meta">×${s.storage[id]} stored</span>
               <span class="item-btns"><button class="btn green tiny" data-a="place" data-id="${id}">Place</button><button class="btn red tiny" data-a="sellst" data-id="${id}">Sell</button></span></div>`;
           })
           .join('')

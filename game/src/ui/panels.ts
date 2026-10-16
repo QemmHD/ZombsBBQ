@@ -13,16 +13,17 @@ import {
   serviceStars,
   studyFromFridge,
   zombies,
-  CUSTOMER_BY_ID,
   RIVALS,
   DECOR_STARS,
+  type WorkerState,
 } from '../sim';
 import { audio, sfx } from '../game/sfx';
 import { headUrl, artUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import type { Hud } from './hud';
-import { bindActions, energyColor, esc, fmt, fmtTime, icon, priceHtml, starsHtml } from './dom';
+import { bindActions, energyColor, esc, fmtTime, icon, priceHtml, starsHtml } from './dom';
 import { dishRow } from './hud';
+import { itemThumb } from './store';
 
 declare const __BUILD__: string;
 
@@ -72,12 +73,26 @@ export function openCookbook(hud: Hud) {
   );
 }
 
+const STATUS: Record<WorkerState, string> = {
+  idle: 'Ready for orders',
+  toStove: 'Heading to a stove',
+  cooking: 'Cooking',
+  toCounter: 'Plating up',
+  carrying: 'Carrying food',
+  hunting: 'HANGRY! Hunting a snack',
+  toRest: 'Off for a nap',
+  resting: 'Napping on the lawn',
+  daydream: 'Daydreaming about brains',
+  raiding: 'Out raiding',
+  down: 'Knocked out',
+};
+
 export function openCrew(hud: Hud) {
   const s = hud.ctl.state;
   const rows = s.workers
     .map((w) => {
       const f = w.energy / w.stats.energy;
-      const status = w.state === 'down' ? `KO · ${fmtTime((w.downUntil ?? 0) - s.now)}` : w.state === 'raiding' ? 'Raiding' : w.state;
+      const status = w.state === 'down' ? `KO · back in ${fmtTime((w.downUntil ?? 0) - s.now)}` : STATUS[w.state];
       return `<div class="crew-row" data-id="${w.id}"><img src="${headUrl(charIdFor(w), w.state === 'down' ? 'dazed' : undefined)}" alt=""/><b>${esc(w.name)}<br/><span class="sub">${esc(status)}</span></b><div class="bar"><i style="width:${f * 100}%;background:${energyColor(f)}"></i></div><span class="chip">PWR ${w.stats.power}</span></div>`;
     })
     .join('');
@@ -161,7 +176,7 @@ export function openZombiepedia(hud: Hud) {
 export function openLevelUp(hud: Hud, level: number) {
   const unlocks: string[] = [];
   for (const d of DISHES) if (d.source === 'level' && d.level === level) unlocks.push(`${icon(d.icon, 'ico')} ${d.name}`);
-  for (const it of ITEMS) if (it.level === level) unlocks.push(`${icon(it.kind === 'wall' ? `${it.art}_r` : it.kind === 'seat' ? (it.art === 'bench' ? 'bench_l' : `${it.art}_se`) : it.art, 'ico')} ${it.name}`);
+  for (const it of ITEMS) if (it.level === level) unlocks.push(`<img class="unl-ico" src="${itemThumb(it)}" alt=""/> ${it.name}`);
   for (const t of THEMES) if (t.level === level && t.id !== 'shack') unlocks.push(`${t.name} theme`);
   for (const c of CUSTOMERS) if (c.minLevel === level) unlocks.push(`<img class="ico" src="${headUrl(c.id)}" alt=""/> ${c.name} may visit`);
   for (const e of EXPANSIONS) if (e.level === level) unlocks.push(`${icon('ui_expand', 'ico')} Expand to ${e.size}×${e.size}`);
@@ -186,11 +201,9 @@ export function openRating(hud: Hud) {
   const pts = decorPoints(s);
   const next = DECOR_STARS.find((p) => p > pts);
   hud.openModal(
-    `<h2>Star Rating</h2><div class="rate-row"><b>Service</b>${starsHtml(Math.floor(serviceStars(s) * 2) / 2)}<span class="sub">Happy faces push it up, frowns and bites drag it down.</span></div>
-    <div class="rate-row"><b>Decor</b>${starsHtml(decorStars(s))}<span class="sub">${pts} decor points${next ? ` · next half-star at ${next}` : ''}</span></div>
+    `<h2>Star Rating</h2><div class="rate-row"><b>Service</b><span class="big-stars">${starsHtml(Math.floor(serviceStars(s) * 2) / 2)}</span><span class="sub">Happy faces push it up, frowns and bites drag it down.</span></div>
+    <div class="rate-row"><b>Decor</b><span class="big-stars">${starsHtml(decorStars(s))}</span><span class="sub">${pts} decor points${next ? ` · next half-star at ${next}` : ''}</span></div>
     <p class="small">Your rating is the lower of the two. More stars = more customers, and rarer ones.</p>`,
     { cls: 'narrow' },
   );
-  void CUSTOMER_BY_ID;
-  void fmt;
 }

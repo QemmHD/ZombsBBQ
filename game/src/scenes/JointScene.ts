@@ -394,8 +394,9 @@ export class JointScene extends Phaser.Scene {
     for (const [fid, bag] of this.cashBags) {
       if (bag.visible && Math.abs(wx - bag.x) < 18 && wy < bag.y + 6 && wy > bag.y - 30) return this.game.events.emit('collect', fid);
     }
-    // characters (front-most wins)
-    let best: { id: string; kind: 'w' | 'c' | 'p'; depth: number } | null = null;
+    // characters: whoever's body is closest to the finger wins (front-most only breaks ties), so a
+    // zombie half-hidden behind a customer is still easy to grab
+    let best: { id: string; kind: 'w' | 'c' | 'p'; score: number } | null = null;
     const consider = (id: string, kind: 'w' | 'c' | 'p') => {
       const a = this.actors.get(id);
       if (!a?.puppet || !a.holder.visible) return;
@@ -403,7 +404,9 @@ export class JointScene extends Phaser.Scene {
       const hw = lying ? 40 : 22;
       const top = lying ? 30 : a.puppet.height + 8;
       if (Math.abs(wx - a.holder.x) < hw && wy < a.holder.y + 8 && wy > a.holder.y - top) {
-        if (!best || a.holder.depth > best.depth) best = { id, kind, depth: a.holder.depth };
+        const cy = a.holder.y - (lying ? 10 : a.puppet.height * 0.45);
+        const score = (wx - a.holder.x) ** 2 + ((wy - cy) * 0.7) ** 2 - a.holder.depth * 1e-6;
+        if (!best || score < best.score) best = { id, kind, score };
       }
     };
     for (const w of s.workers) if (w.state !== 'raiding') consider(w.id, 'w');

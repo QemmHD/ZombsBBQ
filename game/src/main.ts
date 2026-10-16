@@ -5,10 +5,14 @@ import { music, unlockAudio } from './game/sfx';
 import { Hud } from './ui/hud';
 import { JointScene } from './scenes/JointScene';
 import { RaidScene } from './scenes/RaidScene';
-import { initArt } from './scenes/assets';
+import { initArt, measureCrops } from './scenes/assets';
+import * as sim from './sim';
+import { openFridge } from './ui/panels';
 
 const dpr = () => Math.min(3, window.devicePixelRatio || 1);
 initArt();
+// shop thumbnails of wall hangings are cropped to their painted area
+setTimeout(() => measureCrops(sim.ITEMS.filter((i) => i.kind === 'wall').map((i) => `${i.art}_r`)), 1500);
 const ctl = new Controller();
 
 const game = new Phaser.Game({
@@ -59,10 +63,8 @@ ctl.onMode((m) => {
 });
 
 // money-maker taps and fridge taps come from the scene
-game.events.on('collect', (id: string) => {
-  import('./sim').then(({ collectPayout }) => collectPayout(ctl.state, id));
-});
-game.events.on('open-fridge', () => import('./ui/panels').then(({ openFridge }) => openFridge(hud)));
+game.events.on('collect', (id: string) => sim.collectPayout(ctl.state, id));
+game.events.on('open-fridge', () => openFridge(hud));
 
 // handy for debugging from the console / smoke tests
-(window as unknown as { zbbq: unknown }).zbbq = { ctl, game, hud };
+(window as unknown as { zbbq: unknown }).zbbq = { ctl, game, hud, sim };

@@ -4,7 +4,7 @@
  */
 import Phaser from 'phaser';
 import { RAID_META, TILE_H, TILE_W, WALL_H } from '../art';
-import { ARENA_N, GATE_Y, LINE_X, RIVAL_BY_ID, focusTarget, isoToWorld, sendOne, stealDish, worldToIso, type RaidEvent, type RaidUnit } from '../sim';
+import { ARENA_N, DISH_BY_ID, GATE_Y, LINE_X, RIVAL_BY_ID, focusTarget, isoToWorld, sendOne, stealDish, worldToIso, type RaidEvent, type RaidUnit } from '../sim';
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
 import { TEX_S, charArt, charLoaded, hasProp, loadChar, loadRaidProps, propMeta } from './assets';
@@ -101,7 +101,7 @@ export class RaidScene extends Phaser.Scene {
     r.counter.forEach((c, i) => {
       const p = iso(c.x, c.y);
       this.img('counter', p.x, p.y).setDepth(depthOf(c.x, c.y) + 1);
-      this.counterDishes[i] = this.img(r.counter[i].dish ? `dish_${dishArt(c.dish)}` : 'dish_burger', p.x, p.y - 34).setDepth(depthOf(c.x, c.y) + 2);
+      this.counterDishes[i] = this.img(r.counter[i].dish ? DISH_BY_ID[c.dish]?.icon ?? 'dish_burger' : 'dish_burger', p.x, p.y - 34).setDepth(depthOf(c.x, c.y) + 2);
     });
     for (const [x, y] of [
       [2, 2],
@@ -321,7 +321,7 @@ export class RaidScene extends Phaser.Scene {
       case 'hit': {
         const p = iso(e.x, e.y);
         const u = unitOf(e.unit);
-        this.floatText(p.x + (Math.random() - 0.5) * 16, p.y - 70, `-${e.dmg}`, u?.side === 'z' ? '#ff5a4a' : '#ffffff', 12);
+        this.floatText(p.x + (Math.random() - 0.5) * 16, p.y - 70, `-${Math.max(1, Math.round(e.dmg))}`, u?.side === 'z' ? '#ff5a4a' : '#ffffff', 12);
         if (Math.random() < 0.35) this.pop('fx_hit', p.x, p.y - 50, 180);
         const by = unitOf(e.by);
         if (by?.kind !== 'zapper') sfx(by?.kind === 'boss' ? 'whack' : 'hit', { volume: 0.5 });
@@ -407,7 +407,3 @@ export class RaidScene extends Phaser.Scene {
   }
 }
 
-function dishArt(id: string): string {
-  const map: Record<string, string> = { hotdog: 'hotdog', burger: 'burger', wings: 'wings', pork: 'pork', ribs: 'ribs', brisket: 'brisket', rings: 'rings', nuggets: 'nuggets', chili: 'chili', smash: 'smash', salad: 'salad', chicken: 'chicken', foie: 'foie' };
-  return map[id] ?? 'burger';
-}

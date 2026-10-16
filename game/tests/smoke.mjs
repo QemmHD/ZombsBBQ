@@ -1,5 +1,6 @@
-// Smoke test: serve the production build, open it as an iPhone in landscape, play the opening
-// of the tutorial through real taps, and save screenshots + fail on any console error.
+// End-to-end smoke test: serve the production build, open it as an iPhone in landscape and play
+// through every feature with real taps (tutorial, infection, crew care, every menu, shop + decorating,
+// expansion, themes, raids). Saves screenshots and fails on any console error or broken step.
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -34,128 +35,341 @@ const ctx = await browser.newContext({
 });
 const page = await ctx.newPage();
 const errors = [];
+const log = {};
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto(`http://localhost:${port}/index.html`);
-await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 30000 });
-await page.waitForTimeout(1500);
-await page.screenshot({ path: join(out, '01-start.png') });
-
-// screen position of a world point (CSS px)
-const screenOf = (wx, wy) =>
-  page.evaluate(([x, y]) => {
-    const cam = window.zbbq.game.scene.getScene('joint').cameras.main;
-    const dpr = Math.min(3, window.devicePixelRatio || 1);
-    return { x: ((x - cam.worldView.x) * cam.zoom) / dpr, y: ((y - cam.worldView.y) * cam.zoom) / dpr };
-  }, [wx, wy]);
-const isoW = (x, y) => ({ x: (x - y) * 48, y: (x + y) * 24 });
-const tapWorld = async (wx, wy) => {
-  const p = await screenOf(wx, wy);
-  await page.touchscreen.tap(p.x, p.y);
-  await page.waitForTimeout(250);
+const check = (ok, msg) => {
+  if (!ok) errors.push(`STEP FAILED: ${msg}`);
+};
+let shotN = 0;
+const shot = (name) => page.screenshot({ path: join(out, `${String(++shotN).padStart(2, '0')}-${name}.png`) });
+const wait = (ms) => page.waitForTimeout(ms);
+const ff = (sec) =>
+  page.evaluate((n) => {
+    for (let i = 0; i < n; i++) window.zbbq.ctl.update(0.1);
+  }, Math.round(sec * 10));
+const tapSel = async (sel, name) => {
+  const l = page.locator(sel).first();
+  if (!(await l.count())) return check(false, `missing ${name ?? sel}`);
+  await l.tap();
+  await wait(300);
+};
+const modalOpen = () => page.evaluate(() => window.zbbq.hud.modalOpen);
+const closeModal = async () => {
+  if (await modalOpen()) await tapSel('.modal .x', 'modal close');
 };
 
-// Tutorial: tap YOU, then the grill, pick the hot dog.
-const you = await page.evaluate(() => {
-  const w = window.zbbq.ctl.state.workers[0];
-  return { x: w.x, y: w.y };
-});
-let p = isoW(you.x, you.y);
-await tapWorld(p.x, p.y - 35);
+await page.goto(`http://localhost:${port}/index.html`);
+await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
+await wait(1500);
+check(await page.evaluate(() => document.getElementById('boot')?.classList.contains('done')), 'boot screen hides');
+await shot('start');
+
+// screen position of a world point (CSS px)
+const screenOf = (wx, wy, scene = 'joint') =>
+  page.evaluate(
+    ([x, y, sc]) => {
+      const cam = window.zbbq.game.scene.getScene(sc).cameras.main;
+      const dpr = Math.min(3, window.devicePixelRatio || 1);
+      return { x: ((x - cam.worldView.x) * cam.zoom) / dpr, y: ((y - cam.worldView.y) * cam.zoom) / dpr };
+    },
+    [wx, wy, scene],
+  );
+const isoW = (x, y) => ({ x: (x - y) * 48, y: (x + y) * 24 });
+const tapWorld = async (wx, wy, scene) => {
+  const p = await screenOf(wx, wy, scene);
+  await page.touchscreen.tap(p.x, p.y);
+  await wait(250);
+};
+const tapActor = async (id) => {
+  const pos = await page.evaluate((id) => {
+    const a = window.zbbq.game.scene.getScene('joint').actors.get(id);
+    return a ? { x: a.holder.x, y: a.holder.y - 30 } : null;
+  }, id);
+  check(!!pos, `actor ${id} on screen`);
+  if (pos) await tapWorld(pos.x, pos.y);
+};
+
+// ---------- 1. tutorial: YOU cooks a hot dog ----------
+const youId = await page.evaluate(() => window.zbbq.ctl.state.workers[0].id);
+await tapActor(youId);
+check((await page.evaluate(() => window.zbbq.ctl.selection?.kind)) === 'worker', 'tap YOU selects YOU');
 const grill = await page.evaluate(() => {
-  const s = window.zbbq.ctl.state;
-  const f = s.furniture.find((f) => f.kind === 'grill');
+  const f = window.zbbq.ctl.state.furniture.find((f) => f.item === 'grill');
   return { x: f.x, y: f.y };
 });
-p = isoW(grill.x, grill.y);
-await tapWorld(p.x, p.y - 10);
-await page.screenshot({ path: join(out, '02-dish-picker.png') });
-const dishBtn = page.locator('[data-dish="hotdog"]');
-if (await dishBtn.count()) await dishBtn.first().tap();
-await page.waitForTimeout(3000);
-await page.screenshot({ path: join(out, '03-cooking.png') });
-const st1 = await page.evaluate(() => window.zbbq.ctl.state.stoves[0].status);
+const gp = isoW(grill.x, grill.y);
+await tapWorld(gp.x, gp.y - 10);
+await shot('dish-picker');
+await tapSel('[data-dish="hotdog"]', 'hot dog button');
+await wait(2500);
+await shot('cooking');
+log.afterPick = await page.evaluate(() => window.zbbq.ctl.state.stoves[0].status);
+check(['cooking', 'reserved', 'pending'].includes(log.afterPick), 'grill starts cooking');
+await ff(30);
+await tapWorld(gp.x, gp.y - 10); // plate it
+await ff(40);
+await wait(800);
+await shot('serving');
 
-// fast-forward the sim (as if time passed) and plate the food
-await page.evaluate(() => {
-  const s = window.zbbq.ctl.state;
-  for (let i = 0; i < 300; i++) window.zbbq.ctl.update(0.1);
-  return s.stoves[0].status;
-});
-await tapWorld(p.x, p.y - 10);
-await page.evaluate(() => {
-  for (let i = 0; i < 400; i++) window.zbbq.ctl.update(0.1);
-});
-await page.waitForTimeout(800);
-await page.screenshot({ path: join(out, '04-serving.png') });
-const summary = await page.evaluate(() => {
-  const s = window.zbbq.ctl.state;
-  const sc = window.zbbq.game.scene.getScene('joint');
-  const views = s.customers.map((c) => `${c.type}->${sc.chars.get(c.id)?.charId}`);
-  return { cash: s.cash, served: s.stats.served, tut: s.tut, customers: views, stove: s.stoves[0].status };
-});
-// Infect a seated customer with a real tap on them, then the INFECT button
-const cust = await page.evaluate(() => {
-  const sc = window.zbbq.game.scene.getScene('joint');
-  const c = window.zbbq.ctl.state.customers.find((c) => c.state === 'waiting' || c.state === 'eating');
-  if (!c) return null;
-  const v = sc.chars.get(c.id);
-  return { x: v.root.x, y: v.root.y - 30 };
-});
-if (cust) await tapWorld(cust.x, cust.y);
-await page.waitForTimeout(300);
-await page.screenshot({ path: join(out, '05-infect-card.png') });
-const infectBtn = page.locator('[data-a="infect"]');
-if (await infectBtn.count()) await infectBtn.first().tap();
-// headless Chromium renders slowly (software GL), so wait on game state instead of wall-clock
-await page.waitForFunction(() => window.zbbq.ctl.state.workers.some((w) => w.kind === 'zombie'), null, { timeout: 30000 });
-await page.waitForTimeout(500);
-await page.screenshot({ path: join(out, '06-first-zombie.png') });
+// ---------- 2. infect a customer ----------
+const custId = await page.evaluate(() => window.zbbq.ctl.state.customers.find((c) => c.state === 'waiting' || c.state === 'eating')?.id);
+check(!!custId, 'a customer is seated');
+if (custId) await tapActor(custId);
+await shot('infect-card');
+await tapSel('[data-a="infect"]', 'INFECT button');
+await wait(400);
+await ff(6); // headless GL renders slowly: advance the infection animation in game time
+await page.waitForFunction(() => window.zbbq.ctl.state.workers.some((w) => w.kind === 'zombie'), null, { timeout: 30000 }).catch(() => {});
+await wait(600);
+await shot('first-zombie');
+const zid = await page.evaluate(() => window.zbbq.ctl.state.workers.find((w) => w.kind === 'zombie')?.id);
+check(!!zid, 'infection via taps');
 
-// The new zombie cooks: tap zombie, tap grill, choose hot dog
-const z = await page.evaluate(() => {
-  const sc = window.zbbq.game.scene.getScene('joint');
-  const w = window.zbbq.ctl.state.workers.find((w) => w.kind === 'zombie');
-  if (!w) return null;
-  const v = sc.chars.get(w.id);
-  return { x: v.root.x, y: v.root.y - 30 };
-});
-const selLog = [];
-if (z) {
-  await tapWorld(z.x, z.y);
-  selLog.push(await page.evaluate(() => JSON.stringify(window.zbbq.ctl.selection)));
-  await tapWorld(p.x, p.y - 10);
-  selLog.push(await page.evaluate(() => JSON.stringify(window.zbbq.ctl.selection)));
-  const d2 = page.locator('[data-dish="hotdog"]');
-  if (await d2.count()) await d2.first().tap();
+// ---------- 3. zombie cooks, goes hangry, rests ----------
+if (zid) {
+  await ff(6);
+  await tapActor(zid);
+  await tapWorld(gp.x, gp.y - 10);
+  await tapSel('[data-dish="hotdog"]', 'zombie dish');
+  await ff(2);
+  await wait(500);
+  await shot('zombie-cooking');
+  await page.evaluate((id) => {
+    for (let i = 0; i < 300; i++) window.zbbq.ctl.update(0.1);
+    const w = window.zbbq.ctl.state.workers.find((w) => w.id === id);
+    w.energy = 1;
+    w.nextDaydream = Infinity;
+    for (let i = 0; i < 60 && !window.zbbq.ctl.state.stats.bites; i++) window.zbbq.ctl.update(0.1);
+  }, zid);
+  await wait(600);
+  await shot('hangry');
+  await page.evaluate((id) => window.zbbq.ctl.tapWorker(id), zid);
+  await wait(300);
+  await tapSel('[data-a="rest"]', 'Rest button');
+  await ff(12);
+  await wait(600);
+  await shot('resting');
+  log.zombie = await page.evaluate((id) => window.zbbq.ctl.state.workers.find((w) => w.id === id)?.state, zid);
+  check(['resting', 'toRest'].includes(log.zombie), `zombie rests (got ${log.zombie})`);
+  await page.evaluate(() => window.zbbq.ctl.select(null));
 }
-await page.waitForFunction(() => window.zbbq.ctl.state.tut >= 6, null, { timeout: 30000 }).catch(() => {});
-await page.screenshot({ path: join(out, '06b-zombie-cooking.png') });
-// Starve the zombie to trigger a HANGRY bite, then send it to rest
+
+// ---------- 4. grow the joint (cheat ahead) and visit every menu ----------
 await page.evaluate(() => {
-  const w = window.zbbq.ctl.state.workers.find((w) => w.kind === 'zombie');
-  for (let i = 0; i < 300; i++) window.zbbq.ctl.update(0.1); // let the zombie finish cooking
-  if (w) { w.energy = 1; w.nextDaydream = Infinity; }
-  for (let i = 0; i < 40 && !window.zbbq.ctl.state.stats.bites; i++) window.zbbq.ctl.update(0.1);
+  const { ctl, sim } = window.zbbq;
+  const s = ctl.state;
+  s.cash += 60000;
+  s.sauce += 80;
+  // level up through the real path so unlock events fire, then drain the level-up modals
+  while (s.level < 7) sim.addXp(s, sim.xpToNext(s.level));
+  s.tut = 99;
+  // a few more zombies for the crew + raids
+  for (const type of ['teen', 'construction', 'cop', 'nurse']) {
+    if (s.workers.filter((w) => w.kind === 'zombie').length >= s.crewCap) break;
+    s.workers.push(sim.makeWorker(s, 'zombie', type, { x: 6, y: 2 }));
+  }
+  s.fridge.push({ dish: 'chili', servings: 6 });
 });
-await page.waitForTimeout(600);
-await page.screenshot({ path: join(out, '07-hangry.png') });
+await ff(1);
+await wait(500);
+check(await modalOpen(), 'level-up popup shows');
+await shot('levelup');
+while (await modalOpen()) await closeModal();
+
+const panels = [
+  ['book', 'cookbook'],
+  ['crew', 'crew'],
+  ['goals', 'goals'],
+  ['fridge', 'fridge'],
+  ['pedia', 'zombiepedia'],
+  ['gear', 'settings'],
+  ['rating', 'rating'],
+];
+for (const [k, name] of panels) {
+  await tapSel(`[data-k="${k}"]`, name);
+  check(await modalOpen(), `${name} opens`);
+  await shot(name);
+  if (name === 'fridge') {
+    await tapSel('[data-a="study"]', 'study chili');
+    log.recipes = await page.evaluate(() => window.zbbq.ctl.state.recipes.slice());
+    check(log.recipes.includes('chili'), 'studying teaches chili');
+  }
+  if (name === 'goals') {
+    const claim = page.locator('[data-a="claim"]');
+    if (await claim.count()) await claim.first().tap();
+  }
+  await closeModal();
+}
+
+// ---------- 5. shop: every tab, buy + place a table ----------
+await tapSel('[data-k="shop"]', 'shop');
+for (const tab of ['featured', 'decor', 'kitchen', 'furniture', 'walls', 'special', 'storage']) {
+  await tapSel(`.tab[data-id="${tab}"]`, `shop tab ${tab}`);
+  await shot(`shop-${tab}`);
+}
+await tapSel('.tab[data-id="furniture"]');
+const before = await page.evaluate(() => window.zbbq.ctl.state.furniture.length);
+await tapSel('[data-a="buy"][data-id="table_diner"]', 'buy diner table');
+check((await page.evaluate(() => window.zbbq.ctl.mode)) === 'edit', 'buying enters decorate mode');
+// find a free valid spot and drag the ghost there
 await page.evaluate(() => {
-  const st = window.zbbq.ctl.state;
-  const w = st.workers.find((w) => w.kind === 'zombie');
-  if (w) { w.energy = 5; window.zbbq.ctl.tapWorker(w.id); }
+  const { ctl } = window.zbbq;
+  for (let y = 1; y < ctl.state.roomN - 1; y++)
+    for (let x = 1; x < ctl.state.roomN - 1; x++) {
+      ctl.movePlacement(x, y);
+      if (!ctl.placementProblem()) return;
+    }
 });
-const restBtn = page.locator('[data-a="rest"]');
-if (await restBtn.count()) await restBtn.first().tap();
-await page.evaluate(() => { for (let i = 0; i < 120; i++) window.zbbq.ctl.update(0.1); });
-await page.waitForTimeout(600);
-await page.screenshot({ path: join(out, '08-resting.png') });
-const end = await page.evaluate(() => {
+await wait(300);
+await shot('placing');
+await tapSel('.eb-btn[data-a="ok"]', 'confirm place');
+const after = await page.evaluate(() => window.zbbq.ctl.state.furniture.length);
+check(after === before + 1, 'table placed');
+
+// select it, rotate, move it, store it, re-place from storage
+const tbl = await page.evaluate(() => window.zbbq.ctl.state.furniture.at(-1));
+const tp = isoW(tbl.x, tbl.y);
+await tapWorld(tp.x, tp.y);
+log.editSel = await page.evaluate(() => JSON.stringify(window.zbbq.ctl.editSel));
+check(!!(await page.evaluate(() => window.zbbq.ctl.editSel)), 'tap furniture in decorate mode selects it');
+await shot('edit-selected');
+await tapSel('.eb-btn[data-a="store"]', 'store');
+check((await page.evaluate(() => window.zbbq.ctl.state.storage.table_diner)) === 1, 'stored');
+await tapSel('.eb-btn[data-a="storage"]', 'storage');
+await tapSel('[data-a="place"][data-id="table_diner"]', 'place from storage');
+await page.evaluate(() => {
+  const { ctl } = window.zbbq;
+  for (let y = 1; y < ctl.state.roomN - 1; y++)
+    for (let x = 1; x < ctl.state.roomN - 1; x++) {
+      ctl.movePlacement(x, y);
+      if (!ctl.placementProblem()) return;
+    }
+});
+await tapSel('.eb-btn[data-a="ok"]', 'confirm place from storage');
+check(!(await page.evaluate(() => window.zbbq.ctl.state.storage.table_diner)), 'storage emptied');
+
+// a wall hanging
+await tapSel('.eb-btn[data-a="shop"]', 'shop from editbar');
+await tapSel('.tab[data-id="walls"]');
+const wallItem = await page.evaluate(() => {
+  const { sim, ctl } = window.zbbq;
+  return sim.ITEMS.find((i) => i.kind === 'wall' && !sim.buyCheck(ctl.state, i.id))?.id;
+});
+if (wallItem) {
+  await tapSel(`[data-a="buy"][data-id="${wallItem}"]`, 'buy wall item');
+  await page.evaluate(() => {
+    const { ctl } = window.zbbq;
+    for (const wall of ['l', 'r'])
+      for (let i = 0; i < ctl.state.roomN; i++) {
+        ctl.moveWallPlacement(wall, i);
+        if (!ctl.placementProblem()) return;
+      }
+  });
+  await shot('wall-placing');
+  await tapSel('.eb-btn[data-a="ok"]', 'confirm wall item');
+  check(await page.evaluate((id) => window.zbbq.ctl.state.walls.some((w) => w.item === id), wallItem), 'wall item hung');
+}
+
+// expansion (two-tap) + theme
+await tapSel('.eb-btn[data-a="shop"]');
+await tapSel('.tab[data-id="special"]');
+await tapSel('[data-a="expand"]', 'expand (arm)');
+await tapSel('[data-a="expand"]', 'expand (confirm)');
+log.roomN = await page.evaluate(() => window.zbbq.ctl.state.roomN);
+check(log.roomN > 8, 'expanded the joint');
+await tapSel('.tab[data-id="walls"]');
+await tapSel('[data-a="theme"][data-id="roadhouse"]', 'buy roadhouse theme');
+log.theme = await page.evaluate(() => window.zbbq.ctl.state.theme);
+check(log.theme === 'roadhouse', 'theme applied');
+await closeModal();
+await wait(800);
+await shot('edit-mode');
+await tapSel('.eb-btn[data-a="done"]', 'done decorating');
+check((await page.evaluate(() => window.zbbq.ctl.mode)) === 'play', 'back to play');
+await ff(20);
+await wait(600);
+await shot('expanded-roadhouse');
+
+// ---------- 6. raid: map → rival → squad → fight → result ----------
+await page.evaluate(() => {
+  for (const w of window.zbbq.ctl.state.workers) if (w.kind === 'zombie') (w.energy = w.stats.energy), (w.state = 'idle'), (w.path = []);
+});
+await tapSel('[data-k="map"]', 'raid map');
+await wait(400);
+await shot('map');
+await tapSel('[data-a="rival"][data-id="chuck"]', 'Chuck pin');
+await shot('rival-card');
+await tapSel('[data-a="go"]', 'go to squad');
+await shot('squad');
+await tapSel('[data-a="start"]', 'start raid');
+check((await page.evaluate(() => window.zbbq.ctl.mode)) === 'raid', 'raid started');
+await page.waitForFunction(() => window.zbbq.game.scene.getScene('raid')?.ready, null, { timeout: 30000 }).catch(() => check(false, 'raid scene loads'));
+await wait(800);
+await shot('raid-start');
+await tapSel('[data-a="sendall"]', 'send all');
+await ff(4);
+await wait(500);
+await shot('raid-fight');
+// tap a counter dish in the raid scene to steal it once the crew is close
+await ff(20);
+const stolen = await page.evaluate(() => {
+  const r = window.zbbq.ctl.raid;
+  if (!r) return 'no raid';
+  const i = r.counter.findIndex((c) => c.servings > 0);
+  return i >= 0 ? window.zbbq.sim.stealDish(r, i) ?? 'ok' : 'empty';
+});
+log.steal = stolen;
+await ff(8);
+await wait(500);
+await shot('raid-steal');
+await page.waitForFunction(() => window.zbbq.ctl.raidResult || window.zbbq.ctl.raid?.phase !== 'fight', null, { timeout: 5000 }).catch(() => {});
+for (let i = 0; i < 20; i++) {
+  const done = await page.evaluate(() => !!window.zbbq.ctl.raidResult || document.querySelector('[data-a="home"]'));
+  if (done) break;
+  await ff(10);
+}
+await wait(1200);
+log.result = await page.evaluate(() => window.zbbq.ctl.raidResult && { result: window.zbbq.ctl.raidResult.result, cash: window.zbbq.ctl.raidResult.cash });
+await shot('raid-result');
+await tapSel('[data-a="home"]', 'home after raid');
+await wait(800);
+check((await page.evaluate(() => window.zbbq.ctl.mode)) === 'play', 'home after raid');
+await shot('home-after-raid');
+
+// ---------- 7. reload: save/load keeps everything ----------
+await page.evaluate(() => window.zbbq.ctl.save());
+const snap = await page.evaluate(() => {
   const s = window.zbbq.ctl.state;
-  return { zombies: s.workers.filter((w) => w.kind === 'zombie').map((w) => `${w.type}:${w.state}`), bites: s.stats.bites, tut: s.tut, rating: s.ratingPts };
+  return { cash: Math.floor(s.cash), roomN: s.roomN, theme: s.theme, n: s.furniture.length, crew: s.workers.length };
 });
-console.log(JSON.stringify({ afterPick: st1, ...summary, end, selLog, errors }, null, 1));
-if (!end.zombies.length) errors.push('infection via taps failed');
+await page.reload();
+await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
+const snap2 = await page.evaluate(() => {
+  const s = window.zbbq.ctl.state;
+  return { cash: Math.floor(s.cash), roomN: s.roomN, theme: s.theme, n: s.furniture.length, crew: s.workers.length };
+});
+check(snap.roomN === snap2.roomN && snap.theme === snap2.theme && snap.n === snap2.n && snap.crew === snap2.crew, `save round-trip ${JSON.stringify(snap)} vs ${JSON.stringify(snap2)}`);
+await wait(1000);
+while (await modalOpen()) await closeModal();
+await shot('reloaded');
+
+// texture memory: iPhones get unhappy well before ~300 MB of GPU textures
+log.textures = await page.evaluate(() => {
+  let px = 0, n = 0;
+  for (const [k, t] of Object.entries(window.zbbq.game.textures.list)) {
+    if (k.startsWith('__')) continue;
+    for (const src of t.source) px += src.width * src.height;
+    n++;
+  }
+  return { count: n, mb: Math.round((px * 4) / 1048576) };
+});
+check(log.textures.mb < 250, `texture memory ${log.textures.mb} MB`);
+log.final = await page.evaluate(() => {
+  const s = window.zbbq.ctl.state;
+  return { level: s.level, cash: Math.floor(s.cash), crew: s.workers.map((w) => `${w.type}:${w.state}`), stars: window.zbbq.sim.stars(s) };
+});
+console.log(JSON.stringify({ ...log, errors }, null, 1));
 await browser.close();
 server.close();
 if (errors.length) process.exit(1);

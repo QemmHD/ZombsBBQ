@@ -28,7 +28,7 @@ import { sfx } from '../game/sfx';
 import { headUrl, artUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import { bindActions, energyColor, esc, fmt, fmtTime, icon, priceHtml, starsHtml } from './dom';
-import { openCookbook, openCrew, openFridge, openGoals, openLevelUp, openOffline, openSettings, openZombiepedia } from './panels';
+import { openCookbook, openCrew, openFridge, openGoals, openLevelUp, openOffline, openRating, openSettings, openZombiepedia } from './panels';
 import { openStore } from './store';
 import { EditBar } from './editbar';
 import { RaidUi, openMap } from './raidui';
@@ -64,7 +64,7 @@ export class Hud {
     this.root.innerHTML = `
       <div class="awning" data-k="awning">
         <div class="lvl" data-k="lvl">1</div>
-        <div class="joint-name"><b>YOUR JOINT</b><span class="stars" data-k="stars"></span></div>
+        <div class="joint-name" data-k="rating" role="button" aria-label="Star rating"><b>YOUR JOINT</b><span class="stars" data-k="stars"></span></div>
         <div class="xpbar"><i data-k="xpfill"></i><span data-k="xptext"></span></div>
         <div class="cur cash" data-k="cash">${icon('ui_cash', 'cur-ico')}<span data-k="cashv"></span></div>
         <div class="cur sauce" data-k="sauce">${icon('ui_sauce', 'cur-ico')}<span data-k="saucev"></span></div>
@@ -98,6 +98,7 @@ export class Hud {
         f();
       });
     btn('gear', () => openSettings(this));
+    btn('rating', () => openRating(this));
     btn('shop', () => openStore(this));
     btn('book', () => openCookbook(this));
     btn('crew', () => openCrew(this));
@@ -164,6 +165,10 @@ export class Hud {
 
   get modalOpen() {
     return !!this.el.modal.innerHTML;
+  }
+
+  clearToasts() {
+    this.el.toasts.innerHTML = '';
   }
 
   showToast(t: string) {

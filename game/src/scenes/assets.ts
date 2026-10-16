@@ -65,6 +65,60 @@ export function artUrl(key: string): string {
   return u;
 }
 
+const autoCrops = new Map<string, [number, number, number, number]>();
+/** Measure the painted bounds of some art (async, once) so thumbnails can be cropped to it. */
+export function measureCrops(keys: string[], pad = 3) {
+  for (const key of keys) {
+    const a = ui.get(key) ?? props.get(key) ?? raidProps.get(key);
+    if (!a || autoCrops.has(key)) continue;
+    const img = new Image();
+    img.onload = () => {
+      const S = 2;
+      const c = document.createElement('canvas');
+      c.width = a.w * S;
+      c.height = a.h * S;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      if (!g) return;
+      g.drawImage(img, 0, 0, c.width, c.height);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < c.height; y++)
+        for (let x = 0; x < c.width; x++)
+          if (d[(y * c.width + x) * 4 + 3] > 8) {
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+          }
+      if (x1 < 0) return;
+      // square-ish box around the painted area
+      let bx = x0 / S - pad, by = y0 / S - pad, bw = (x1 - x0) / S + pad * 2, bh = (y1 - y0) / S + pad * 2;
+      const side = Math.max(bw, bh);
+      bx -= (side - bw) / 2;
+      by -= (side - bh) / 2;
+      autoCrops.set(key, [bx, by, side, side].map((v) => Math.round(v * 10) / 10) as [number, number, number, number]);
+    };
+    img.src = svgData(a.svg);
+  }
+}
+
+/** Art cropped to its painted bounds when measured, else the whole canvas. */
+export function artUrlFit(key: string): string {
+  const c = autoCrops.get(key);
+  return c ? artUrlCrop(key, ...c) : artUrl(key);
+}
+
+/** Same art cropped to a box (wall hangings live in a tall wall-sized canvas, too small as shop thumbnails). */
+export function artUrlCrop(key: string, x: number, y: number, w: number, h: number): string {
+  const k = `crop:${key}:${x},${y},${w},${h}`;
+  let u = urlCache.get(k);
+  if (u) return u;
+  const a = ui.get(key) ?? props.get(key) ?? raidProps.get(key);
+  u = a ? svgData(a.svg.replace(/width="[^"]*" height="[^"]*" viewBox="[^"]*"/, `width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}"`)) : '';
+  urlCache.set(k, u);
+  return u;
+}
+
 /** Portrait = the character's head part (or a face variant). */
 export function headUrl(charId: string, face?: string): string {
   const k = `head:${charId}:${face ?? ''}`;

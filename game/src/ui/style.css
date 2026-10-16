@@ -741,6 +741,7 @@ h4 {
 
 /* ---------- modals ---------- */
 .modal-root {
+  position: relative;
   z-index: 30;
 }
 .modal-root:empty {
@@ -836,6 +837,14 @@ h4 {
   font-size: 13px;
   margin: 8px 0;
 }
+.unlocks img.ico,
+.unl-ico {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 4px;
+}
 .unlocks > div {
   background: #fff;
   border: 2px solid var(--ink);
@@ -923,6 +932,13 @@ h4 {
   display: grid;
   gap: 2px;
   margin: 6px 0;
+}
+.big-stars {
+  display: block;
+  white-space: nowrap;
+}
+.modal .big-stars .st {
+  font-size: 28px;
 }
 
 /* zombiepedia */
@@ -1030,6 +1046,9 @@ h4 {
 .item.wide-item {
   grid-column: span 2;
   background: linear-gradient(#fff7d8, #ffe9a8);
+}
+.item.wide-item .item-art {
+  background: none;
 }
 .item-art {
   width: 100%;

@@ -400,9 +400,12 @@ function nearest(u: RaidUnit, list: RaidUnit[]) {
   return best;
 }
 
+/** Global combat pace: every blow does this share of its listed damage, so brawls last ~30–70 s of the 2-minute clock. */
+export const COMBAT_PACE = 0.4;
+
 function damage(r: RaidState, from: RaidUnit, to: RaidUnit) {
   const rage = from.side === 'z' && r.t < r.redUntil ? 1.6 : 1;
-  const dmg = Math.round(from.dmg * rage * (0.85 + rnd(r) * 0.3));
+  const dmg = Math.round(from.dmg * rage * COMBAT_PACE * (0.85 + rnd(r) * 0.3) * 10) / 10;
   to.hp -= dmg;
   to.hitAt = r.t;
   from.attackAt = r.t;
