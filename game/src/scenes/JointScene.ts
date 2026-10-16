@@ -49,6 +49,9 @@ interface Actor {
   faceUntil: number;
   face?: string;
   holder: Phaser.GameObjects.Container;
+  /** was carrying a plate to a table last frame (to play the serve lean when it's set down) */
+  wasServing?: boolean;
+  serveAt?: number;
 }
 
 interface StoveFx {
@@ -696,14 +699,21 @@ export class JointScene extends Phaser.Scene {
     const zombie = w.kind === 'zombie';
     const moving = w.path.length > 0;
     pup.setFacing(w.facing, !!w.back);
+    // a server who just set a plate down leans in over the table for a beat (the original's serve clip)
+    const serving = w.state === 'carrying' && w.job?.kind === 'serve';
+    if (a.wasServing && !serving) a.serveAt = this.t;
+    a.wasServing = serving;
+    const serveT = this.t - (a.serveAt ?? -9);
     let pose: Parameters<Puppet['pose']>[0] = 'idle';
     if ((w.state === 'resting' || w.state === 'down') && !moving) pose = 'lie';
+    else if (serveT < 0.5) pose = 'serve';
     else if (moving) pose = w.state === 'hunting' ? 'run' : 'walk';
     else if (w.state === 'cooking') pose = 'cook';
     pup.pose(pose, dt, {
-      zombie: zombie && w.state !== 'cooking',
+      zombie: zombie && w.state !== 'cooking' && pose !== 'serve',
       speed: w.state === 'hunting' ? 1.3 : 1,
-      carry: w.state === 'carrying' || w.state === 'carryDish' || w.state === 'carryPlate',
+      carry: pose !== 'serve' && (w.state === 'carrying' || w.state === 'carryDish' || w.state === 'carryPlate'),
+      attackT: pose === 'serve' ? serveT : undefined,
     });
     const face = this.t < a.faceUntil ? a.face : w.state === 'resting' ? 'sleep' : w.state === 'down' ? 'dazed' : w.state === 'hunting' ? 'chomp' : undefined;
     pup.setFace(face as never);
@@ -809,7 +819,7 @@ export class JointScene extends Phaser.Scene {
     if (sp) pup.setFacing(sp.facing, sp.back);
     else pup.setFacing(c.facing, !!c.back && c.path.length > 0);
     const pose = c.state === 'infecting' ? 'shiver' : c.state === 'fleeing' ? 'run' : c.path.length ? 'walk' : c.state === 'eating' ? 'eat' : seated ? 'sit' : 'idle';
-    pup.pose(pose, dt, { speed: c.state === 'fleeing' ? 1.6 : 1, seated });
+    pup.pose(pose, dt, { speed: c.state === 'fleeing' ? 1.6 : 1, seated, impatient: c.state === 'waiting' && c.waitLeft < 25 });
     const face =
       c.state === 'fleeing'
         ? 'scream'

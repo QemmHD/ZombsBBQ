@@ -151,8 +151,9 @@ if (zid) {
   log.zombieCook = await page.evaluate((id) => window.zbbq.ctl.state.workers.find((w) => w.id === id)?.state, zid);
   check(['cooking', 'toStove'].includes(log.zombieCook), `zombie goes to cook (got ${log.zombieCook})`);
   await page.evaluate((id) => {
-    for (let i = 0; i < 300; i++) window.zbbq.ctl.update(0.1);
     const w = window.zbbq.ctl.state.workers.find((w) => w.id === id);
+    // the cook stands at the stove until the dish is done (2 min), then is free to be sent off to rest
+    for (let i = 0; i < 2000 && (w.state === 'cooking' || w.state === 'toStove'); i++) window.zbbq.ctl.update(0.1);
     w.energy = 1;
     w.nextDaydream = Infinity;
     for (let i = 0; i < 80 && !window.zbbq.ctl.state.stats.bites; i++) window.zbbq.ctl.update(0.1);

@@ -344,8 +344,8 @@ export function startRaid(s: GameState, rivalId: RivalId, workerIds: string[], p
       cdMax: 1.1,
     });
   }
-  // the Head Chef, in the kitchen behind the counter
-  const chef = { x: KITCHEN_X, y: ct.y };
+  // the Head Chef, at the first stove (as in the original, where the chef starts at the stove)
+  const chef = { x: KITCHEN_X, y: 1 };
   unit(r, {
     side: 'r',
     kind: 'boss',

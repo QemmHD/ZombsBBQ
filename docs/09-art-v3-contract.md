@@ -176,13 +176,17 @@ Each is a chipped plate seen at the iso angle with appetising-but-gross food: ey
 ### C1 — joint characters (`chars/*.ts`, exporting `buildChar3(id)` and `CHAR3_IDS`)
 
 Same rig contract as `src/art/types.ts` `CharArt`: biped `parts`, `backParts`, and `faces`.
+- **Rig v2 (two-segment limbs, matching the original's skeleton):** parts `armL, armL2, armR, armR2, legL, legL2, legR, legR2, torso, head`. Upper parts pivot at the shoulder or hip; `*2` parts (forearm and hand, shin and shoe) pivot at the elbow or knee. Each part's (x, y) is its pivot in the straight rest pose, so the puppet chains a lower segment by rotating its pivot about the upper one.
+  - Standard pivots: hip (±5.8, −21), knee (±6, −11), shoulder (±11, −44), elbow (±13.2, −32), neck (1, −47).
+  - Front order: armR, armR2, legR, legR2, legL, legL2, torso, head, armL, armL2. Back order: armL, armL2, legL, legL2, legR, legR2, torso, armR, armR2, head.
+  - Joint caps are round and centred on each pivot, so knees bend 90° (sit) and elbows 100° (carry, eat, claw) without gaps.
 - Faces now include **`angry`** (an unhappy customer) and **`eat`** (mid-chew, cheeks full) for humans, alongside scream, happy and shock.
 - Zombies have chomp, sleep and dazed.
 
 Ids are the existing 20 customer types plus four common walk-ins: `joe`, `jane`, `senior`, `hipster`. Each has a `<id>_z` zombie form. Add `you` (the Patient-Zero owner in a stained apron, who looks human) and `gus` (the zombie union rep in a chef's toque).
 
 Look:
-- big heads (about 45% of height), about 100 tall;
+- big heads (about 50–55% of height, about 2× the torso's width, as in the original), about 105 tall;
 - adult, ugly, sardonic faces with eye bags, stubble and missing teeth;
 - khaki skin.
 

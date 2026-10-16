@@ -380,7 +380,8 @@ export class RaidScene extends Phaser.Scene {
       else if (u.state === 'flee') pose = 'run';
       else if (u.state === 'grabbed') pose = 'shiver';
       else if (u.state === 'eat' || u.state === 'steal') pose = 'eat';
-      else if (attackT < 0.5) pose = 'attack';
+      else if (attackT < 0.5) pose = zombie ? 'attack' : 'punch';
+      else if (r.t - u.hitAt < 0.3) pose = 'hit';
       else if (u.state === 'walk' && u.path.length) pose = 'walk';
       v.puppet.pose(pose, dt, {
         zombie,

@@ -24,7 +24,7 @@ Concept art lives in [`../art/concepts/`](../art/concepts/):
 |---|---|
 | **Outlines** | Dark brown-black `#2B1B17`, never pure black. 4–6 px on characters at 1× (scaled with the camera), 3 px on props. Round joins. |
 | **Shading** | Flat cel: 1 base + 1 shadow tone (shadow falls bottom-right) + 1 small highlight. No gradients on characters. Soft gradients are OK on UI and lighting only. |
-| **Proportions** | 2.5 heads tall. Head ≈ 40% of height. Hands are simple mitts, no fingers except for gestures. |
+| **Proportions** | About 2 heads tall. Head ≈ 50% of height and about 2× the torso's width (measured from the original; see [10](10-original-animation-and-layouts.md) §1). Hands are simple mitts, no fingers except for gestures. |
 | **Silhouette test** | Every character must be recognizable as a solid black silhouette (hat, hair, prop). |
 | **Zombie read** | Green skin `#8DC63F`, yellow eyes `#FFE14D` with tiny pupils, one droopy lid, stitches/patches, a drool drop. Clothes stay in the human's original colors but torn. |
 | **Gore policy** | Goo, not gore. Green slime, bandages and missing teeth are fine. No blood, no exposed organs. (This keeps the 12+ rating.) |

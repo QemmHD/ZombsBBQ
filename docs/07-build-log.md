@@ -46,6 +46,42 @@ Play link (private to the owner until shared): https://claude.ai/artifact/AceM4e
 - `npm run gallery`: screenshots a decked-out 12×12 joint in every theme and every rival arena mid-fight, for art review.
 - Texture memory on an iPhone screen: about 51 MB.
 
+## Version 3 (Oct 2026): the faithful rework
+Researched against the original's real gameplay and its decoded animation and layout data (facts and numbers only; see [10](10-original-animation-and-layouts.md)). No original code or assets were used.
+
+**Look**
+- Art v3: a grimy adult-cartoon style replaces the bright v2 art. Muted palette, ink outlines, stains and grime, two-tone shading.
+- A corner lot with sidewalks and road on both street sides, plus matching scenery.
+- A real front door: an actual doorway you can see through. The leaf swings open as people pass, and it has an OPEN/CLOSED sign you can tap.
+- The cast is rebuilt to the original's construction: a huge 3/4 head (≈50% of height) and two-segment limbs that bend at the knees and elbows.
+
+**Animation:** poses retuned to the original's decoded clips.
+- walk: thighs ±24°, knee folding 55° a quarter-cycle behind, arms ±17°.
+- idle: head-only sway.
+- sit: thighs 64°/84°, shins hanging straight.
+- eat: fork to mouth, then chew.
+- carry: arms locked at 17°/7° with forearms at 44°/55°.
+- cook: stirring.
+- run: zombie lurch; humans run with hands to the head.
+- raids: zombie claw, human punch and hit reaction; feast, serve and death fall.
+- A dev pose sheet (`tools/poses.html`) shows every pose frame by frame.
+
+**Rules and timing** (tuned to the original)
+- Customers: they wait 60 s, eat for 30 s, and arrive every 18 s down to every 4.5 s as the rating rises.
+- Walking: 1.4 + 0.125 × speed tiles/s; zombies are 20% slower.
+- Raids: +5 HP per kill and 2 s to steal a dish. Rivals reopen after 4, 8, 12 and then 18 h under new management.
+
+**Raids**
+- Rival cafés laid out like the original's: 9×8 rooms, a kitchen along the back wall behind a divider with a serving counter, diners seated at tables, and the head chef at the stove.
+- The squad lines up on the sidewalk.
+- You select a zombie, then tap a target or the counter. You can also use ATTACK ALL, tombstones (5-second buffs) and summons.
+- A neglected rival steals your customers. A boss food truck turns up from level 5.
+
+**Fixes**
+- Phaser 4.2.1's multi-texture shader compared an interpolated texture id with exact float equality, so half of a rotated sprite could vanish. It's patched at build time (`vite.config.ts`).
+- Servers no longer walk into unreachable pockets.
+- Economy rebalanced so an engaged player (the economy bot) reaches level 3 and 4 seats by 30 min, 2★ by 1 h, and level 6–12 with 1–3 rivals beaten by 6 h.
+
 ## Next steps
 1. Playtest on a real iPhone: tune timers, prices and energy drain from feel.
 2. Haptics, Home Screen icon and manifest, and a "photo mode" share card.
