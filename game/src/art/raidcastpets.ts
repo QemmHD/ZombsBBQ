@@ -34,7 +34,7 @@ import {
 } from './raidcastkit';
 import type { Biped, Box, Expr, Rig } from './raidcastkit';
 
-const ZFACES: FaceName[] = ['chomp', 'sleep', 'dazed'];
+const ZFACES: (FaceName & Expr)[] = ['chomp', 'sleep', 'dazed'];
 
 /** Ragged fur outline along a path's points (zigzag tufts). */
 function furTufts(pts: Pt[], depth: number): string {
@@ -382,7 +382,7 @@ interface QuadSpec {
   head: (d: Doc, e: Expr) => string;
   neck: Pt;
   headBox: Box;
-  faces: FaceName[];
+  faces: (FaceName & Expr)[];
 }
 
 function quad(id: string, Q: QuadSpec): CharArt {

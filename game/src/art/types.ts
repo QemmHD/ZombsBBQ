@@ -27,10 +27,11 @@ export type QuadPartName = 'legBL' | 'legBR' | 'body' | 'tail' | 'legFL' | 'legF
 
 /**
  * Expression heads that replace the 'head' part for comedic beats. Same pivot/placement as the
- * normal head. Humans: scream (bitten/fleeing), happy (eating, paying), shock (watching an infection).
+ * normal head. Humans: scream (bitten/fleeing), happy (eating, paying), shock (watching an infection),
+ * angry (unhappy customer), eat (mid-chew, cheeks full).
  * Zombies: chomp (biting, mouth wide open), sleep (resting, eyes shut + drool), dazed (KO'd in raids).
  */
-export type FaceName = 'scream' | 'happy' | 'shock' | 'chomp' | 'sleep' | 'dazed';
+export type FaceName = 'scream' | 'happy' | 'shock' | 'angry' | 'eat' | 'chomp' | 'sleep' | 'dazed';
 
 export interface CharPart {
   key: string;

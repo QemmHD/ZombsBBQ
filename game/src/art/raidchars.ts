@@ -43,7 +43,7 @@ import { buildBigfoot, buildWerewoof, buildQuad } from './raidcastpets';
 
 export { RAID_CHAR_IDS };
 
-const HUMAN: FaceName[] = ['scream', 'shock', 'happy', 'dazed'];
+const HUMAN: (FaceName & Expr)[] = ['scream', 'shock', 'happy', 'dazed'];
 
 // ------------------------------------------------------------------ rigs
 /** Boss rig: the joint rig scaled ~1.18, with a chunkier body. */

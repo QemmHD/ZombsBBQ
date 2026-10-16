@@ -869,7 +869,7 @@ export interface Biped {
   head: (d: Doc, u: number, back: boolean, e: Expr) => string;
   /** Local head-frame box. */
   headBox: Box;
-  faces: FaceName[];
+  faces: (FaceName & Expr)[];
   legBox?: (side: -1 | 1) => Box;
   /** Custom leg painter (monsters); defaults to legArt with `leg`. */
   legPaint?: (d: Doc, side: -1 | 1, back: boolean) => string;
