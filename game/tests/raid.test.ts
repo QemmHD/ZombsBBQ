@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DOOR_X,
+  startingDiners,
   ITEM_BY_ID,
   NEGLECT_SEC,
   RIVAL_CLOSED_SEC,
@@ -52,9 +53,9 @@ describe('the rival joint is a real café', () => {
     expect(kinds('divider').length).toBeGreaterThanOrEqual(3);
     expect(kinds('table')).toHaveLength(4);
     expect(kinds('chair')).toHaveLength(4);
-    // one diner per chair, sitting on it
+    // like the original, only some chairs start taken (2 diners at a level-2 café), each sitting on a chair
     const diners = r.units.filter((u) => u.kind === 'customer');
-    expect(diners).toHaveLength(4);
+    expect(diners).toHaveLength(startingDiners(2));
     for (const d of diners) expect(kinds('chair').some((c) => c.x === d.x && c.y === d.y)).toBe(true);
     expect(r.units.filter((u) => u.kind === 'staff')).toHaveLength(2);
     const chef = r.units.find((u) => u.kind === 'boss')!;
@@ -137,6 +138,26 @@ describe('the fight', () => {
     expect(s.workers.every((w) => w.state !== 'raiding')).toBe(true);
   });
 
+  it('more diners wander in off the street during the raid (every 5-20 s), and head for a free chair', () => {
+    const s = withCrew(['construction']);
+    const r = startRaid(s, 'chuck', crewIds(s)) as RaidState;
+    const before = r.units.filter((u) => u.kind === 'customer').length;
+    // nobody goes in: a quiet café keeps filling up
+    for (let i = 0; i < 120 / 0.05; i++) stepRaid(r, 0.05);
+    const diners = r.units.filter((u) => u.kind === 'customer');
+    expect(diners.length).toBeGreaterThan(before);
+    expect(r.events.some((e) => e.t === 'arrive')).toBe(true);
+    // walk-ins take free chairs, one each, and sit down
+    const seats = diners.map((d) => d.seatId);
+    expect(new Set(seats).size).toBe(seats.length);
+    const settled = diners.filter((d) => d.state === 'idle');
+    for (const d of settled) {
+      const c = r.furniture.find((f) => f.id === d.seatId)!;
+      expect([d.x, d.y]).toEqual([c.x, c.y]);
+    }
+    expect(settled.length).toBeGreaterThan(before);
+  });
+
   it('diners run for the door; the ones you catch are lunch (and cash), the rest escape', () => {
     const s = withCrew(['construction', 'accountant', 'teen', 'cop']);
     const r = startRaid(s, 'chuck', crewIds(s)) as RaidState;
@@ -144,7 +165,10 @@ describe('the fight', () => {
     play(r);
     const eaten = r.events.filter((e) => e.t === 'eat').length;
     const escaped = r.events.filter((e) => e.t === 'escape').length;
-    expect(eaten + escaped).toBe(4);
+    // everyone who was there or walked in is either lunch or gone
+    const diners = r.units.filter((u) => u.kind === 'customer');
+    expect(eaten + escaped).toBe(diners.filter((d) => d.state === 'gone').length);
+    expect(diners.length).toBeGreaterThanOrEqual(2);
     expect(r.cashEaten).toBe(eaten * 20);
   });
 

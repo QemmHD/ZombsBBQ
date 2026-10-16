@@ -357,7 +357,9 @@ export class RaidScene extends Phaser.Scene {
       const gone = u.state === 'gone' && !corpse;
       v.holder.setVisible(!gone).setAlpha(corpse ? Math.min(1, (2.4 - eatenFor) / 0.6) : 1);
       if (gone) continue;
-      const seat = (u.state === 'idle' || u.state === 'scream') && u.kind === 'customer' ? this.seatPose(r, u) : null;
+      // seated only when actually on the chair (a walk-in who screams in the doorway is standing)
+      const onChair = !!u.home && Math.abs(u.x - u.home.x) < 0.05 && Math.abs(u.y - u.home.y) < 0.05;
+      const seat = (u.state === 'idle' || u.state === 'scream') && u.kind === 'customer' && onChair ? this.seatPose(r, u) : null;
       const p = seat ?? iso(u.x, u.y);
       v.holder.setPosition(p.x, p.y).setDepth(seat ? seat.depth : moverDepth(u.x, u.y, 4));
       if (!v.puppet && charLoaded(this, v.charId)) {

@@ -91,6 +91,7 @@ export type RaidEvent =
     }
   | { t: 'steal'; unit: string; dish: string; x: number; y: number }
   | { t: 'scream'; unit: string; x: number; y: number }
+  | { t: 'arrive'; unit: string; x: number; y: number }
   | { t: 'escape'; unit: string }
   | { t: 'enter'; unit: string }
   | { t: 'boss'; x: number; y: number }
@@ -120,6 +121,8 @@ export interface RaidState {
   counter: { x: number; y: number; dish: string; servings: number }[];
   events: RaidEvent[];
   nextId: number;
+  /** when the next walk-in diner may turn up (original: every 5–20 s, 33–50% chance) */
+  nextDinerAt?: number;
 }
 
 export interface RaidResult {
@@ -175,6 +178,84 @@ export const counterTile = (_r: RaidState): Pt => ({ x: 2, y: 2 });
 export const stealSpot = (_r: RaidState): Pt => ({ x: 3, y: 2 });
 /** The gap in the divider line the chef comes out through. */
 export const kitchenGap = (r: RaidState): Pt => ({ x: 2, y: r.room.h - 2 });
+
+const DINER_ART = ['accountant', 'teen', 'yoga', 'politician', 'nurse', 'joe', 'jane', 'senior', 'hipster', 'ceo'];
+/** Original NUM_CUSTOMERS by café level: 2 diners at levels 1–2, 3 at 3–5, 4 at 6–11, 5 at 12–17… */
+export function startingDiners(level: number): number {
+  return level <= 2 ? 2 : level <= 5 ? 3 : level <= 11 ? 4 : level <= 17 ? 5 : level <= 23 ? 6 : 7;
+}
+
+function seatDiner(r: RaidState, c: RaidFurniture, i: number) {
+  if (r.units.some((u) => u.seatId === c.id && alive(u))) return;
+  unit(r, {
+    side: 'c',
+    kind: 'customer',
+    art: DINER_ART[(i * 3 + r.gen) % DINER_ART.length],
+    name: 'Diner',
+    x: c.x,
+    y: c.y,
+    hp: 2,
+    dmg: 0,
+    speed: 1.7,
+    seatId: c.id,
+    home: { x: c.x, y: c.y },
+    back: true,
+    facing: 1,
+  });
+}
+
+/** Original: during a raid another diner may wander in every 5–20 s (a 33–50% chance each roll, more
+ * at tougher cafés), pausing at the door for about a second first. They head for a free chair; if the
+ * zombies are already inside, they scream and run once they're through the door. */
+function trickleDiners(r: RaidState) {
+  if (r.nextDinerAt === undefined || r.t < r.nextDinerAt) return;
+  const def = RIVAL_BY_ID[r.rival];
+  r.nextDinerAt = r.t + 5 + rnd(r) * 15 + (rnd(r) * 2 - 1);
+  const chance = 0.33 + 0.17 * Math.min(1, (def.level + r.gen * 2) / 20);
+  if (rnd(r) >= chance) return;
+  const taken = new Set(r.units.filter((u) => u.kind === 'customer' && alive(u) && u.seatId).map((u) => u.seatId));
+  const free = r.furniture.filter((f) => ITEM_BY_ID[f.item]?.kind === 'chair' && !taken.has(f.id));
+  if (!free.length) return;
+  const c = free[Math.floor(rnd(r) * free.length)];
+  const d = unit(r, {
+    side: 'c',
+    kind: 'customer',
+    art: DINER_ART[Math.floor(rnd(r) * DINER_ART.length)],
+    name: 'Diner',
+    x: DOOR_X,
+    y: -1,
+    hp: 2,
+    dmg: 0,
+    speed: 1.7,
+    seatId: c.id,
+    home: { x: c.x, y: c.y },
+    state: 'walk',
+    facing: 1,
+    back: true,
+    busyUntil: r.t + 1 + (rnd(r) * 1.6 - 0.8),
+  });
+  r.events.push({ t: 'arrive', unit: d.id, x: d.x, y: d.y });
+}
+
+/** A walk-in diner heading for their chair (chairs are furniture, so path to it with it unblocked). */
+function walkToSeat(r: RaidState, c: RaidUnit, dt: number) {
+  const seat = r.furniture.find((f) => f.id === c.seatId);
+  if (!seat) return;
+  if (!c.path.length) {
+    if (Math.round(c.x) === seat.x && Math.round(c.y) === seat.y) {
+      c.x = seat.x;
+      c.y = seat.y;
+      c.state = 'idle';
+      return;
+    }
+    const blocked = blockedTiles(r);
+    blocked.delete(key(seat.x, seat.y));
+    const p = findPath({ x: Math.round(c.x), y: Math.round(c.y) }, { x: seat.x, y: seat.y }, blocked, r.room);
+    if (!p) return;
+    c.path = p.length ? p : [{ x: seat.x, y: seat.y }];
+  }
+  walk(c, dt);
+}
 
 /** Lay out a rival joint the way the original's were: kitchen behind dividers, diners at tables. */
 function buildCafe(r: RaidState) {
@@ -303,27 +384,15 @@ export function startRaid(s: GameState, rivalId: RivalId, workerIds: string[], p
       state: 'queued',
     });
   }
-  // the diners, each on their chair facing their table
-  const diners = ['accountant', 'teen', 'yoga', 'politician', 'nurse', 'joe', 'jane', 'senior', 'hipster', 'ceo'];
-  r.furniture
-    .filter((f) => ITEM_BY_ID[f.item]?.kind === 'chair')
-    .forEach((c, i) => {
-      unit(r, {
-        side: 'c',
-        kind: 'customer',
-        art: diners[(i * 3 + gen) % diners.length],
-        name: 'Diner',
-        x: c.x,
-        y: c.y,
-        hp: 2,
-        dmg: 0,
-        speed: 1.7,
-        seatId: c.id,
-        home: { x: c.x, y: c.y },
-        back: true,
-        facing: 1,
-      });
-    });
+  // the diners, each on their chair facing their table. Like the original, only some chairs start
+  // taken (its per-level customer count); more walk in off the street during the raid
+  const chairs = r.furniture.filter((f) => ITEM_BY_ID[f.item]?.kind === 'chair');
+  const seated = Math.min(chairs.length, startingDiners(def.level + gen * 2));
+  for (let k = 0; k < seated; k++) {
+    const i = Math.floor((k * chairs.length) / seated); // spread round the room
+    seatDiner(r, chairs[i], i);
+  }
+  r.nextDinerAt = 5 + rnd(r) * 15;
   // the waiters, on their posts in the aisles
   const posts: Pt[] = [];
   for (const x of [3, 5, 7]) for (let y = 1; y < r.room.h; y++) if (x < W && !blockedTiles(r).has(key(x, y))) posts.push({ x, y });
@@ -756,7 +825,20 @@ function updateChef(r: RaidState, u: RaidUnit, dt: number) {
 }
 
 function updateDiner(r: RaidState, c: RaidUnit, dt: number) {
-  if (!alive(c) || !r.aggro || r.t < c.busyUntil) return;
+  if (!alive(c) || r.t < c.busyUntil) return;
+  if (c.state === 'walk' && c.seatId) {
+    // a walk-in: once through the door into a brawl, scream first, then run
+    if (r.aggro && indoors(r, c)) {
+      c.state = 'scream';
+      c.path = [];
+      c.busyUntil = r.t + 0.6 + rnd(r) * 0.6;
+      r.events.push({ t: 'scream', unit: c.id, x: c.x, y: c.y });
+      return;
+    }
+    walkToSeat(r, c, dt);
+    return;
+  }
+  if (!r.aggro) return;
   // screaming and running for the door, then off down the street
   const exit = { x: -1, y: r.room.h + STREET_RUN };
   if (c.state !== 'flee') {
@@ -789,6 +871,7 @@ export function stepRaid(r: RaidState, dt: number) {
   }
   // the health tombstone mends everyone while it glows
   if (r.buff?.kind === 'hp' && r.t < r.buff.until) for (const u of r.units) if (fighter(u) && u.state !== 'queued') u.hp = Math.min(u.maxHp, u.hp + 6 * dt);
+  trickleDiners(r);
   for (const u of r.units) {
     if (u.side === 'z') updateHorde(r, u, dt);
     else if (u.kind === 'staff') updateStaff(r, u, dt);
