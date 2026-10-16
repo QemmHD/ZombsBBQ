@@ -5,6 +5,9 @@ import {
   addToCounter,
   arrivalGap,
   bribeTodo,
+  criticReview,
+  paintFloor,
+  skipTodo,
   buyAndPlace,
   cookedCount,
   createInitialState,
@@ -41,6 +44,7 @@ function doEverything(s: GameState) {
   s.stats.raidsWon += 50;
   s.stats.infected += 50;
   s.stats.decor += 50;
+  s.stats.spent += 1e6;
   for (const t of s.todo!.tasks) if (t.dish) s.stats.cooked[t.dish] = (s.stats.cooked[t.dish] ?? 0) + 50;
 }
 
@@ -82,8 +86,9 @@ describe('Gus’s to-do list', () => {
       }
       throw new Error(`no ${kind} task drawn`);
     };
-    for (const k of ['serve', 'clear', 'earn', 'raid', 'decor']) expect(target(hi, k)).toBeGreaterThan(target(lo, k));
-    expect(target(lo, 'serve')).toBe(22);
+    for (const k of ['serve', 'clear', 'earn', 'raid', 'decor', 'spend']) expect(target(hi, k)).toBeGreaterThan(target(lo, k));
+    expect(target(lo, 'serve')).toBe(60); // original: serve 10 x level
+    expect(target(lo, 'spend')).toBe(600); // original: spend $100 x level
     // a full crew is never asked to infect anyone; cook jobs are dishes it can actually make
     const full = at(6);
     full.crewCap = 0;
@@ -248,5 +253,82 @@ describe('purple stars boost the joint', () => {
     const boosted = run(3);
     expect(boosted.served).toBeGreaterThan(plain.served);
     expect(boosted.tipRate).toBeGreaterThan(plain.tipRate);
+  });
+});
+
+describe('to-do list: skip, spend, a week cap and the critic', () => {
+  it('Skip swaps one unfinished task for a different job, free, once per list', () => {
+    const s = at(6);
+    const sauce = s.sauce;
+    const cash = s.cash;
+    const before = s.todo!.tasks.map((t) => t.kind);
+    expect(skipTodo(s, 9)).toMatch(/Nothing/);
+    expect(skipTodo(s, 1)).toBeNull();
+    const after = s.todo!.tasks.map((t) => t.kind);
+    expect(after[1]).not.toBe(before[1]);
+    expect(new Set(after).size).toBe(PURPLE.tasks); // still four distinct jobs
+    expect(after.filter((_, i) => i !== 1)).toEqual(before.filter((_, i) => i !== 1));
+    expect(todoDone(s, s.todo!.tasks[1])).toBe(false);
+    expect([s.sauce, s.cash]).toEqual([sauce, cash]);
+    expect(skipTodo(s, 2)).toMatch(/one skip/i);
+    // a fresh list gets a fresh skip
+    doEverything(s);
+    tick(s, 0.1);
+    expect(s.todo!.skipped).toBeFalsy();
+    expect(skipTodo(s, 0)).toBeNull();
+  });
+
+  it('finished tasks and locked lists cannot be skipped', () => {
+    const lo = at(5);
+    expect(skipTodo(lo, 0)).toMatch(/level 6/);
+    const s = at(6);
+    s.sauce = 10;
+    bribeTodo(s, 0);
+    expect(skipTodo(s, 0)).toMatch(/Already/);
+  });
+
+  it('a spend task counts cash spent on the café itself', () => {
+    const s = at(6);
+    s.cash = 1e6;
+    s.todo = { n: 0, tasks: [{ kind: 'spend', target: 600, base: s.stats.spent }, ...s.todo!.tasks.filter((t) => t.kind !== 'spend').slice(0, 3)] };
+    const t = s.todo.tasks[0];
+    expect(todoText(t)).toBe('Spend $600 on your café');
+    expect(buyAndPlace(s, 'plant_potted', 6, 5)).toBeNull();
+    const spent1 = todoProgress(s, t);
+    expect(spent1).toBeGreaterThan(0);
+    expect(paintFloor(s, 1, 1, 'tile')).toBeNull();
+    expect(todoProgress(s, t)).toBeGreaterThan(spent1);
+  });
+
+  it('purple stars top out a week away (168 h)', () => {
+    expect(PURPLE.capHours).toBe(168);
+    const s = at(6);
+    for (let i = 0; i < 12; i++) {
+      doEverything(s);
+      tick(s, 0.1);
+    }
+    expect(purpleStars(s)).toBe(3);
+    expect(purpleLeft(s)).toBeGreaterThan(108 * H);
+    expect(purpleLeft(s)).toBeLessThanOrEqual(168 * H + 1e-6);
+  });
+
+  it('a newspaper review comes with every purple star, deterministic and about this joint', () => {
+    const s = at(6);
+    s.name = 'Rib Crypt';
+    s.stats.cooked = { gumbo: 9, sliders: 2 };
+    doEverything(s);
+    tick(s, 0.1);
+    const r = criticReview(s);
+    expect(r.stars).toBe(1);
+    expect(r.paper.length).toBeGreaterThan(3);
+    expect(r.critic.length).toBeGreaterThan(3);
+    expect(`${r.headline} ${r.body}`).toMatch(/Rib Crypt/);
+    expect(r.body).toMatch(/Gutter Gumbo/);
+    expect(r.verdict).toBeTruthy();
+    expect(criticReview(s)).toEqual(r);
+    // no name yet: the critic uses the default
+    s.name = undefined;
+    expect(criticReview(s).body).toMatch(/Zombs BBQ/);
+    for (const v of Object.values(r)) expect(String(v)).not.toMatch(/undefined|NaN/);
   });
 });

@@ -596,6 +596,7 @@ function spawnCustomers(s: GameState, dt: number) {
     eatEnd: 0,
   };
   s.customers.push(c);
+  if (def.tier !== 'common' && def.tier !== 'uncommon') s.events.push({ t: 'rareArrival', customerId: c.id, tier: def.tier });
   if (!seats.length) {
     // no clean table: walk in, look around, leave unhappy (like the original)
     c.state = 'turnedAway';
@@ -748,6 +749,7 @@ function findJob(s: GameState, w: Worker): boolean {
       food.slot.servings -= 1;
       w.job = { kind: 'serve', slotId: food.slot.id, dish: food.slot.dish!, customerId: c.id };
       if (food.slot.servings <= 0) food.slot.dish = undefined;
+      if (!s.counter.some((k) => k.dish && k.servings > 0)) s.events.push({ t: 'outOfFood' });
       c.serverId = w.id;
       w.state = 'toCounter';
       if (!setPath(s, w, food.at, speed)) releaseJob(s, w);
@@ -912,7 +914,9 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         if (table) faceTowards(w, table.x, table.y);
         c.state = 'eating';
         c.dish = job.dish;
-        c.eatEnd = s.now + TUNING.eatSec;
+        // the tutorial's first diner eats quickly so the lesson keeps moving (original: 10 s)
+        const first = s.stats.served === 0 && s.tut < TUTORIAL.length && !s.customers.some((o) => o !== c && o.state === 'eating');
+        c.eatEnd = s.now + (first ? TUNING.tutorialEatSec : TUNING.eatSec);
         w.job = undefined;
         drain(w, TUNING.energyPerServe);
         addZombieXp(s, w, 1);
@@ -1025,6 +1029,7 @@ function finishStove(s: GameState, st: Stove) {
   // Frozen variants take FROZEN_BURN_MULT times longer to burn
   const wait = Math.max(TUNING.burnMinSec, dish.cookSec) * (f.keepWarm ? TUNING.keepWarmFactor : 1) * (dish.burnMult ?? 1);
   st.burnAt = s.now + wait;
+  st.burnWarn = s.now + wait * 0.75;
   addXp(s, dish.xp);
   s.stats.cooked[dish.id] = (s.stats.cooked[dish.id] ?? 0) + 1;
   s.events.push({ t: 'xp', x: f.x, y: f.y, amount: dish.xp });
@@ -1050,8 +1055,13 @@ function updateStove(s: GameState, st: Stove, dt: number) {
     if (st.left <= 0) finishStove(s, st);
   } else if (st.status === 'done' && s.now >= (st.burnAt ?? Infinity) && !st.carrierId) {
     st.status = 'burnt';
+    st.burnWarn = undefined;
     s.events.push({ t: 'burnt', stoveId: st.id });
+  } else if (st.status === 'done' && s.now >= (st.burnWarn ?? Infinity) && !st.carrierId) {
+    st.burnWarn = undefined;
+    s.events.push({ t: 'burnSoon', stoveId: st.id });
   }
+  if (st.status !== 'done') st.burnWarn = undefined;
 }
 
 export const TUTORIAL = [

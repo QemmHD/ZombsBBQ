@@ -1,6 +1,7 @@
 import { CUSTOMER_BY_ID, DISH_BY_ID, TUNING, YOU_STATS, crewCapForLevel, zombieLevel, type StationKind, type ZombieStats } from './data';
 import { ITEM_BY_ID, START_SIZE, type Dir } from './catalog';
 import { DOOR_X, type Pt } from './grid';
+import type { HintState } from './hints';
 
 export interface Furniture {
   id: string;
@@ -118,6 +119,8 @@ export interface Stove {
   cookId?: string;
   /** worker on the way to carry the finished dish to a counter */
   carrierId?: string;
+  /** a finished dish raises a "burnSoon" alert at this sim time (with 25% of its burn window left) */
+  burnWarn?: number;
 }
 
 export interface CounterSlot {
@@ -152,7 +155,7 @@ export interface RivalProgress {
 }
 
 /** One job on Gus's to-do list. Progress = the matching counter's growth since the list was drawn. */
-export type TodoKind = 'serve' | 'cook' | 'clear' | 'earn' | 'raid' | 'infect' | 'decor';
+export type TodoKind = 'serve' | 'cook' | 'clear' | 'earn' | 'raid' | 'infect' | 'decor' | 'spend';
 
 export interface TodoTask {
   kind: TodoKind;
@@ -169,6 +172,8 @@ export interface TodoList {
   /** how many lists were finished before this one (also seeds the next draw) */
   n: number;
   tasks: TodoTask[];
+  /** a task on this list was already swapped out with Skip (one per list) */
+  skipped?: boolean;
 }
 
 export type GameEvent =
@@ -192,6 +197,12 @@ export type GameEvent =
   | { t: 'goal'; goalId: string }
   | { t: 'purple'; stars: number; gained: boolean }
   | { t: 'daydream'; workerId: string }
+  /** the last serving just left the counter */
+  | { t: 'outOfFood' }
+  /** a finished dish has a quarter of its burn window left */
+  | { t: 'burnSoon'; stoveId: string }
+  /** a rare (or better) customer is walking in */
+  | { t: 'rareArrival'; customerId: string; tier: string }
   | { t: 'toast'; text: string };
 
 export interface GameState {
@@ -239,6 +250,10 @@ export interface GameState {
   todo?: TodoList;
   /** purple bonus stars (max 3) and the sim time they all drop */
   purple?: { stars: number; until: number };
+  /** the joint's name on the awning (tap it to rename) */
+  name?: string;
+  /** Gus's one-shot hints, the guided first purchase and the HUD "new" badges (see hints.ts) */
+  hints?: HintState;
   stats: {
     served: number;
     earned: number;
@@ -255,6 +270,8 @@ export interface GameState {
     studied: number;
     /** decorations bought (decor items and wall hangings) */
     decor: number;
+    /** cash spent on the café itself: furniture, kitchen kit, walls, floors, expansions */
+    spent: number;
   };
   events: GameEvent[];
 }
@@ -301,7 +318,7 @@ export function addFurniture(s: GameState, item: string, x: number, y: number, d
 }
 
 export function freshStats(): GameState['stats'] {
-  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0 };
+  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0, spent: 0 };
 }
 
 /** The starting café, as the original handed it over: a grimy 7x6 room with the bare essentials. */
