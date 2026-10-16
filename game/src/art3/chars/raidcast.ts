@@ -1357,7 +1357,7 @@ const staff_chuck_b = mk({
 
 const boss_chuck = mk({
   body: 'fat',
-  bodyMod: { s: 1.26, belly: 5 },
+  bodyMod: { s: 1.1, belly: 5 },
   height: 122,
   skin: tone('#A88C6C', '#86694E', '#5A4430'),
   face: { shape: 'jowl', lid: 0.5, bags: 2, brow: 'bushy', browCol: '#8A867C', nose: 'bulb', mouth: 'frown', wrinkles: 3, stubble: true },
@@ -1419,7 +1419,7 @@ const staff_hank_b = mk({
 
 const boss_hank = mk({
   body: 'muscle',
-  bodyMod: { s: 1.28, belly: 4, wBot: 15.6, tBot: -16.4 },
+  bodyMod: { s: 1.12, belly: 4, wBot: 15.6, tBot: -26.4 },
   height: 112,
   skin: tone('#B0A084', '#8E7E64', '#5E5038'),
   face: { shape: 'square', lid: 0.45, bags: 2, brow: 'thick', browCol: '#2A2420', nose: 'broken', mouth: 'grim', stubble: true, wrinkles: 2 },
@@ -1477,7 +1477,7 @@ const staff_vera_b = mk({
 
 const boss_vera = mk({
   body: 'slim',
-  bodyMod: { s: 1.24, wBot: 12, belly: 0.6 },
+  bodyMod: { s: 1.08, wBot: 12, belly: 0.6 },
   height: 112,
   face: { shape: 'long', lid: 0.62, bags: 2, brow: 'arched', browCol: '#5A4428', nose: 'pointy', mouth: 'sneer', lips: '#6A3A3A', lash: true, shadow: '#5A6A50', wrinkles: 2, look: [1.2, 0.4] },
   hair: tone('#8A6A3E', '#6A4E2A'),
@@ -1534,7 +1534,7 @@ const staff_crunch_b = mk({
 
 const boss_crunch = mk({
   body: 'old',
-  bodyMod: { s: 1.24, belly: 4.4, wBot: 14, hunch: 1.4 },
+  bodyMod: { s: 1.14, belly: 4.4, wBot: 14, hunch: 1.4 },
   height: 104,
   skin: SKIN_PALE,
   face: { shape: 'jowl', lid: 0.5, bags: 2, brow: 'bushy', browCol: '#D0CCC0', nose: 'bulb', mouth: 'smirk', wrinkles: 3 },
@@ -1595,7 +1595,7 @@ const staff_snob_b = mk({
 
 const boss_snob = mk({
   body: 'std',
-  bodyMod: { s: 1.24, belly: 3 },
+  bodyMod: { s: 1.08, belly: 3 },
   height: 136,
   face: { shape: 'long', lid: 0.6, bags: 2, brow: 'raised', browCol: '#2A221A', nose: 'long', mouth: 'sneer', wrinkles: 2, look: [1.2, -0.2] },
   hair: HAIR.dark,
@@ -1646,7 +1646,7 @@ const staff_boss_b = mk({
 
 const boss_boss = mk({
   body: 'muscle',
-  bodyMod: { s: 1.3, belly: 2.4 },
+  bodyMod: { s: 1.12, belly: 2.4 },
   height: 112,
   skin: tone('#A6806A', '#845E4C', '#5A3A2C'),
   face: { shape: 'square', lid: 0.45, bags: 2, brow: 'bushy', browCol: '#1A1614', nose: 'hook', mouth: 'grin', wrinkles: 2 },
@@ -1663,7 +1663,7 @@ const boss_boss = mk({
 // ---------------------------------------------------------------- the monsters
 const bigfoot = mk({
   body: 'sumo',
-  bodyMod: { s: 1.5, legW: 16, armW: 14, hipY: -19.6, thighL: 9 },
+  bodyMod: { s: 1.3, legW: 16, armW: 14, hipY: -30.6, thighL: 13.5 },
   height: 110,
   zskin: BF_SKIN,
   face: { shape: 'round', lid: 0.4, bags: 2, brow: 'bushy', browCol: '#2E2016', nose: 'pug', mouth: 'grim', zMouth: 'snarl', eyeS: 0.9 },
@@ -1679,7 +1679,7 @@ const bigfoot = mk({
 
 const werewoof = mk({
   body: 'muscle',
-  bodyMod: { s: 0.88, hunch: 2.6, neckY: -46.4, tTop: -50 },
+  bodyMod: { s: 0.88, hunch: 2.6, neckY: -58.4, tTop: -62 },
   height: 112,
   zskin: WW_FUR,
   face: { shape: 'long', lid: 0.4, bags: 1, brow: 'bushy', browCol: '#2A2620', nose: 'small', mouth: 'grim', zMouth: 'snarl' },

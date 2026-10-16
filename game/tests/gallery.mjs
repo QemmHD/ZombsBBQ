@@ -1,5 +1,5 @@
-// Art QA gallery: builds a decked-out late-game joint and screenshots it in every theme, then visits
-// every rival's arena mid-fight. Run after `npm run build`: `node tests/gallery.mjs` (SHOTS=dir).
+// Art QA gallery: builds a decked-out late-game joint full of seated customers and screenshots it (wide and
+// zoomed), then visits every rival's café mid-fight. Run after `npm run build`: `node tests/gallery.mjs` (SHOTS=dir).
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -38,11 +38,11 @@ const problems = await page.evaluate(() => {
   const s = ctl.state;
   const errs = [];
   s.tut = 99;
-  s.cash = 1e6;
+  s.cash = 1e7;
   s.sauce = 500;
   while (s.level < 12) sim.addXp(s, sim.xpToNext(s.level));
   s.events.length = 0;
-  while (sim.nextExpansion(s)) {
+  for (let i = 0; i < 3 && sim.nextExpansion(s); i++) {
     const e = sim.expand(s);
     if (e) { errs.push(`expand: ${e}`); break; }
   }
@@ -50,69 +50,49 @@ const problems = await page.evaluate(() => {
     const e = sim.buyAndPlace(s, id, x, y, dir);
     if (e) errs.push(`${id}@${x},${y}${dir ?? ''}: ${e}`);
   };
-  place('smoker', 3, 0);
-  place('fryer', 8, 0);
-  place('counter_chrome', 0, 5);
-  // a diner booth, a coffin table, a barrel table
-  place('table_diner', 9, 4);
-  place('chair_diner', 8, 4, 'se');
-  place('chair_diner', 10, 4, 'nw');
-  place('chair_diner', 9, 3, 'sw');
-  place('chair_diner', 9, 5, 'ne');
-  place('table_coffin', 9, 8);
-  place('chair_bone', 8, 8, 'se');
-  place('chair_bone', 10, 8, 'nw');
-  place('chair_bone', 9, 9, 'ne');
-  place('table_barrel', 6, 9);
-  place('chair_wood', 5, 9, 'se');
-  place('chair_wood', 7, 9, 'nw');
-  place('chair_wood', 6, 10, 'ne');
-  // money-makers, pets and decor around the edges
-  place('vending', 0, 9);
-  place('atm', 0, 10);
-  place('barrel_keg', 0, 8);
-  place('jukebox', 1, 11);
-  place('arcade', 3, 11);
-  place('pethouse_pug', 11, 1);
-  place('pethouse_kennel', 11, 11);
-  const decor = ['flamingo_zombie', 'gnome_zombie', 'pumpkin_pile', 'skeleton_statue', 'coffin_upright', 'slime_fountain', 'lamp_post', 'hay_bale', 'barrel_stack', 'cactus', 'tombstone'];
-  [[11, 3], [11, 5], [11, 7], [11, 9], [5, 11], [8, 11], [10, 11], [9, 11], [11, 10], [11, 4], [11, 6]].forEach(([x, y], i) => place(decor[i], x, y));
-  // every wall slot gets something
-  const hangings = sim.ITEMS.filter((i) => i.kind === 'wall').map((i) => i.id);
-  let h = 0;
-  for (const wall of ['l', 'r'])
-    for (let i = 0; i < s.roomN; i++) if (!sim.wallSlotFree(s, wall, i)) sim.buyWall(s, hangings[h++ % hangings.length], wall, i);
-  // a big crew with rares
+  // kitchen along the back wall, as in the original
+  place('grill', 2, 0, 'se');
+  place('smoker', 0, 3, 'se');
+  place('counter_steel', 0, 5, 'se');
+  place('counter_steel', 0, 6, 'se');
+  // single-seat tables, a chair on each free side (the original's 1x1 table + chairs)
+  const sets = [['table_diner', 'chair_diner', 4, 4], ['table_wood', 'chair_wood', 7, 4], ['table_barrel', 'chair_barrel', 4, 7], ['table_coffin', 'chair_bone', 7, 7]];
+  for (const [t, c, x, y] of sets) {
+    place(t, x, y);
+    place(c, x - 1, y, 'se');
+    place(c, x + 1, y, 'nw');
+    place(c, x, y - 1, 'sw');
+    place(c, x, y + 1, 'ne');
+  }
+  // a big crew
   for (const type of ['construction', 'cop', 'nurse', 'boxer', 'lumberjack', 'sumo', 'champ', 'moviestar', 'grandma', 'celebrity'])
-    if (s.workers.length <= s.crewCap) s.workers.push(sim.makeWorker(s, 'zombie', type, { x: 6, y: 6 }));
+    if (s.workers.length <= s.crewCap) s.workers.push(sim.makeWorker(s, 'zombie', type, { x: 5, y: 2 }));
   for (const c of s.counter) { c.dish = 'ribs'; c.servings = 60; }
   s.ratingPts = 1e9;
   return errs;
 });
-await ff(40);
-await wait(1500);
-for (const theme of ['shack', 'roadhouse', 'diner', 'graveyard']) {
-  await page.evaluate((t) => {
-    const { ctl, sim } = window.zbbq;
-    const e = sim.buyTheme(ctl.state, t);
-    if (e && !e.includes('already')) console.warn(e);
-  }, theme);
-  await ff(8);
-  await wait(1500);
-  await page.evaluate(() => window.zbbq.hud.closeModal());
-  await page.screenshot({ path: join(out, `joint-${theme}.png`) });
-}
+// let customers arrive, sit, order and eat
+await ff(90);
+await wait(2500);
+await page.evaluate(() => window.zbbq.hud.closeModal?.());
+await page.screenshot({ path: join(out, 'joint.png') });
 // zoomed-in look at the crowd
-await page.evaluate(() => {
-  const cam = window.zbbq.game.scene.getScene('joint').cameras.main;
-  cam.setZoom(cam.zoom * 2.2);
-});
-await wait(800);
-await page.screenshot({ path: join(out, 'joint-zoom.png') });
-await page.evaluate(() => {
-  const cam = window.zbbq.game.scene.getScene('joint').cameras.main;
-  cam.setZoom(cam.zoom / 2.2);
-});
+const zoomShot = async (name, k) => {
+  await page.evaluate((z) => {
+    const cam = window.zbbq.game.scene.getScene('joint').cameras.main;
+    cam.setZoom(cam.zoom * z);
+  }, k);
+  await wait(800);
+  await page.screenshot({ path: join(out, name) });
+  await page.evaluate((z) => {
+    const cam = window.zbbq.game.scene.getScene('joint').cameras.main;
+    cam.setZoom(cam.zoom / z);
+  }, k);
+};
+await zoomShot('joint-zoom.png', 2.2);
+await ff(20);
+await wait(1500);
+await zoomShot('joint-zoom2.png', 2.2);
 
 for (const rival of ['chuck', 'hank', 'vera', 'crunch', 'snob']) {
   const err = await page.evaluate((id) => {

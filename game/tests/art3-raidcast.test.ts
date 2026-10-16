@@ -122,7 +122,7 @@ describe('art v3 raid cast', () => {
     }
   });
 
-  it('gives sensible heights: waiters like the joint cast, chefs ~1.25x, Big Foot-Long ~1.5x', () => {
+  it('gives sensible heights: waiters like the joint cast, chefs a head taller (~1.1x), Big Foot-Long ~1.3x', () => {
     const h = (id: string) => built.get(id)!.height;
     const joe = buildChar3('joe')!.height;
     for (const id of RAID3_STAFF_IDS) {
@@ -131,11 +131,11 @@ describe('art v3 raid cast', () => {
     }
     for (const r of RAID3_RIVALS) {
       expect(h(`boss_${r}`), r).toBeGreaterThan(h(`staff_${r}`));
-      expect(h(`boss_${r}`), r).toBeGreaterThan(joe * 1.15);
-      expect(h(`boss_${r}`), r).toBeLessThan(joe * 1.8);
+      expect(h(`boss_${r}`), r).toBeGreaterThan(joe * 1.02);
+      expect(h(`boss_${r}`), r).toBeLessThan(joe * 1.55); // tall toques count
     }
-    expect(h('bigfoot')).toBeGreaterThan(joe * 1.4);
-    expect(h('bigfoot')).toBeLessThan(joe * 1.9);
+    expect(h('bigfoot')).toBeGreaterThan(joe * 1.2);
+    expect(h('bigfoot')).toBeLessThan(joe * 1.6);
     for (const r of RAID3_RIVALS) expect(h('bigfoot')).toBeGreaterThan(h(`staff_${r}`));
     expect(h('werewoof')).toBeGreaterThan(joe * 0.75);
     expect(h('werewoof')).toBeLessThan(joe * 1.2);

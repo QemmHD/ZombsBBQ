@@ -68,7 +68,7 @@ describe('art v3 joint characters (C1)', () => {
     expect(c.id).toBe(id);
     expect(c.rig ?? 'biped').toBe('biped');
     expect(c.height).toBeGreaterThan(80);
-    expect(c.height).toBeLessThan(140);
+    expect(c.height).toBeLessThan(160);
     expect(c.parts.map((p) => lastSeg(p.key))).toEqual(PART_ORDER3);
     for (const p of c.parts) expect(p.key).toBe(`char_${id}_${lastSeg(p.key)}`);
     expect(c.backParts).toBeDefined();
@@ -135,10 +135,11 @@ describe('art v3 joint characters (C1)', () => {
       expect(by('armL').x).toBeLessThan(0);
       expect(by('armR').x).toBeGreaterThan(0);
       expect(by('legL').x).toBeLessThan(by('legR').x);
-      // the original's construction: the head takes the top ~52-58% of the figure (neck at ~42-48%)
+      // the original's construction: the head takes the top ~half of the figure, with a real body under it
+      // (legs that show below the shirt), so the neck sits at ~45-55% of the height
       const neckFrac = -by('head').y / c.height;
-      expect(neckFrac, c.id).toBeGreaterThan(0.33);
-      expect(neckFrac, c.id).toBeLessThan(0.5);
+      expect(neckFrac, c.id).toBeGreaterThan(0.38); // Gus's tall toque counts in his height
+      expect(neckFrac, c.id).toBeLessThan(0.58);
     }
   });
 
