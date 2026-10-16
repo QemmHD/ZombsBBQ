@@ -25,6 +25,7 @@ import { buildDishes } from '../art3/dishes';
 import { buildFx } from '../art3/fx';
 import { buildUi3 } from '../art3/ui3';
 import { buildChar3 } from '../art3/chars';
+import { buildRaidChar3 } from '../art3/chars/raidcast';
 import { buildRaidMap3 } from '../art3/raidmap3';
 
 /** Rasterization scale: textures are drawn bigger than world units so zoomed-in Retina stays crisp. */
@@ -68,10 +69,11 @@ export function hasProp(key: string) {
   return props.has(key) || legacy.has(key);
 }
 
-/** A character's art: v3 joint rigs first, then the older sets (raid cast, not-yet-redrawn folks). */
+/** A character's art: v3 joint rigs, then the v3 raid cast, then the older sets (quads, not-yet-redrawn folks). */
 export function charArt(id: string): CharArt | null {
   if (!chars.has(id)) {
     let a: CharArt | null = safe(() => buildChar3(id), null);
+    if (!a || !a.parts?.length) a = safe(() => buildRaidChar3(id), null);
     if ((!a || !a.parts?.length) && (CHAR_IDS as readonly string[]).includes(id)) a = safe(() => buildChar(id as never), null);
     if (!a || !a.parts?.length) {
       try {

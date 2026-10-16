@@ -273,7 +273,7 @@ export function eyeZ(c: Ctx, cx: number, cy: number, rx: number, ry: number, o: 
 }
 
 /** Closed eye (sleep / bliss). */
-function eyeShut(c: Ctx, cx: number, cy: number, rx: number, up = false): string {
+export function eyeShut(c: Ctx, cx: number, cy: number, rx: number, up = false): string {
   const { sk } = c;
   let s = fill(ellD(cx + 0.2, cy - 0.4, rx + 1.8, rx + 1.2), sk.d, 'opacity="0.18"');
   s += up
@@ -285,7 +285,7 @@ function eyeShut(c: Ctx, cx: number, cy: number, rx: number, up = false): string
 }
 
 /** Dazed spiral (pupil-less) eye for zombies. */
-function eyeSpiral(c: Ctx, cx: number, cy: number, r: number): string {
+export function eyeSpiral(c: Ctx, cx: number, cy: number, r: number): string {
   let dd = `M${f(cx)},${f(cy)}`;
   for (let i = 1; i <= 26; i++) {
     const t = i / 26;

@@ -15,6 +15,7 @@
  *   faces  expression heads with exactly the head's frame (w, h, px, py, x, y):
  *          humans + you: scream, happy, shock, angry, eat · zombies + gus: chomp, sleep, dazed
  *   keys   char_<id>_<part>, char_<id>_back_<part>, char_<id>_face_<name>
+ * The raid cast (raidcast.ts → buildRaidChar3) is built from its own Looks with `buildLook3`.
  * Joint caps are round and centred on each pivot: knees bend 90° (sit), elbows 100° (carry, eat, claw).
  */
 import type { CharArt, CharPart, FaceName } from '../../art/types';
@@ -41,12 +42,15 @@ function hash(s: string): number {
   return (h >>> 0) % 9973;
 }
 
-function headFront(c: Ctx, e: Expr): string {
+/** Paints the face itself (eyes, brows, nose, mouth) for an expression; the joint cast uses `face`. */
+export type FacePaint = (c: Ctx, e: Expr) => string;
+
+function headFront(c: Ctx, e: Expr, paintFace: FacePaint = face): string {
   const L = c.L;
   let s = L.hairBehind ? L.hairBehind(c) : '';
   s += skullFront(c, L.face.shape, e);
   if (L.faceUnder) s += L.faceUnder(c, e);
-  s += face(c, e);
+  s += paintFace(c, e);
   if (L.facialHair) s += L.facialHair(c, e);
   if (L.hairFront) s += L.hairFront(c, e);
   if (!L.earHidden) s += earFront(c);
@@ -71,8 +75,26 @@ export function buildChar3(id: string): CharArt | null {
   const base = id.endsWith('_z') ? id.slice(0, -2) : id;
   const L: Look | undefined = LOOKS[base];
   if (!L) return null;
+  return buildLook3(id, L, { z: isZ, seedKey: base, faces: isZ ? ZOMBIE_FACES3 : HUMAN_FACES3 });
+}
+
+export interface BuildOpts {
+  /** zombie skin, eyes and wear */
+  z: boolean;
+  /** texture-scatter seed source (a zombie shares its human form's seed) */
+  seedKey: string;
+  /** expression heads to build */
+  faces: readonly FaceName[];
+  /** face painter (default: the joint cast's `face`) */
+  face?: FacePaint;
+}
+
+/** Build a biped rig for any `Look` (the joint cast, the raid cast) with the C1 part contract. */
+export function buildLook3(id: string, L: Look, o: BuildOpts): CharArt {
+  const isZ = o.z;
+  const paintFace = o.face ?? face;
   const b = L.body;
-  const seed = hash(base);
+  const seed = hash(o.seedKey);
   const sk = isZ ? L.zskin ?? ZSKINS[seed % ZSKINS.length] : L.skin;
   const k_ = (p: string) => `char_${id}_${p}`;
   const ctx = (d: Ctx['d'], back: boolean, side: -1 | 1, near: boolean): Ctx => ({ d, z: isZ, back, b, L, sk, seed, side, near });
@@ -118,7 +140,7 @@ export function buildChar3(id: string): CharArt | null {
   const hbox = L.headBox ?? ([-32, -118, 36, -37] as [number, number, number, number]);
   const k = S * b.headS;
   const ho: [number, number] = [S * (b.neckX + b.hunch) - k * NECK_STD[0], S * b.neckY - k * NECK_STD[1]];
-  const head = (key: string, e: Expr) => part(key, hbox, NECK_STD, k, ho, (d) => headFront(ctx(d, false, 1, true), e));
+  const head = (key: string, e: Expr) => part(key, hbox, NECK_STD, k, ho, (d) => headFront(ctx(d, false, 1, true), e, paintFace));
   const headB = (key: string) => part(key, hbox, NECK_STD, k, ho, (d) => headBack(ctx(d, true, 1, true)));
 
   const parts: CharPart[] = [
@@ -132,6 +154,6 @@ export function buildChar3(id: string): CharArt | null {
     arm(k_('back_armR'), 1, true), arm2(k_('back_armR2'), 1, true), headB(k_('back_head')),
   ];
   const faces: Partial<Record<FaceName, CharPart>> = {};
-  for (const fn of isZ ? ZOMBIE_FACES3 : HUMAN_FACES3) faces[fn] = head(k_(`face_${fn}`), fn as Expr);
+  for (const fn of o.faces) faces[fn] = head(k_(`face_${fn}`), fn as Expr);
   return { id, rig: 'biped', parts, backParts, faces, height: Math.round(S * (-b.neckY + b.headS * (L.height - 54))) };
 }
