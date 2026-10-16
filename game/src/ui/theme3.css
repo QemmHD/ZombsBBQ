@@ -378,3 +378,91 @@
 .item.on {
   outline: 2px solid var(--gold);
 }
+
+/* ---------- raids ---------- */
+.flag-btn {
+  background: rgba(22, 18, 12, 0.55);
+  border: 1.5px solid rgba(232, 223, 196, 0.45);
+  border-radius: 3px;
+  box-shadow: none;
+}
+.rh-name {
+  background: var(--tex-awning) 0 0 / auto 160% repeat-x;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  font-family: var(--font);
+  text-shadow: 0 1px 0 var(--ink);
+}
+.rh-name .sub {
+  color: #e8d27a;
+}
+.rh-timer {
+  background: rgba(22, 18, 12, 0.85);
+  border-radius: 3px;
+  font-family: var(--font);
+}
+.tray-u {
+  padding: 0;
+  cursor: pointer;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  background: #cfc39a;
+}
+.tray-u i {
+  background: #7a9a32;
+}
+.tray-u.queued {
+  outline: 2px dashed rgba(217, 180, 74, 0.8);
+}
+.tray-u.on {
+  outline: 3px solid var(--gold);
+  transform: scale(1.08);
+}
+.rh-orders {
+  position: absolute;
+  right: calc(var(--safe-r) + 6px);
+  bottom: calc(var(--safe-b) + 64px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rh-orders .btn {
+  flex: none;
+  font-size: 16px;
+  min-height: 46px;
+  padding: 0 14px;
+  letter-spacing: 0.5px;
+}
+.rh-hint {
+  background: rgba(22, 18, 12, 0.75);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 2px;
+  max-width: 260px;
+}
+.rh-hint:empty {
+  display: none;
+}
+.sendall {
+  display: none;
+}
+.item-btn.stone.glow {
+  filter: drop-shadow(0 0 6px #d9b44a);
+}
+.map-pin .pin-over {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  width: 100%;
+}
+.map-pin .pin-steal {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  width: 34px;
+  animation: pulse 1.2s infinite;
+}

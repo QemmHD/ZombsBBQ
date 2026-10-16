@@ -140,7 +140,12 @@ export interface FridgeItem {
 export interface RivalProgress {
   stars: number;
   wins: number;
+  /** boarded up until (after a win), or a short regroup after a loss */
   nextAt: number;
+  /** how many times it has reopened under new management (tougher, richer) */
+  gen?: number;
+  /** when you last raided it (rivals left alone too long poach your customers) */
+  lastRaid?: number;
 }
 
 export type GameEvent =

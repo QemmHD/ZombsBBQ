@@ -16,6 +16,7 @@ import { DIR_STEP, FLOOR_BY_ID, ITEM_BY_ID, WALL_BY_ID, type ItemDef } from './c
 import { DOOR_X, findPath, isInside, key, reachable, restSpots, streetEnds, walkable, type Pt, type Room } from './grid';
 import { makeWorker, maxEnergy, type Customer, type Furniture, type GameState, type Mover, type Stove, type Worker } from './state';
 import { updateProgress } from './progress';
+import { stealingRivals } from './rivals';
 
 // ---------- helpers ----------
 
@@ -534,7 +535,8 @@ function spawnCustomers(s: GameState, dt: number) {
   const target = Math.min(1 + Math.round(st * 2), validSeats(s).length + 1);
   if (!validSeats(s).length) return;
   const present = s.customers.filter((c) => ['entering', 'waiting', 'eating', 'turnedAway'].includes(c.state)).length;
-  s.spawnCooldown = 5 + rand(s) * 6;
+  // rivals you've left alone too long are poaching your customers
+  s.spawnCooldown = (5 + rand(s) * 6) * (1 + 0.25 * stealingRivals(s).length);
   if (present >= target) return;
   const pool = CUSTOMERS.filter((d) => d.minLevel <= s.level && d.minStars <= st);
   // gentle anti-streak: recently seen types are less likely, so the crowd stays varied

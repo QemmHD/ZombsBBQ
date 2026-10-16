@@ -1,62 +1,79 @@
 /**
- * Raids: send your zombies (and pets) to attack a rival joint, like the original.
+ * Raids (v3), played like the original: a rival joint is a real café on its own street corner.
  *
- * Flow: pick a rival on the map → choose the squad → they line up on the sidewalk → Send one or
- * Send All → zombies bash the gate, the rival staff swarm, customers get eaten (cash you keep even
- * if you lose), tap the counter to steal a dish, and the Head Chef comes out once the room is mostly
- * cleared. Beat the Head Chef to win. A zombie's Energy is its health; KO'd zombies reanimate later.
+ * - Your squad lines up single file on the sidewalk outside.
+ * - Tap a zombie, then ATTACK to send it on a rampage, or tap a target for it: a person, or the
+ *   counter to swipe a dish. ATTACK ALL sends everyone.
+ * - Zombies walk to the door at their own speed and go in.
+ * - The moment the fight starts, the diners scream and run for the door; catch one and it's lunch
+ *   (cash you keep even if you lose). The waiters swarm your zombies.
+ * - The Head Chef stays behind the counter in the kitchen, and fights anyone who comes in, until most
+ *   of the staff are down. Then the chef storms out. Beat the chef to win.
+ * - Tap a tombstone you own for a 5-second glow buff (one at a time).
+ * - Wave the white flag to retreat. KO'd zombies reanimate back home later.
  *
- * Pure and deterministic (own RNG): the scene renders it, tests drive it.
+ * A zombie's Energy is its health. Pure and deterministic (own RNG): the scene renders it, tests drive it.
  */
-import { DISH_BY_ID, TUNING } from './data';
-import { maxEnergy, type GameState } from './state';
-import { addXp, outsideSpot, releaseJob } from './sim';
-import { refreshDaily } from './progress';
-import type { Pt } from './grid';
+import { DISHES, DISH_BY_ID, TUNING, walkSpeed } from "./data";
+import { ITEM_BY_ID, type Dir } from "./catalog";
+import {
+  DOOR_X,
+  STREET_RUN,
+  findPath,
+  isInside,
+  key,
+  type Pt,
+  type Room,
+} from "./grid";
+import { maxEnergy, type GameState, type Worker } from "./state";
+import { addXp, addZombieXp, outsideSpot, releaseJob } from "./sim";
+import {
+  GEN_STEP,
+  RIVAL_BY_ID,
+  RIVAL_CLOSED_SEC,
+  rivalGen,
+  rivalReady,
+  type RivalId,
+} from "./rivals";
 
-export type RivalId = 'chuck' | 'hank' | 'vera' | 'crunch' | 'snob';
+export * from "./rivals";
 
-export interface RivalDef {
-  id: RivalId;
-  name: string;
-  chef: string;
-  level: number;
-  staff: { count: number; hp: number; dmg: number };
-  boss: { hp: number; dmg: number };
-  dogs: number;
-  zappers: number;
-  gateHp: number;
-  customers: number;
-  cashPerCustomer: number;
-  dishes: string[];
-  signature: string;
-  reward: { cash: number; xp: number; sauceChance: number };
-  taunt: string;
-}
-
-export const RIVALS: RivalDef[] = [
-  { id: 'chuck', name: "Chuck Wagon's Chow Hall", chef: 'Chef Chuck', level: 2, staff: { count: 3, hp: 32, dmg: 3 }, boss: { hp: 230, dmg: 9 }, dogs: 0, zappers: 0, gateHp: 60, customers: 3, cashPerCustomer: 15, dishes: ['sliders', 'chili'], signature: 'chili', reward: { cash: 250, xp: 60, sauceChance: 0.25 }, taunt: 'Git along, little zombie!' },
-  { id: 'hank', name: "Big Hank's Burger Barn", chef: 'Big Hank', level: 4, staff: { count: 4, hp: 48, dmg: 4 }, boss: { hp: 420, dmg: 13 }, dogs: 1, zappers: 0, gateHp: 100, customers: 4, cashPerCustomer: 25, dishes: ['burger', 'smash'], signature: 'smash', reward: { cash: 600, xp: 120, sauceChance: 0.3 }, taunt: 'You want fries with that beatdown?' },
-  { id: 'vera', name: "Vegan Vera's Salad Fortress", chef: 'Vegan Vera', level: 6, staff: { count: 5, hp: 62, dmg: 5 }, boss: { hp: 640, dmg: 16 }, dogs: 1, zappers: 1, gateHp: 150, customers: 4, cashPerCustomer: 35, dishes: ['wings', 'salad'], signature: 'salad', reward: { cash: 1200, xp: 220, sauceChance: 0.35 }, taunt: 'Brains are NOT plant-based!' },
-  { id: 'crunch', name: "Colonel Crunch's Chicken Shack", chef: 'Colonel Crunch', level: 8, staff: { count: 6, hp: 70, dmg: 5 }, boss: { hp: 800, dmg: 16 }, dogs: 2, zappers: 1, gateHp: 200, customers: 5, cashPerCustomer: 50, dishes: ['rings', 'chicken'], signature: 'chicken', reward: { cash: 2400, xp: 380, sauceChance: 0.4 }, taunt: 'My secret recipe stays SECRET!' },
-  { id: 'snob', name: 'Le Snob Bistro', chef: 'Chef Le Snob', level: 10, staff: { count: 6, hp: 90, dmg: 6 }, boss: { hp: 1150, dmg: 20 }, dogs: 2, zappers: 2, gateHp: 260, customers: 5, cashPerCustomer: 80, dishes: ['ribs', 'foie'], signature: 'foie', reward: { cash: 5000, xp: 650, sauceChance: 0.5 }, taunt: 'Zut alors! No shirt, no shoes, no SERVICE!' },
-];
-export const RIVAL_BY_ID: Record<string, RivalDef> = Object.fromEntries(RIVALS.map((r) => [r.id, r]));
-
-export const RAID_TIME = 120;
-export const RIVAL_COOLDOWN = 5 * 60;
-export const ARENA_N = 6;
-export const GATE_Y = 2; // gate on the front-right fence, between (5,2) and (6,2)
-export const LINE_X = 8; // sidewalk where the horde lines up
-export const HEADSTONE_COST = 300;
+export const RAID_TIME = 180;
 export const SUMMON_COST = 5; // Brain Sauce
+export const BUFF_SEC = 5;
+export const TOMBSTONE_USES = 5;
+export const TOMBSTONE_RECHARGE = 24 * 3600;
 
-export type UnitKind = 'zombie' | 'you' | 'pet' | 'summon' | 'staff' | 'boss' | 'dog' | 'zapper' | 'gate' | 'customer';
-export type UnitState = 'queued' | 'walk' | 'idle' | 'eat' | 'steal' | 'flee' | 'down' | 'gone' | 'hidden';
+export type UnitKind =
+  | "zombie"
+  | "you"
+  | "pet"
+  | "summon"
+  | "staff"
+  | "boss"
+  | "customer";
+export type UnitState =
+  | "queued"
+  | "walk"
+  | "idle"
+  | "attack"
+  | "eat"
+  | "steal"
+  | "scream"
+  | "flee"
+  | "grabbed"
+  | "down"
+  | "gone";
+
+/** What a zombie was told to do. */
+export type Order =
+  | { kind: "attack" }
+  | { kind: "target"; id: string }
+  | { kind: "steal"; slot: number };
 
 export interface RaidUnit {
   id: string;
-  side: 'z' | 'r' | 'c';
+  side: "z" | "r" | "c";
   kind: UnitKind;
   /** worker / pet id for your side */
   ref?: string;
@@ -68,12 +85,15 @@ export interface RaidUnit {
   hp: number;
   maxHp: number;
   dmg: number;
-  range: number;
   speed: number;
   cd: number;
   cdMax: number;
   state: UnitState;
+  order?: Order;
   target?: string;
+  /** where this unit stands guard / sits (staff post, the chef's spot, a diner's chair) */
+  home?: Pt;
+  seatId?: string;
   path: Pt[];
   repathAt: number;
   facing: 1 | -1;
@@ -82,42 +102,64 @@ export interface RaidUnit {
   attackAt: number;
   hitAt: number;
   busyUntil: number;
-  stealSlot?: number;
+  /** diners eaten, for zombie XP */
+  eats: number;
+}
+
+export interface RaidFurniture {
+  id: string;
+  item: string;
+  x: number;
+  y: number;
+  dir?: Dir;
 }
 
 export type RaidEvent =
-  | { t: 'hit'; unit: string; by: string; dmg: number; x: number; y: number }
-  | { t: 'ko'; unit: string; x: number; y: number }
-  | { t: 'eat'; unit: string; customer: string; cash: number; x: number; y: number }
-  | { t: 'steal'; unit: string; dish: string; x: number; y: number }
-  | { t: 'gate'; x: number; y: number }
-  | { t: 'boss'; x: number; y: number }
-  | { t: 'zap'; from: string; to: string }
-  | { t: 'heal'; unit: string }
-  | { t: 'summon'; unit: string }
-  | { t: 'rage' }
-  | { t: 'end'; result: 'won' | 'lost' | 'retreat' };
+  | { t: "hit"; unit: string; by: string; dmg: number; x: number; y: number }
+  | { t: "ko"; unit: string; x: number; y: number }
+  | {
+      t: "eat";
+      unit: string;
+      customer: string;
+      cash: number;
+      x: number;
+      y: number;
+    }
+  | { t: "steal"; unit: string; dish: string; x: number; y: number }
+  | { t: "scream"; unit: string; x: number; y: number }
+  | { t: "escape"; unit: string }
+  | { t: "enter"; unit: string }
+  | { t: "boss"; x: number; y: number }
+  | { t: "buff"; kind: "str" | "hp" }
+  | { t: "summon"; unit: string }
+  | { t: "end"; result: "won" | "lost" | "retreat" };
 
 export interface RaidState {
   rival: RivalId;
+  name: string;
+  gen: number;
   t: number;
   rng: number;
+  room: Room;
+  furniture: RaidFurniture[];
+  wallItems: { item: string; wall: "l" | "r"; index: number }[];
   units: RaidUnit[];
-  phase: 'fight' | 'won' | 'lost' | 'retreat';
+  phase: "fight" | "won" | "lost" | "retreat";
   aggro: boolean;
   bossOut: boolean;
-  gateBroken: boolean;
+  buff?: { kind: "str" | "hp"; until: number };
+  /** legacy "everyone pile on this" target (also used by tests) */
   focus?: string;
-  redUntil: number;
   cashEaten: number;
   stolen: string[];
+  /** dishes on the rival's serving counter (all on one counter tile, stacked) */
   counter: { x: number; y: number; dish: string; servings: number }[];
   events: RaidEvent[];
   nextId: number;
 }
 
 export interface RaidResult {
-  result: 'won' | 'lost' | 'retreat';
+  result: "won" | "lost" | "retreat";
   cash: number;
   xp: number;
   sauce: number;
@@ -127,29 +169,9 @@ export interface RaidResult {
   kos: string[];
 }
 
-// ---------- availability ----------
-
-export function rivalUnlocked(s: GameState, id: RivalId): boolean {
-  const i = RIVALS.findIndex((r) => r.id === id);
-  return i === 0 || (s.rivals[RIVALS[i - 1].id]?.wins ?? 0) > 0;
-}
-
-export const MAP_LEVEL = 2;
-
-export function rivalReady(s: GameState, id: RivalId): string | null {
-  if (s.level < MAP_LEVEL) return `The raid map opens at level ${MAP_LEVEL}.`;
-  if (!rivalUnlocked(s, id)) return 'Beat the previous joint on the road first.';
-  const def = RIVAL_BY_ID[id];
-  if (s.level < def.level) return `${def.name} is a level ${def.level} joint. Level up first!`;
-  const p = s.rivals[id];
-  if (p && s.now < p.nextAt) return `They're still rebuilding. Back in ${Math.ceil((p.nextAt - s.now) / 60)} min.`;
-  return null;
-}
-
-/** Workers that can go raiding: zombies and YOU who aren't cooking, KO'd or already out. */
-/** Anyone conscious and home can go. A cook just walks off: the stove keeps cooking on its own timer. */
-export function raidCandidates(s: GameState) {
-  return s.workers.filter((w) => w.state !== 'down' && w.state !== 'raiding');
+/** Anyone conscious and home can go. A cook just walks off (and their dish pauses until someone returns). */
+export function raidCandidates(s: GameState): Worker[] {
+  return s.workers.filter((w) => w.state !== "down" && w.state !== "raiding");
 }
 
 // ---------- setup ----------
@@ -161,238 +183,641 @@ function rnd(r: RaidState): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-function unit(r: RaidState, u: Partial<RaidUnit> & Pick<RaidUnit, 'side' | 'kind' | 'art' | 'name' | 'x' | 'y' | 'hp' | 'dmg' | 'speed'>): RaidUnit {
+function unit(
+  r: RaidState,
+  u: Partial<RaidUnit> &
+    Pick<
+      RaidUnit,
+      "side" | "kind" | "art" | "name" | "x" | "y" | "hp" | "dmg" | "speed"
+    >,
+): RaidUnit {
   const full: RaidUnit = {
     id: `u${r.nextId++}`,
     maxHp: u.hp,
-    range: 0.9,
     cd: 0,
     cdMax: 1,
-    state: 'idle',
+    state: "idle",
     path: [],
     repathAt: 0,
-    facing: 1,
+    facing: -1,
     attackAt: -9,
     hitAt: -9,
     busyUntil: 0,
+    eats: 0,
     ...u,
   } as RaidUnit;
   r.units.push(full);
   return full;
 }
 
-export function startRaid(s: GameState, rivalId: RivalId, workerIds: string[], petIds: string[] = []): RaidState | string {
+/** The kitchen: the two columns along the north-west wall, behind the dividers and the counter. */
+export const KITCHEN_X = 1;
+export const inKitchen = (r: RaidState, p: Pt) =>
+  Math.round(p.x) <= KITCHEN_X &&
+  isInside(Math.round(p.x), Math.round(p.y), r.room);
+/** Where the counter sits (in the divider line), and where you stand to grab from it. */
+export const counterTile = (_r: RaidState): Pt => ({ x: 2, y: 2 });
+export const stealSpot = (_r: RaidState): Pt => ({ x: 3, y: 2 });
+/** The gap in the divider line the chef comes out through. */
+export const kitchenGap = (r: RaidState): Pt => ({ x: 2, y: r.room.h - 2 });
+
+/** Lay out a rival joint the way the original's were: kitchen behind dividers, diners at tables. */
+function buildCafe(r: RaidState) {
+  const def = RIVAL_BY_ID[r.rival];
+  const { w: W, h: H } = r.room;
+  let n = 1;
+  const add = (item: string, x: number, y: number, dir?: Dir) =>
+    r.furniture.push({ id: `rf${n++}`, item, x, y, dir });
+  const stove =
+    r.rival === "chuck" || r.rival === "vera"
+      ? "stove_plain"
+      : r.rival === "hank" || r.rival === "crunch"
+        ? "stove_steel"
+        : "stove_super";
+  // the kitchen along the north-west wall
+  add(
+    r.rival === "snob" || r.rival === "boss" ? "fridge_steel" : "fridge_plain",
+    0,
+    0,
+    "se",
+  );
+  for (let y = 1; y < H - 1; y += 2)
+    add(
+      y === 3 && r.rival !== "chuck"
+        ? r.rival === "hank"
+          ? "grill"
+          : r.rival === "crunch"
+            ? "fryer"
+            : r.rival === "boss"
+              ? "smoker"
+              : stove
+        : stove,
+      0,
+      y,
+      "se",
+    );
+  add("sink_steel", 0, H - 1, "se");
+  // the divider line, with the serving counter and a gap for the chef
+  const ct = counterTile(r);
+  const gap = kitchenGap(r);
+  const divider =
+    r.rival === "chuck"
+      ? "divider_wood"
+      : r.rival === "crunch" || r.rival === "boss"
+        ? "divider_brick"
+        : "divider_plain";
+  for (let y = 0; y < H; y++) {
+    if (y === ct.y)
+      add(
+        r.rival === "snob" ? "counter_bar" : "counter_steel",
+        ct.x,
+        ct.y,
+        "se",
+      );
+    else if (y !== gap.y) add(divider, 2, y);
+  }
+  // the dining room: one diner per table, chair in front of it. Aisles run along the divider line
+  // (x = 3, so the counter and the kitchen gap stay open) and between the tables (x = 5, 7)
+  const spots: Pt[] = [];
+  for (let y = 2; y + 1 <= H - 1; y += 2)
+    for (let x = 4; x <= W - 1; x += 2) spots.push({ x, y });
+  spots.slice(0, def.tables).forEach((p) => {
+    add(def.table, p.x, p.y);
+    add(def.chair, p.x, p.y + 1, "ne");
+  });
+  add(r.rival === "vera" ? "plant_tree" : "plant_potted", W - 1, 0);
+  // walls: the shop sign over the door is drawn by the scene; a couple of hangings inside
+  r.wallItems.push(
+    { item: "menu_board", wall: "l", index: Math.min(H - 1, 2) },
+    {
+      item:
+        r.rival === "chuck"
+          ? "skull_longhorn"
+          : r.rival === "snob"
+            ? "painting_zombie"
+            : "clock",
+      wall: "r",
+      index: 1,
+    },
+  );
+}
+
+function blockedTiles(r: RaidState): Set<string> {
+  return new Set(r.furniture.map((f) => key(f.x, f.y)));
+}
+
+export function startRaid(
+  s: GameState,
+  rivalId: RivalId,
+  workerIds: string[],
+  petIds: string[] = [],
+): RaidState | string {
   const def = RIVAL_BY_ID[rivalId];
-  if (!def) return 'Unknown joint.';
+  if (!def) return "Unknown joint.";
   const notReady = rivalReady(s, rivalId);
   if (notReady) return notReady;
   const candidates = new Set(raidCandidates(s).map((w) => w.id));
   const squad = workerIds.filter((id) => candidates.has(id));
-  if (!squad.length) return 'Pick at least one zombie for the squad.';
-  refreshDaily(s);
+  if (!squad.length) return "Pick at least one zombie for the squad.";
+  const gen = rivalGen(s, rivalId);
+  const tough = 1 + gen * GEN_STEP;
   const r: RaidState = {
     rival: rivalId,
+    name: def.name,
+    gen,
     t: 0,
     rng: (s.rng ^ 0x9e3779b9) >>> 0 || 7,
+    room: { ...def.room },
+    furniture: [],
+    wallItems: [],
     units: [],
-    phase: 'fight',
+    phase: "fight",
     aggro: false,
     bossOut: false,
-    gateBroken: false,
-    redUntil: -1,
     cashEaten: 0,
     stolen: [],
-    counter: def.dishes.map((d, i) => ({ x: 0, y: 2 + i, dish: d, servings: 1 })),
+    counter: [],
     events: [],
     nextId: 1,
   };
-  // your horde, lined up on the sidewalk
-  squad.forEach((id, i) => {
+  buildCafe(r);
+  const ct = counterTile(r);
+  r.counter = def.dishes.map((d) => ({
+    x: ct.x,
+    y: ct.y,
+    dish: d,
+    servings: 1,
+  }));
+  const W = r.room.w;
+  // your squad, single file on the sidewalk past the end of their wall
+  const n = squad.length + petIds.length;
+  const sp = Math.min(0.8, (STREET_RUN - 0.6) / Math.max(1, n));
+  let slot = 0;
+  for (const id of squad) {
     const w = s.workers.find((x) => x.id === id)!;
     releaseJob(s, w);
-    w.state = 'raiding';
-    const isYou = w.kind === 'you';
+    w.state = "raiding";
+    w.path = [];
+    const isYou = w.kind === "you";
     unit(r, {
-      side: 'z',
-      kind: isYou ? 'you' : 'zombie',
+      side: "z",
+      kind: isYou ? "you" : "zombie",
       ref: w.id,
-      art: isYou ? 'you' : `${w.type}_z`,
+      art: isYou ? "you" : `${w.type}_z`,
       name: w.name,
-      x: LINE_X,
-      y: -1 + i * 0.9,
+      x: W + 0.4 + slot++ * sp,
+      y: -1,
       hp: Math.max(1, w.energy),
       maxHp: maxEnergy(w),
       dmg: 3 + w.stats.power * 1.6,
-      speed: 0.9 + w.stats.speed * 0.12,
+      speed: walkSpeed(w.stats.speed) * 1.15,
       cdMax: 0.9,
-      state: 'queued',
+      state: "queued",
     });
-  });
-  petIds.forEach((id, i) => {
-    const p = s.pets.find((x) => x.id === id);
-    if (!p || p.state === 'raiding') return;
-    p.state = 'raiding';
-    const rot = p.type === 'rotweiler';
-    unit(r, { side: 'z', kind: 'pet', ref: p.id, art: rot ? 'pet_rotweiler' : 'pet_pug', name: rot ? 'Rot-weiler' : 'Zombie Pug', x: LINE_X + 0.6, y: -2 - i, hp: rot ? 90 : 45, dmg: rot ? 9 : 4, speed: rot ? 2.6 : 2.2, cdMax: 0.7, state: 'queued' });
-  });
-  // the rival joint
-  unit(r, { side: 'r', kind: 'gate', art: 'gate_r', name: 'Gate', x: ARENA_N - 0.5, y: GATE_Y, hp: def.gateHp, dmg: 0, speed: 0 });
-  const tables: Pt[] = [
-    { x: 2, y: 2 },
-    { x: 4, y: 2 },
-    { x: 2, y: 4 },
-    { x: 4, y: 4 },
-    { x: 3, y: 1 },
-  ];
-  for (let i = 0; i < def.customers; i++) {
-    const t = tables[i % tables.length];
-    unit(r, { side: 'c', kind: 'customer', art: ['accountant', 'teen', 'yoga', 'politician', 'nurse'][i % 5], name: 'Customer', x: t.x + 0.45, y: t.y, hp: 10, dmg: 0, speed: 2.4 });
   }
-  for (let i = 0; i < def.staff.count; i++)
-    unit(r, { side: 'r', kind: 'staff', art: `staff_${rivalId}`, name: 'Waiter', x: 1 + (i % 4), y: 1 + Math.floor(i / 4) * 2 + 0.5, hp: def.staff.hp, dmg: def.staff.dmg, speed: 1.6, cdMax: 1.1 });
-  for (let i = 0; i < def.dogs; i++) unit(r, { side: 'r', kind: 'dog', art: 'guard_dog', name: 'Guard Dog', x: ARENA_N - 1, y: 1 + i * 3, hp: 40 + def.level * 5, dmg: 3 + def.level * 0.4, speed: 2.5, cdMax: 0.8 });
-  const zapSpots = [
-    { x: ARENA_N - 1, y: ARENA_N - 1 },
-    { x: ARENA_N - 1, y: 0 },
+  for (const id of petIds) {
+    const p = s.pets.find((x) => x.id === id);
+    if (!p || p.state === "raiding") continue;
+    p.state = "raiding";
+    const rot = p.type === "rotweiler";
+    unit(r, {
+      side: "z",
+      kind: "pet",
+      ref: p.id,
+      art: rot ? "pet_rotweiler" : "pet_pug",
+      name: rot ? "Rot-weiler" : "Zombie Pug",
+      x: W + 0.4 + slot++ * sp,
+      y: -1,
+      hp: rot ? 90 : 45,
+      dmg: rot ? 9 : 4,
+      speed: rot ? 2.4 : 2.0,
+      cdMax: 0.7,
+      state: "queued",
+    });
+  }
+  // the diners, each on their chair facing their table
+  const diners = [
+    "accountant",
+    "teen",
+    "yoga",
+    "politician",
+    "nurse",
+    "joe",
+    "jane",
+    "senior",
+    "hipster",
+    "ceo",
   ];
-  for (let i = 0; i < def.zappers; i++)
-    unit(r, { side: 'r', kind: 'zapper', art: 'bug_zapper', name: 'Bug Zapper', ...zapSpots[i], hp: 100 + def.level * 12, dmg: 4 + def.level * 0.45, speed: 0, range: 2.8, cdMax: 1.6 });
-  unit(r, { side: 'r', kind: 'boss', art: `boss_${rivalId}`, name: def.chef, x: 1, y: 0.3, hp: def.boss.hp, dmg: def.boss.dmg, speed: 1.3, cdMax: 1.2, range: 1.0, state: 'hidden' });
+  r.furniture
+    .filter((f) => ITEM_BY_ID[f.item]?.kind === "chair")
+    .forEach((c, i) => {
+      unit(r, {
+        side: "c",
+        kind: "customer",
+        art: diners[(i * 3 + gen) % diners.length],
+        name: "Diner",
+        x: c.x,
+        y: c.y,
+        hp: 2,
+        dmg: 0,
+        speed: 1.7,
+        seatId: c.id,
+        home: { x: c.x, y: c.y },
+        back: true,
+        facing: 1,
+      });
+    });
+  // the waiters, on their posts in the aisles
+  const posts: Pt[] = [];
+  for (const x of [3, 5, 7])
+    for (let y = 1; y < r.room.h; y++)
+      if (x < W && !blockedTiles(r).has(key(x, y))) posts.push({ x, y });
+  const pick = posts
+    .filter((_, i) => i % 2 === 0)
+    .concat(posts.filter((_, i) => i % 2 === 1));
+  for (let i = 0; i < def.staff.count; i++) {
+    const p = pick[i % pick.length];
+    unit(r, {
+      side: "r",
+      kind: "staff",
+      art: i % 2 ? `staff_${rivalId}_b` : `staff_${rivalId}`,
+      name: i % 2 ? "Waitress" : "Waiter",
+      x: p.x,
+      y: p.y,
+      home: p,
+      hp: Math.round(def.staff.hp * tough),
+      dmg: def.staff.dmg * tough,
+      speed: 1.5,
+      cdMax: 1.1,
+    });
+  }
+  // the Head Chef, in the kitchen behind the counter
+  const chef = { x: KITCHEN_X, y: ct.y };
+  unit(r, {
+    side: "r",
+    kind: "boss",
+    art: `boss_${rivalId}`,
+    name: def.chef,
+    x: chef.x,
+    y: chef.y,
+    home: chef,
+    hp: Math.round(def.boss.hp * tough),
+    dmg: def.boss.dmg * tough,
+    speed: 1.3,
+    cdMax: 1.2,
+    facing: 1,
+  });
   return r;
 }
 
 // ---------- player commands ----------
 
-export function sendOne(r: RaidState, unitId?: string): string | null {
-  const u = unitId ? r.units.find((x) => x.id === unitId && x.state === 'queued') : r.units.find((x) => x.side === 'z' && x.state === 'queued');
-  if (!u) return 'Everyone is already in!';
-  u.state = 'walk';
-  return null;
-}
+const fighter = (u: RaidUnit) =>
+  u.side === "z" && u.hp > 0 && u.state !== "down" && u.state !== "gone";
 
-export function sendAll(r: RaidState): string | null {
-  const q = r.units.filter((x) => x.side === 'z' && x.state === 'queued');
-  if (!q.length) return 'Everyone is already in!';
-  for (const u of q) u.state = 'walk';
-  return null;
-}
-
-/** Tap an enemy (or a customer, or the gate) and the whole horde piles on it. */
-export function focusTarget(r: RaidState, unitId: string): string | null {
+/** Give one of your zombies an order (from the line-up, or already inside). */
+export function order(r: RaidState, unitId: string, o: Order): string | null {
   const u = r.units.find((x) => x.id === unitId);
-  if (!u || u.side === 'z' || u.hp <= 0 || u.state === 'hidden' || u.state === 'gone') return null;
-  r.focus = u.id;
+  if (!u || !fighter(u)) return "They’re out of the fight.";
+  if (o.kind === "steal") {
+    const c = r.counter[o.slot];
+    if (!c || c.servings <= 0) return "Already swiped!";
+    if (u.kind === "pet" || u.kind === "summon")
+      return "Only zombies can carry food.";
+  }
+  if (o.kind === "target") {
+    const t = r.units.find((x) => x.id === o.id);
+    if (
+      !t ||
+      t.side === "z" ||
+      t.hp <= 0 ||
+      t.state === "gone" ||
+      t.state === "down"
+    )
+      return "Pick someone still standing.";
+  }
+  u.order = o;
+  if (u.state === "queued") {
+    u.state = "walk";
+    r.events.push({ t: "enter", unit: u.id });
+  }
+  u.path = [];
+  u.repathAt = 0;
   return null;
 }
 
-/** Tap the counter: the nearest free zombie runs over and swipes a dish. */
+/** Send the next zombie in line (or a given one) on a rampage. */
+export function sendOne(r: RaidState, unitId?: string): string | null {
+  const u = unitId
+    ? r.units.find((x) => x.id === unitId && x.state === "queued")
+    : r.units.find((x) => x.side === "z" && x.state === "queued");
+  if (!u) return "Everyone is already in!";
+  return order(r, u.id, { kind: "attack" });
+}
+
+/** ATTACK ALL: everyone still in line charges in. */
+export function sendAll(r: RaidState): string | null {
+  const q = r.units.filter((x) => x.side === "z" && x.state === "queued");
+  if (!q.length) return "Everyone is already in!";
+  for (const u of q) order(r, u.id, { kind: "attack" });
+  return null;
+}
+
+/** Point everyone who's in at one target. */
+export function focusTarget(r: RaidState, unitId: string): string | null {
+  const t = r.units.find((x) => x.id === unitId);
+  if (
+    !t ||
+    t.side === "z" ||
+    t.hp <= 0 ||
+    t.state === "gone" ||
+    t.state === "down"
+  )
+    return null;
+  r.focus = t.id;
+  for (const u of r.units)
+    if (fighter(u) && u.state !== "queued" && u.order?.kind !== "steal")
+      u.order = { kind: "target", id: t.id };
+  return null;
+}
+
+/** Tap the counter with nobody picked: the nearest zombie (in or in line) goes for the food. */
 export function stealDish(r: RaidState, slot: number): string | null {
   const c = r.counter[slot];
-  if (!c || c.servings <= 0) return 'Already swiped!';
-  if (!r.gateBroken) return 'Break through the gate first!';
-  const busy = new Set(r.units.filter((u) => u.stealSlot === slot).map((u) => u.id));
-  if (busy.size) return 'Someone’s already on it.';
+  if (!c || c.servings <= 0) return "Already swiped!";
+  if (
+    r.units.some(
+      (u) => u.order?.kind === "steal" && u.order.slot === slot && fighter(u),
+    )
+  )
+    return "Someone’s already on it.";
+  const spot = stealSpot(r);
   const z = r.units
-    .filter((u) => u.side === 'z' && (u.kind === 'zombie' || u.kind === 'you') && (u.state === 'walk' || u.state === 'idle') && u.hp > 0)
-    .sort((a, b) => dist(a, c) - dist(b, c))[0];
-  if (!z) return 'Send in a zombie first!';
-  z.stealSlot = slot;
-  z.state = 'walk';
-  z.path = [];
-  z.repathAt = 0;
-  return null;
+    .filter(
+      (u) =>
+        fighter(u) &&
+        (u.kind === "zombie" || u.kind === "you") &&
+        u.state !== "eat",
+    )
+    .sort((a, b) => dist(a, spot) - dist(b, spot))[0];
+  if (!z) return "Send in a zombie first!";
+  return order(r, z.id, { kind: "steal", slot });
 }
 
-export function useGreen(s: GameState, r: RaidState): string | null {
-  refreshDaily(s);
-  if (s.graves.green <= 0) return 'No green grave markers left today.';
-  s.graves.green--;
-  for (const u of r.units) if (u.side === 'z' && u.hp > 0) {
-    u.maxHp = Math.round(u.maxHp * 1.5);
-    u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.5);
-    r.events.push({ t: 'heal', unit: u.id });
+/** Tap a tombstone you own: every zombie glows with its blessing for 5 seconds. */
+export function useTombstone(
+  s: GameState,
+  r: RaidState,
+  furnitureId: string,
+): string | null {
+  const f = s.furniture.find((x) => x.id === furnitureId);
+  const def = f && ITEM_BY_ID[f.item];
+  if (!f || !def?.boost) return "That’s not a tombstone.";
+  if (r.buff && r.t < r.buff.until) return "One blessing at a time!";
+  if ((f.usesResetAt ?? 0) && s.now >= (f.usesResetAt ?? 0)) {
+    f.uses = TOMBSTONE_USES;
+    f.usesResetAt = undefined;
   }
-  return null;
-}
-
-export function useRed(s: GameState, r: RaidState): string | null {
-  refreshDaily(s);
-  if (s.graves.red <= 0) return 'No red grave markers left today.';
-  if (r.t < r.redUntil) return 'Already raging!';
-  s.graves.red--;
-  r.redUntil = r.t + 15;
-  r.events.push({ t: 'rage' });
-  return null;
-}
-
-export function useHeadstone(s: GameState, r: RaidState): string | null {
-  if (s.inventory.headstone <= 0) return 'No Healing Headstones. Buy them before the raid.';
-  s.inventory.headstone--;
-  for (const u of r.units) if (u.side === 'z' && u.state !== 'down' && u.state !== 'gone') {
-    u.hp = Math.min(u.maxHp, u.hp + 100);
-    r.events.push({ t: 'heal', unit: u.id });
-  }
+  if ((f.uses ?? 0) <= 0)
+    return `Recharging: back in ${Math.ceil(((f.usesResetAt ?? 0) - s.now) / 3600)} h.`;
+  f.uses = (f.uses ?? 0) - 1;
+  if (f.uses <= 0) f.usesResetAt = s.now + TOMBSTONE_RECHARGE;
+  r.buff = { kind: def.boost, until: r.t + BUFF_SEC };
+  r.events.push({ t: "buff", kind: def.boost });
   return null;
 }
 
 export function useSummon(s: GameState, r: RaidState): string | null {
-  if (s.inventory.summon <= 0) return 'No Summon Stones. Buy one before the raid.';
-  if (r.units.filter((u) => u.kind === 'summon' && u.hp > 0).length >= 3) return 'Three Big Foot-Longs is the legal limit.';
+  if (s.inventory.summon <= 0)
+    return "No Summon Stones. Buy one before the raid.";
+  if (r.units.filter((u) => u.kind === "summon" && u.hp > 0).length >= 3)
+    return "Three Big Foot-Longs is the legal limit.";
   s.inventory.summon--;
-  const u = unit(r, { side: 'z', kind: 'summon', art: 'bigfoot', name: 'Big Foot-Long', x: LINE_X - 0.5, y: GATE_Y, hp: 420, dmg: 22, speed: 1.2, cdMax: 1.3, range: 1.1, state: 'walk' });
-  r.events.push({ t: 'summon', unit: u.id });
+  const u = unit(r, {
+    side: "z",
+    kind: "summon",
+    art: "bigfoot",
+    name: "Big Foot-Long",
+    x: DOOR_X + 1,
+    y: -1,
+    hp: 420,
+    dmg: 22,
+    speed: 1.3,
+    cdMax: 1.3,
+    state: "walk",
+    order: { kind: "attack" },
+  });
+  r.events.push({ t: "summon", unit: u.id });
   return null;
 }
 
+export function buySummon(s: GameState): string | null {
+  if (s.level < 5) return "Summon Stones unlock at level 5.";
+  if (s.sauce < SUMMON_COST) return "Not enough Brain Sauce!";
+  s.sauce -= SUMMON_COST;
+  s.inventory.summon++;
+  return null;
+}
+
+/** Wave the white flag. */
 export function retreat(r: RaidState) {
-  if (r.phase !== 'fight') return;
-  r.phase = 'retreat';
-  r.events.push({ t: 'end', result: 'retreat' });
+  if (r.phase !== "fight") return;
+  r.phase = "retreat";
+  r.events.push({ t: "end", result: "retreat" });
 }
 
 // ---------- simulation ----------
 
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
-const alive = (u: RaidUnit) => u.hp > 0 && u.state !== 'down' && u.state !== 'gone' && u.state !== 'hidden';
-const inside = (p: Pt) => p.x > -0.5 && p.y > -0.5 && p.x < ARENA_N - 0.5 && p.y < ARENA_N - 0.5;
+const alive = (u: RaidUnit) =>
+  u.hp > 0 && u.state !== "down" && u.state !== "gone";
+const indoors = (r: RaidState, p: Pt) =>
+  isInside(Math.round(p.x), Math.round(p.y), r.room);
+/** Close enough to swing at (next tile over, diagonals included). */
+const REACH = 1.5;
 
-/** Walk toward a point; the fence only lets you through the gate once it's broken. */
-function stepToward(r: RaidState, u: RaidUnit, goal: Pt, dt: number) {
-  let target = goal;
-  const uIn = inside(u);
-  const gIn = inside(goal);
-  const outsideGate = { x: ARENA_N + 0.2, y: GATE_Y };
-  const insideGate = { x: ARENA_N - 1, y: GATE_Y };
-  // once lined up with the gateway, walk straight through (a wide corridor so jostling can't stall it)
-  const inCorridor = Math.abs(u.y - GATE_Y) < 0.7 && u.x > ARENA_N - 1.2 && u.x < ARENA_N + 0.9;
-  if (uIn !== gIn) {
-    if (uIn) target = inCorridor ? outsideGate : insideGate;
-    else target = inCorridor && r.gateBroken ? insideGate : outsideGate;
-  }
-  const d = dist(u, target);
-  if (d < 0.01) return;
-  const step = Math.min(d, u.speed * dt);
-  const dx = (target.x - u.x) / d;
-  const dy = (target.y - u.y) / d;
-  const px = u.x;
-  const py = u.y;
-  u.x += dx * step;
-  u.y += dy * step;
-  // the fence: nobody crosses it except through a broken gate
-  if (inside(u) !== uIn && !(r.gateBroken && Math.abs(u.y - GATE_Y) < 0.7)) {
-    u.x = px;
-    u.y = py;
-  }
+/** Global combat pace: every blow does this share of its listed damage, so brawls last ~40–90 s. */
+export const COMBAT_PACE = 0.3;
+
+function face(u: RaidUnit, dx: number, dy: number) {
   const sdx = dx - dy;
-  if (Math.abs(sdx) > 0.05) u.facing = sdx > 0 ? 1 : -1;
-  u.back = dx + dy < -0.05;
+  if (Math.abs(sdx) > 0.02) u.facing = sdx > 0 ? 1 : -1;
+  u.back = dx + dy < -0.02;
 }
 
-function nearest(u: RaidUnit, list: RaidUnit[]) {
-  let best: RaidUnit | undefined;
+/** Walk the current path. Returns true when there's nowhere left to go. */
+function walk(u: RaidUnit, dt: number): boolean {
+  let left = u.speed * dt;
+  while (left > 0 && u.path.length) {
+    const n = u.path[0];
+    const dx = n.x - u.x;
+    const dy = n.y - u.y;
+    const d = Math.hypot(dx, dy);
+    face(u, dx, dy);
+    if (d <= left) {
+      u.x = n.x;
+      u.y = n.y;
+      u.path.shift();
+      left -= d;
+    } else {
+      u.x += (dx / d) * left;
+      u.y += (dy / d) * left;
+      left = 0;
+    }
+  }
+  return u.path.length === 0;
+}
+
+/** Plot a path to a goal tile (allowed to end on furniture, e.g. a chair). */
+function goTo(r: RaidState, u: RaidUnit, goal: Pt): boolean {
+  const p = findPath(
+    { x: Math.round(u.x), y: Math.round(u.y) },
+    goal,
+    blockedTiles(r),
+    r.room,
+  );
+  if (!p) return false;
+  // already on the goal tile: still step onto its centre
+  u.path = p.length ? p : [{ x: goal.x, y: goal.y }];
+  return true;
+}
+
+/** A free floor tile next to the target, spreading attackers around it instead of stacking them. */
+function besideTile(r: RaidState, u: RaidUnit, t: RaidUnit): Pt | null {
+  const blocked = blockedTiles(r);
+  const tx = Math.round(t.x);
+  const ty = Math.round(t.y);
+  const taken = new Map<string, number>();
+  for (const o of r.units) {
+    if (o === u || !alive(o)) continue;
+    const g = o.path.at(-1) ?? { x: Math.round(o.x), y: Math.round(o.y) };
+    const k = key(g.x, g.y);
+    taken.set(k, (taken.get(k) ?? 0) + 1);
+  }
+  let best: Pt | null = null;
+  let bestScore = Infinity;
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
+  ]) {
+    const x = tx + dx;
+    const y = ty + dy;
+    if (blocked.has(key(x, y))) continue;
+    if (!isInside(x, y, r.room) && !(y === -1 && x >= -1)) continue;
+    const score =
+      Math.abs(x - u.x) +
+      Math.abs(y - u.y) +
+      (taken.get(key(x, y)) ?? 0) * 2.5 +
+      (dx && dy ? 0.4 : 0);
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x, y };
+    }
+  }
+  return best;
+}
+
+function damage(r: RaidState, from: RaidUnit, to: RaidUnit) {
+  const str =
+    from.side === "z" && r.buff?.kind === "str" && r.t < r.buff.until ? 1.6 : 1;
+  from.attackAt = r.t;
+  to.hitAt = r.t;
+  if (to.kind === "customer") {
+    // scratch, then eat: the first swipe grabs them, the second is lunch
+    to.hp -= 1;
+    r.events.push({
+      t: "hit",
+      unit: to.id,
+      by: from.id,
+      dmg: 1,
+      x: to.x,
+      y: to.y,
+    });
+    if (to.hp > 0) {
+      to.state = "grabbed";
+      to.busyUntil = r.t + 0.9;
+      to.path = [];
+      return;
+    }
+    const def = RIVAL_BY_ID[r.rival];
+    const cash = Math.round(def.cashPerCustomer * (1 + r.gen * GEN_STEP));
+    to.state = "gone";
+    from.state = "eat";
+    from.busyUntil = r.t + 1.4;
+    from.hp = Math.min(from.maxHp, from.hp + 10);
+    from.eats++;
+    r.cashEaten += cash;
+    r.events.push({
+      t: "eat",
+      unit: from.id,
+      customer: to.id,
+      cash,
+      x: to.x,
+      y: to.y,
+    });
+    return;
+  }
+  const dmg =
+    Math.round(from.dmg * str * COMBAT_PACE * (0.85 + rnd(r) * 0.3) * 10) / 10;
+  to.hp -= dmg;
+  r.events.push({ t: "hit", unit: to.id, by: from.id, dmg, x: to.x, y: to.y });
+  aggro(r);
+  if (to.hp <= 0) {
+    to.hp = 0;
+    to.state = "down";
+    to.path = [];
+    to.busyUntil = r.t + 1.2;
+    r.events.push({ t: "ko", unit: to.id, x: to.x, y: to.y });
+    if (r.focus === to.id) r.focus = undefined;
+  }
+}
+
+/** Close in on a target and swing when in reach. */
+function fight(r: RaidState, u: RaidUnit, t: RaidUnit, dt: number) {
+  u.target = t.id;
+  if (dist(u, t) <= REACH) {
+    u.path = [];
+    face(u, t.x - u.x, t.y - u.y);
+    u.state = "attack";
+    u.cd -= dt;
+    if (u.cd <= 0) {
+      u.cd = u.cdMax;
+      damage(r, u, t);
+    }
+    return;
+  }
+  u.state = "walk";
+  if (r.t >= u.repathAt || !u.path.length) {
+    u.repathAt = r.t + 0.45;
+    const spot = besideTile(r, u, t);
+    if (spot) goTo(r, u, spot);
+  }
+  walk(u, dt);
+}
+
+/** The fight starts: diners panic, staff come at you. */
+function aggro(r: RaidState) {
+  if (r.aggro) return;
+  r.aggro = true;
+  for (const c of r.units)
+    if (c.kind === "customer" && alive(c)) {
+      c.state = "scream";
+      c.busyUntil = r.t + 0.6 + rnd(r) * 0.8;
+      r.events.push({ t: "scream", unit: c.id, x: c.x, y: c.y });
+    }
+}
+
+function nearest<T extends Pt>(p: Pt, list: T[]): T | undefined {
+  let best: T | undefined;
   let bd = Infinity;
   for (const o of list) {
-    const d = dist(u, o);
+    const d = dist(p, o);
     if (d < bd) {
       bd = d;
       best = o;
@@ -401,200 +826,153 @@ function nearest(u: RaidUnit, list: RaidUnit[]) {
   return best;
 }
 
-/** Global combat pace: every blow does this share of its listed damage, so brawls last ~30–70 s of the 2-minute clock. */
-export const COMBAT_PACE = 0.4;
-
-function damage(r: RaidState, from: RaidUnit, to: RaidUnit) {
-  const rage = from.side === 'z' && r.t < r.redUntil ? 1.6 : 1;
-  const dmg = Math.round(from.dmg * rage * COMBAT_PACE * (0.85 + rnd(r) * 0.3) * 10) / 10;
-  to.hp -= dmg;
-  to.hitAt = r.t;
-  from.attackAt = r.t;
-  r.events.push({ t: 'hit', unit: to.id, by: from.id, dmg, x: to.x, y: to.y });
-  if (to.side === 'r' && to.kind !== 'gate') r.aggro = true;
-  if (to.hp <= 0) {
-    to.hp = 0;
-    to.state = 'down';
-    to.busyUntil = r.t + 1.2;
-    r.events.push({ t: 'ko', unit: to.id, x: to.x, y: to.y });
-    if (to.kind === 'gate') {
-      r.gateBroken = true;
-      r.aggro = true;
-      r.events.push({ t: 'gate', x: to.x, y: to.y });
-    }
-    if (r.focus === to.id) r.focus = undefined;
-  }
-}
-
-function fight(r: RaidState, u: RaidUnit, target: RaidUnit, dt: number) {
-  u.target = target.id;
-  const range = u.range + (target.kind === 'gate' ? 0.4 : 0) + (target.kind === 'boss' || u.kind === 'boss' ? 0.2 : 0);
-  if (dist(u, target) > range) {
-    stepToward(r, u, target, dt);
-    return;
-  }
-  const sdx = target.x - u.x - (target.y - u.y);
-  if (Math.abs(sdx) > 0.05) u.facing = sdx > 0 ? 1 : -1;
-  u.cd -= dt;
-  if (u.cd <= 0) {
-    u.cd = u.cdMax;
-    damage(r, u, target);
-  }
-}
-
 function updateHorde(r: RaidState, u: RaidUnit, dt: number) {
-  if (u.state === 'queued' || !alive(u)) return;
-  if (r.t < u.busyUntil) return;
-  if (u.state === 'eat' || u.state === 'steal') u.state = 'walk';
-  const enemies = r.units.filter((o) => o.side === 'r' && alive(o) && o.kind !== 'gate');
-  const gate = r.units.find((o) => o.kind === 'gate' && alive(o));
-  // 1) steal task
-  if (u.stealSlot !== undefined) {
-    const c = r.counter[u.stealSlot];
-    if (!c || c.servings <= 0) u.stealSlot = undefined;
+  if (u.state === "queued" || !alive(u) || r.t < u.busyUntil) return;
+  if (u.state === "eat" || u.state === "steal") u.state = "walk";
+  // walking in through the door sets things off
+  if (!r.aggro && indoors(r, u)) aggro(r);
+  const o = u.order ?? { kind: "attack" };
+  // 1) grab food off the counter
+  if (o.kind === "steal") {
+    const c = r.counter[o.slot];
+    if (!c || c.servings <= 0) u.order = { kind: "attack" };
     else {
-      const spot = { x: c.x + 0.9, y: c.y };
-      if (dist(u, spot) > 0.3) return stepToward(r, u, spot, dt);
+      const spot = stealSpot(r);
+      if (dist(u, spot) > 0.15) {
+        if (r.t >= u.repathAt || !u.path.length) {
+          u.repathAt = r.t + 1;
+          goTo(r, u, spot);
+        }
+        u.state = "walk";
+        walk(u, dt);
+        return;
+      }
+      face(u, c.x - u.x, c.y - u.y);
       c.servings = 0;
       r.stolen.push(c.dish);
       u.busyUntil = r.t + 1.5;
-      u.state = 'steal';
-      r.events.push({ t: 'steal', unit: u.id, dish: c.dish, x: u.x, y: u.y });
-      u.stealSlot = undefined;
+      u.state = "steal";
+      u.order = { kind: "attack" };
+      r.events.push({ t: "steal", unit: u.id, dish: c.dish, x: u.x, y: u.y });
       return;
     }
   }
-  // 2) the player's focus target
-  const focus = r.focus ? r.units.find((o) => o.id === r.focus && alive(o)) : undefined;
-  if (focus && (focus.side === 'r' || focus.side === 'c')) {
-    if (focus.side === 'c') return eat(r, u, focus, dt);
-    if (inside(focus) && !r.gateBroken && gate) return fight(r, u, gate, dt);
-    return fight(r, u, focus, dt);
+  // 2) a specific target
+  if (o.kind === "target") {
+    const t = r.units.find((x) => x.id === o.id && alive(x));
+    if (t) return fight(r, u, t, dt);
+    u.order = { kind: "attack" };
   }
-  // 3) outside the fence: anything in the yard that's on us, else the gate
-  if (!inside(u) && gate) {
-    const close = enemies.filter((e) => !inside(e) || dist(u, e) < 1.2);
-    const t = nearest(u, close);
-    if (t && dist(u, t) < 2) return fight(r, u, t, dt);
-    return fight(r, u, gate, dt);
-  }
-  // 4) inside: nearest enemy, but zombies can't resist a nearby customer
-  const prey = r.units.filter((o) => o.side === 'c' && alive(o));
-  const e = nearest(u, enemies);
-  const p = u.kind === 'zombie' || u.kind === 'pet' ? nearest(u, prey) : undefined;
-  if (p && (!e || dist(u, p) + 0.8 < dist(u, e))) return eat(r, u, p, dt);
+  // 3) rampage: diners first (zombies can't resist), else the nearest waiter, else the chef
+  const chef = r.units.find((x) => x.kind === "boss")!;
+  const diners = r.units.filter(
+    (x) =>
+      x.kind === "customer" && alive(x) && (indoors(r, x) || dist(u, x) < 4),
+  );
+  const staff = r.units.filter((x) => x.kind === "staff" && alive(x));
+  const pet = u.kind === "pet" || u.kind === "summon";
+  const d = pet ? undefined : nearest(u, diners);
+  const e = nearest(u, staff);
+  if (d && (!e || dist(u, d) < dist(u, e) + 1.5)) return fight(r, u, d, dt);
   if (e) return fight(r, u, e, dt);
-  if (p) return eat(r, u, p, dt);
+  if (alive(chef)) return fight(r, u, chef, dt);
+  if (d) return fight(r, u, d, dt);
 }
 
-function eat(r: RaidState, u: RaidUnit, c: RaidUnit, dt: number) {
-  if (dist(u, c) > 0.8) return stepToward(r, u, c, dt);
-  const def = RIVAL_BY_ID[r.rival];
-  c.hp = 0;
-  c.state = 'gone';
-  u.state = 'eat';
-  u.busyUntil = r.t + 1.4;
-  u.hp = Math.min(u.maxHp, u.hp + 10);
-  r.cashEaten += def.cashPerCustomer;
-  r.aggro = true;
-  r.events.push({ t: 'eat', unit: u.id, customer: c.id, cash: def.cashPerCustomer, x: c.x, y: c.y });
-}
-
-function updateRival(r: RaidState, u: RaidUnit, dt: number) {
+function updateStaff(r: RaidState, u: RaidUnit, dt: number) {
   if (!alive(u) || r.t < u.busyUntil) return;
-  const horde = r.units.filter((o) => o.side === 'z' && alive(o) && o.state !== 'queued');
-  if (u.kind === 'gate') return;
-  if (u.kind === 'zapper') {
-    u.cd -= dt;
-    const t = nearest(u, horde.filter((h) => dist(u, h) <= u.range));
-    if (t && u.cd <= 0) {
-      u.cd = u.cdMax;
-      r.events.push({ t: 'zap', from: u.id, to: t.id });
-      damage(r, u, t);
-    }
+  const horde = r.units.filter(
+    (o) => fighter(o) && o.state !== "queued" && o.y > -0.6,
+  );
+  if (!r.aggro) return;
+  // waiters stay in their own café; anyone who comes in gets swarmed
+  const t = nearest(
+    u,
+    horde.filter((h) => indoors(r, h)),
+  );
+  if (t) return fight(r, u, t, dt);
+  u.state = "idle";
+  if (u.home && dist(u, u.home) > 0.2) {
+    if (!u.path.length) goTo(r, u, u.home);
+    walk(u, dt);
+  }
+}
+
+function updateChef(r: RaidState, u: RaidUnit, dt: number) {
+  if (!alive(u) || r.t < u.busyUntil) return;
+  const horde = r.units.filter(
+    (o) => fighter(o) && o.state !== "queued" && indoors(r, o),
+  );
+  if (!r.bossOut) {
+    // the chef guards the kitchen: anyone who wanders back here gets the cleaver
+    const t = nearest(
+      u,
+      horde.filter((h) => inKitchen(r, h)),
+    );
+    if (t) return fight(r, u, t, dt);
+    u.state = "idle";
+    if (u.home && dist(u, u.home) > 0.2) {
+      if (!u.path.length) goTo(r, u, u.home);
+      walk(u, dt);
+    } else face(u, 1, 0);
     return;
   }
-  if (u.kind === 'dog') {
-    // guard dogs patrol the yard and charge anything near the fence
-    const t = nearest(u, horde.filter((h) => dist(u, h) < 3.5 && (r.gateBroken || inside(h))));
-    if (t && (inside(t) || r.gateBroken)) return fight(r, u, t, dt);
-    return;
-  }
-  if (!r.aggro) return; // staff and boss mind their business until the fight starts
-  const t = nearest(u, horde.filter((h) => inside(h) || r.gateBroken));
+  const t = nearest(u, horde);
   if (t) fight(r, u, t, dt);
 }
 
-function updateCustomer(r: RaidState, c: RaidUnit, dt: number) {
-  if (!alive(c) || !r.aggro) return;
-  // panic! run for the back corner and escape
-  c.state = 'flee';
-  const exit = { x: -0.4, y: -0.4 };
-  stepToward(r, c, exit, dt);
-  if (dist(c, exit) < 0.3) c.state = 'gone';
-}
-
-function nudge(r: RaidState, u: RaidUnit, dx: number, dy: number) {
-  const was = inside(u);
-  u.x += dx;
-  u.y += dy;
-  if (inside(u) !== was && !(r.gateBroken && Math.abs(u.y - GATE_Y) < 0.7)) {
-    u.x -= dx;
-    u.y -= dy;
+function updateDiner(r: RaidState, c: RaidUnit, dt: number) {
+  if (!alive(c) || !r.aggro || r.t < c.busyUntil) return;
+  // screaming and running for the door, then off down the street
+  const exit = { x: -1, y: r.room.h + STREET_RUN };
+  if (c.state !== "flee") {
+    c.state = "flee";
+    c.path = [];
   }
-}
-
-/** Personal space (tiles): wide enough that brawlers fan out around a target instead of stacking. */
-const SEP = 0.62;
-
-/** Units gently push apart so the horde doesn't stack on one tile. */
-function separate(r: RaidState) {
-  const list = r.units.filter((u) => alive(u) && u.speed > 0 && u.state !== 'queued');
-  for (let i = 0; i < list.length; i++)
-    for (let j = i + 1; j < list.length; j++) {
-      const a = list[i];
-      const b = list[j];
-      const d = dist(a, b);
-      if (d > 0.001 && d < SEP) {
-        const push = (SEP - d) * 0.5;
-        const dx = ((a.x - b.x) / d) * push;
-        const dy = ((a.y - b.y) / d) * push;
-        nudge(r, a, dx, dy);
-        nudge(r, b, -dx, -dy);
-      }
+  if (!c.path.length) {
+    if (dist(c, exit) < 0.3) {
+      c.state = "gone";
+      r.events.push({ t: "escape", unit: c.id });
+      return;
     }
+    goTo(r, c, exit);
+  }
+  walk(c, dt);
 }
 
 export function stepRaid(r: RaidState, dt: number) {
-  if (r.phase !== 'fight') return;
+  if (r.phase !== "fight") return;
   r.t += dt;
-  for (const u of r.units) if (u.state === 'down' && u.side !== 'z' && r.t > u.busyUntil) u.state = 'gone';
-  // the Head Chef storms out once most of the staff are down (or the fight drags on)
-  const boss = r.units.find((u) => u.kind === 'boss')!;
+  // the Head Chef storms out once most of the waiters are down (or the brawl drags on)
+  const chef = r.units.find((u) => u.kind === "boss")!;
   if (!r.bossOut && r.aggro) {
-    const staff = r.units.filter((u) => u.kind === 'staff');
+    const staff = r.units.filter((u) => u.kind === "staff");
     const down = staff.filter((u) => u.hp <= 0).length;
-    if (down >= Math.ceil(staff.length * 0.6) || r.t > 60) {
+    if (down >= Math.ceil(staff.length * 0.6) || r.t > 100) {
       r.bossOut = true;
-      boss.state = 'idle';
-      r.events.push({ t: 'boss', x: boss.x, y: boss.y });
+      r.events.push({ t: "boss", x: chef.x, y: chef.y });
     }
   }
+  // the health tombstone mends everyone while it glows
+  if (r.buff?.kind === "hp" && r.t < r.buff.until)
+    for (const u of r.units)
+      if (fighter(u) && u.state !== "queued")
+        u.hp = Math.min(u.maxHp, u.hp + 6 * dt);
   for (const u of r.units) {
-    if (u.side === 'z') updateHorde(r, u, dt);
-    else if (u.side === 'r') updateRival(r, u, dt);
-    else updateCustomer(r, u, dt);
+    if (u.side === "z") updateHorde(r, u, dt);
+    else if (u.kind === "staff") updateStaff(r, u, dt);
+    else if (u.kind === "boss") updateChef(r, u, dt);
+    else updateDiner(r, u, dt);
   }
-  separate(r);
-  if (boss.hp <= 0) {
-    r.phase = 'won';
-    r.events.push({ t: 'end', result: 'won' });
-  } else if (r.units.filter((u) => u.side === 'z').every((u) => u.hp <= 0)) {
-    r.phase = 'lost';
-    r.events.push({ t: 'end', result: 'lost' });
+  if (chef.hp <= 0) {
+    r.phase = "won";
+    r.events.push({ t: "end", result: "won" });
+  } else if (r.units.filter((u) => u.side === "z").every((u) => u.hp <= 0)) {
+    r.phase = "lost";
+    r.events.push({ t: "end", result: "lost" });
   } else if (r.t >= RAID_TIME) {
-    r.phase = 'lost';
-    r.events.push({ t: 'end', result: 'lost' });
+    r.phase = "lost";
+    r.events.push({ t: "end", result: "lost" });
   }
   if (r.events.length > 300) r.events.splice(0, r.events.length - 300);
 }
@@ -603,33 +981,41 @@ export function stepRaid(r: RaidState, dt: number) {
 
 /** Apply the raid's outcome to the joint: cash, loot to the Fridge, KOs, XP, rival progress. */
 export function finishRaid(s: GameState, r: RaidState): RaidResult {
-  if (r.phase === 'fight') retreat(r);
+  if (r.phase === "fight") retreat(r);
   const def = RIVAL_BY_ID[r.rival];
-  const won = r.phase === 'won';
-  const out: RaidResult = { result: r.phase as RaidResult['result'], cash: r.cashEaten, xp: 0, sauce: 0, dishes: [...r.stolen], stars: 0, kos: [] };
-  // your horde comes home
+  const won = r.phase === "won";
+  const out: RaidResult = {
+    result: r.phase as RaidResult["result"],
+    cash: r.cashEaten,
+    xp: 0,
+    sauce: 0,
+    dishes: [...r.stolen],
+    stars: 0,
+    kos: [],
+  };
+  // your squad comes home (or gets dumped on the sidewalk, out cold)
   for (const u of r.units) {
-    if (u.side !== 'z') continue;
-    if (u.kind === 'pet') {
+    if (u.side !== "z") continue;
+    if (u.kind === "pet") {
       const p = s.pets.find((x) => x.id === u.ref);
-      if (p) p.state = 'roam';
+      if (p) p.state = "roam";
       continue;
     }
-    if (u.kind === 'summon') continue;
+    if (u.kind === "summon") continue;
     const w = s.workers.find((x) => x.id === u.ref);
     if (!w) continue;
-    w.x = 5;
-    w.y = 1;
+    w.x = DOOR_X;
+    w.y = -1;
     w.path = [];
-    if (u.state === 'queued') {
-      w.state = 'idle';
+    if (u.state === "queued") {
+      w.state = "idle";
       continue;
     }
+    if (w.kind === "zombie") addZombieXp(s, w, 2 * u.eats + (u.hp > 0 ? 3 : 1));
     if (u.hp <= 0) {
       w.energy = 0;
-      w.state = 'down';
+      w.state = "down";
       w.downUntil = s.now + TUNING.reanimateSec;
-      // KO'd zombies are dumped on the sidewalk out front to reanimate
       const spot = outsideSpot(s, w);
       w.x = spot.x;
       w.y = spot.y;
@@ -637,55 +1023,66 @@ export function finishRaid(s: GameState, r: RaidState): RaidResult {
       out.kos.push(w.name);
     } else {
       w.energy = Math.min(maxEnergy(w), Math.round(u.hp));
-      w.state = 'idle';
+      w.state = "idle";
     }
   }
+  const prog = s.rivals[r.rival] ?? { stars: 0, wins: 0, nextAt: 0 };
+  prog.lastRaid = s.now;
+  const mult = 1 + r.gen * GEN_STEP;
   if (won) {
-    const prog = s.rivals[r.rival] ?? { stars: 0, wins: 0, nextAt: 0 };
-    const horde = r.units.filter((u) => u.side === 'z' && u.state !== 'queued' && (u.kind === 'zombie' || u.kind === 'you'));
+    const horde = r.units.filter(
+      (u) =>
+        u.side === "z" &&
+        u.state !== "queued" &&
+        (u.kind === "zombie" || u.kind === "you"),
+    );
     const standing = horde.filter((u) => u.hp > 0).length;
-    out.stars = 1 + (standing >= Math.ceil(horde.length / 2) ? 1 : 0) + (r.t <= 60 ? 1 : 0);
-    out.cash += def.reward.cash;
-    out.xp = def.reward.xp;
-    // the Head Chef sometimes drops Brain Sauce: better odds for a quick, crowded takedown
-    const boss = r.units.find((u) => u.kind === 'boss')!;
-    const ganged = r.units.filter((u) => u.side === 'z' && u.target === boss.id && u.hp > 0).length;
-    const chance = def.reward.sauceChance * (r.t < 60 ? 1.3 : 1) * (1 + Math.min(1, ganged / 3) * 0.5);
-    if (rnd(r) < Math.min(0.95, chance)) out.sauce = 1 + (rnd(r) < 0.3 ? 1 : 0);
-    // the signature recipe: guaranteed the first time, then a 35% chance
-    if (!s.recipes.includes(def.signature) && (prog.wins === 0 || rnd(r) < 0.35)) out.recipeDrop = def.signature;
-    if (out.recipeDrop && !out.dishes.includes(out.recipeDrop)) out.dishes.push(out.recipeDrop);
+    out.stars =
+      1 +
+      (standing >= Math.ceil(horde.length / 2) ? 1 : 0) +
+      (r.t <= 75 ? 1 : 0);
+    out.cash += Math.round(def.reward.cash * mult);
+    out.xp = Math.round(def.reward.xp * mult);
+    // the chef sometimes drops Brain Sauce (the boss café always does)
+    if (r.rival === "boss") out.sauce = 3 + (rnd(r) < 0.5 ? 2 : 0);
+    else if (
+      rnd(r) < Math.min(0.95, def.reward.sauceChance * (r.t < 75 ? 1.3 : 1))
+    )
+      out.sauce = 1 + (rnd(r) < 0.3 ? 1 : 0);
+    // a recipe: the signature the first time (then 35%); the boss café hands over a secret you don't know
+    if (r.rival === "boss") {
+      const secret = DISHES.filter(
+        (d) => d.source === "raid" && !s.recipes.includes(d.id),
+      );
+      if (secret.length)
+        out.recipeDrop = secret[Math.floor(rnd(r) * secret.length)].id;
+    } else if (
+      !s.recipes.includes(def.signature) &&
+      (prog.wins === 0 || rnd(r) < 0.35)
+    )
+      out.recipeDrop = def.signature;
+    if (out.recipeDrop && !out.dishes.includes(out.recipeDrop))
+      out.dishes.push(out.recipeDrop);
     prog.wins++;
     prog.stars = Math.max(prog.stars, out.stars);
-    prog.nextAt = s.now + RIVAL_COOLDOWN;
-    s.rivals[r.rival] = prog;
+    // wrecked: boarded up, then new management (a bit tougher, a bit richer)
+    prog.nextAt = s.now + RIVAL_CLOSED_SEC;
+    prog.gen = (prog.gen ?? 0) + (r.rival === "boss" ? 0 : 1);
     s.stats.raidsWon++;
   } else {
-    const prog = s.rivals[r.rival] ?? { stars: 0, wins: 0, nextAt: 0 };
     prog.nextAt = s.now + 60;
-    s.rivals[r.rival] = prog;
     out.xp = Math.round(def.reward.xp * 0.15);
   }
+  s.rivals[r.rival] = prog;
   s.cash += out.cash;
   s.stats.earned += out.cash;
   s.sauce += out.sauce;
   if (out.xp) addXp(s, out.xp);
-  for (const d of out.dishes) s.fridge.push({ dish: d, servings: Math.max(6, Math.round(DISH_BY_ID[d].servings / 2)) });
+  for (const d of out.dishes)
+    s.fridge.push({
+      dish: d,
+      servings: Math.max(6, Math.round(DISH_BY_ID[d].servings / 2)),
+    });
   if (s.fridge.length > 12) s.fridge.splice(0, s.fridge.length - 12);
   return out;
-}
-
-export function buyHeadstone(s: GameState): string | null {
-  if (s.cash < HEADSTONE_COST) return 'Not enough cash!';
-  s.cash -= HEADSTONE_COST;
-  s.inventory.headstone++;
-  return null;
-}
-
-export function buySummon(s: GameState): string | null {
-  if (s.level < 5) return 'Summon Stones unlock at level 5.';
-  if (s.sauce < SUMMON_COST) return 'Not enough Brain Sauce!';
-  s.sauce -= SUMMON_COST;
-  s.inventory.summon++;
-  return null;
 }

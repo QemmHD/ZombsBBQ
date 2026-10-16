@@ -93,6 +93,8 @@ export class Controller {
   painting: Painting | null = null;
   raid: RaidState | null = null;
   raidResult: RaidResult | null = null;
+  /** the zombie picked in a raid (tap a zombie, then a target or ATTACK) */
+  raidSel: string | null = null;
   offlineReport: { sec: number; cash: number } | null = null;
   private listeners: Listener[] = [];
   private selListeners: (() => void)[] = [];
@@ -464,9 +466,15 @@ export class Controller {
     this.save();
     this.raid = r;
     this.raidResult = null;
+    this.raidSel = null;
     this.raidAcc = 0;
     this.setMode('raid');
     return null;
+  }
+
+  selectRaider(id: string | null) {
+    this.raidSel = id;
+    this.emitSel();
   }
 
   endRaid(): RaidResult | null {
@@ -478,6 +486,7 @@ export class Controller {
 
   leaveRaid() {
     this.raid = null;
+    this.raidSel = null;
     this.raidResult = null;
     this.setMode('play');
     this.save();

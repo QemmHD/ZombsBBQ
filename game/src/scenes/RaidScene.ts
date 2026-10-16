@@ -1,47 +1,92 @@
 /**
- * Renders a raid (src/sim/raid.ts) on top of the joint. The joint scene keeps ticking the sim
- * underneath (your other zombies keep working); this scene only draws and takes taps.
+ * Renders a raid (src/sim/raid.ts): the rival joint is drawn exactly like a player café, on its own
+ * street corner, with your squad lined up on the sidewalk outside. The joint scene keeps ticking the
+ * sim underneath (your other zombies keep working); this scene only draws and takes taps.
+ *
+ * Controls, like the original: tap one of your zombies to pick it, then tap a target (a person, or the
+ * counter to swipe food), or press ATTACK. Tap a target with nobody picked and everyone who's in
+ * piles on it.
  */
-import Phaser from 'phaser';
-import { RAID_META, TILE_H, TILE_W, WALL_H } from '../art';
-import { ARENA_N, DISH_BY_ID, GATE_Y, LINE_X, RIVAL_BY_ID, focusTarget, isoToWorld, sendOne, stealDish, worldToIso, type RaidEvent, type RaidUnit } from '../sim';
-import type { Controller } from '../game/controller';
-import { sfx } from '../game/sfx';
-import { TEX_S, charArt, charLoaded, hasProp, loadChar, loadRaidProps, propMeta } from './assets';
-import { Puppet } from './puppet';
-
-const iso = (x: number, y: number) => isoToWorld(x, y, TILE_W, TILE_H);
-const depthOf = (x: number, y: number) => (x + y) * 10;
-const LOT_LO = -3;
-const LOT_HI = ARENA_N + 4;
+import Phaser from "phaser";
+import { HW, TILE_H, TILE_W, WALL_H } from "../art3/kit";
+import { FURN_META, chairFamilyOf } from "../art3/furniture";
+import { KITCHEN_META } from "../art3/kitchen";
+import {
+  DISH_BY_ID,
+  DOOR_X,
+  ITEM_BY_ID,
+  RIVAL_BY_ID,
+  focusTarget,
+  order,
+  stealDish,
+  worldToIso,
+  type RaidEvent,
+  type RaidState,
+  type RaidUnit,
+} from "../sim";
+import type { Controller } from "../game/controller";
+import { sfx } from "../game/sfx";
+import {
+  TEX_S,
+  charArt,
+  charLoaded,
+  ensureProps,
+  hasProp,
+  loadChar,
+  loadProps,
+} from "./assets";
+import {
+  WALLS,
+  depthOf,
+  drawLot,
+  furnArt,
+  iso,
+  moverDepth,
+  propImage,
+  scenery,
+  wallAnchor,
+} from "./lot";
+import { Puppet } from "./puppet";
 
 interface UnitView {
   holder: Phaser.GameObjects.Container;
   puppet: Puppet | null;
-  img?: Phaser.GameObjects.Image;
+  charId: string;
   bar: Phaser.GameObjects.Graphics;
   barQ: number;
-  alert?: Phaser.GameObjects.Image;
-  koT: number;
+  shadow: Phaser.GameObjects.Ellipse;
+  ring: Phaser.GameObjects.Ellipse;
+  bubble?: Phaser.GameObjects.Image;
+}
+
+/** Waitresses (`staff_x_b`) fall back to their waiter's art if they haven't been drawn. */
+function artFor(id: string): string {
+  if (charArt(id)) return id;
+  const base = id.replace(/_b$/, "");
+  return charArt(base) ? base : id;
 }
 
 export class RaidScene extends Phaser.Scene {
   private ctl!: Controller;
   private views = new Map<string, UnitView>();
   private counterDishes: Phaser.GameObjects.Image[] = [];
-  private gateImg?: Phaser.GameObjects.Image;
   private ready = false;
   private t = 0;
   private seenEvents = 0;
-  private drag: { x: number; y: number; sx: number; sy: number; moved: boolean } | null = null;
-  /** the whole-lot framing; the action cam zooms in from here once the brawl starts */
+  private drag: {
+    x: number;
+    y: number;
+    sx: number;
+    sy: number;
+    moved: boolean;
+  } | null = null;
   private baseZoom = 1;
   private lastUserPan = -99;
   private lastHitText = new Map<string, number>();
   private lastPow = -9;
 
   constructor() {
-    super('raid');
+    super("raid");
   }
 
   init(data: { ctl: Controller }) {
@@ -54,134 +99,175 @@ export class RaidScene extends Phaser.Scene {
 
   create() {
     const r = this.ctl.raid!;
-    this.cameras.main.setBackgroundColor('#7cb342');
-    const ids = new Set(r.units.filter((u) => u.kind !== 'gate' && u.kind !== 'zapper').map((u) => u.art));
-    void Promise.all([loadRaidProps(this), ...[...ids].map((id) => loadChar(this, id))]).then(() => {
-      this.buildArena();
+    this.cameras.main.setBackgroundColor("#4f5a2c");
+    const keys = new Set<string>([`rsign_${r.rival}`]);
+    for (const f of r.furniture) {
+      const a = furnArt(f.item, f.dir);
+      keys.add(a.key);
+      if (a.back) keys.add(a.back);
+    }
+    for (const w of r.wallItems)
+      keys.add(`${ITEM_BY_ID[w.item].art}_${w.wall}`);
+    for (const c of r.counter) keys.add(DISH_BY_ID[c.dish].icon);
+    for (const [k, , , flip] of scenery(r.room.w, r.room.h, true))
+      keys.add(flip && hasProp(`${k}_se`) ? `${k}_se` : k);
+    const chars = new Set(r.units.map((u) => artFor(u.art)));
+    void Promise.all([
+      loadProps(this).then(() => ensureProps(this, keys)),
+      ...[...chars].map((id) => loadChar(this, id)),
+    ]).then(() => {
+      this.buildCafe();
       this.fitCamera();
       this.setupInput();
       this.ready = true;
-      this.game.events.emit('raid-ready');
+      this.game.events.emit("raid-ready");
     });
-    this.scale.on('resize', this.fitCamera, this);
-    this.events.once('shutdown', () => this.scale.off('resize', this.fitCamera, this));
+    this.scale.on("resize", this.fitCamera, this);
+    this.events.once("shutdown", () =>
+      this.scale.off("resize", this.fitCamera, this),
+    );
   }
 
-  private img(key: string, x: number, y: number) {
-    const m = propMeta(key);
-    const i = this.add.image(x, y, hasProp(key) ? key : '__MISSING').setScale(1 / TEX_S);
-    if (m) i.setOrigin(m.ox, m.oy);
-    return i;
-  }
+  // ---------- the rival café ----------
 
-  private buildArena() {
+  private buildCafe() {
     const r = this.ctl.raid!;
-    const rid = r.rival;
-    const N = ARENA_N;
-    for (let y = LOT_LO; y <= LOT_HI; y++)
-      for (let x = LOT_LO; x <= LOT_HI; x++) {
-        const inside = x >= 0 && y >= 0 && x < N && y < N;
-        let key = 'grass';
-        if (inside) key = `raid_floor_${rid}_${(x + y) % 2 === 0 ? 'a' : 'b'}`;
-        else if (x === LINE_X) key = 'sidewalk';
-        else if (x === LINE_X + 1) key = 'road_line';
-        else if (x > LINE_X + 1) key = 'road';
-        const p = iso(x, y);
-        this.img(key, p.x, p.y).setDepth(-100000 + depthOf(x, y));
-      }
-    for (let i = 0; i < N; i++) {
-      const cr = iso(i, 0);
-      this.img(`raid_wall_r_${rid}`, cr.x + TILE_W / 4, cr.y).setDepth(depthOf(i, 0) - 6);
-      const cl = iso(0, i);
-      this.img(`raid_wall_l_${rid}`, cl.x - TILE_W / 4, cl.y).setDepth(depthOf(0, i) - 6);
-      // front fences (see raidprops.ts placement notes)
-      const fl = iso(i, N - 1);
-      this.img('fence_l', fl.x - TILE_W / 4, fl.y + TILE_H / 2).setDepth(depthOf(i, N - 1) + 9);
-      const fr = iso(N - 1, i);
-      const key = i === GATE_Y ? 'gate_r' : 'fence_r';
-      const fimg = this.img(key, fr.x + TILE_W / 4, fr.y + TILE_H / 2).setDepth(depthOf(N - 1, i) + 9);
-      if (i === GATE_Y) this.gateImg = fimg;
-    }
-    // inside: counter with the dishes you can swipe, tables
-    r.counter.forEach((c, i) => {
-      const p = iso(c.x, c.y);
-      this.img('counter', p.x, p.y).setDepth(depthOf(c.x, c.y) + 1);
-      this.counterDishes[i] = this.img(r.counter[i].dish ? DISH_BY_ID[c.dish]?.icon ?? 'dish_burger' : 'dish_burger', p.x, p.y - 34).setDepth(depthOf(c.x, c.y) + 2);
+    const def = RIVAL_BY_ID[r.rival];
+    const W = r.room.w;
+    const H = r.room.h;
+    drawLot(this, {
+      w: W,
+      h: H,
+      wallKey: (side) => `wall_${side}_${def.wall}`,
+      floorKeys: (x, y) => [`floor_${def.floor}_${(x + y) % 2 ? "a" : "b"}`],
+      wallItems: r.wallItems.map((w, i) => ({
+        id: `w${i}`,
+        key: `${ITEM_BY_ID[w.item].art}_${w.wall}`,
+        wall: w.wall,
+        index: w.index,
+      })),
+      scenery: scenery(W, H, true),
     });
-    for (const [x, y] of [
-      [2, 2],
-      [4, 2],
-      [2, 4],
-      [4, 4],
-    ]) {
-      const p = iso(x, y);
-      this.img('table_diner', p.x, p.y).setDepth(depthOf(x, y) + 1);
+    // the shop sign, bolted over the door
+    const sign = `rsign_${r.rival}`;
+    if (hasProp(sign)) {
+      const a = wallAnchor("r", DOOR_X - 1);
+      propImage(this, sign, a.x - HW / 2, a.y - WALL_H * 0.66).setDepth(
+        WALLS + DOOR_X * 10 + 4,
+      );
     }
-    const sign = iso(N + 1, -1);
-    this.img(`raid_sign_${rid}`, sign.x, sign.y).setDepth(depthOf(N + 1, -1) + 2);
-    if (rid === 'chuck') {
-      const w = iso(N + 1, N + 1);
-      this.img('chuck_wagon', w.x, w.y).setDepth(depthOf(N + 1, N + 1) + 2);
+    for (const f of r.furniture) {
+      const p = iso(f.x, f.y);
+      const a = furnArt(f.item, f.dir);
+      const d = depthOf(f.x, f.y);
+      propImage(this, a.key, p.x, p.y, a.flip).setDepth(d + 2);
+      if (a.back) propImage(this, a.back, p.x, p.y, a.flip).setDepth(d + 6);
+      // a pot on every burner: the kitchen's working
+      if (
+        ITEM_BY_ID[f.item].kind === "stove" &&
+        this.textures.exists("fx_steam_1")
+      ) {
+        const top =
+          p.y - (KITCHEN_META.stoveTopZ[ITEM_BY_ID[f.item].art] ?? 36);
+        const steam = propImage(this, "fx_steam_1", p.x, top, a.flip)
+          .setDepth(d + 3)
+          .setAlpha(0.8);
+        this.tweens.add({
+          targets: steam,
+          alpha: 0.35,
+          yoyo: true,
+          repeat: -1,
+          duration: 900 + Math.random() * 400,
+        });
+      }
     }
-    for (const [k, x, y] of [
-      ['tree', -2, 2],
-      ['tree', 2, N + 2],
-      ['tombstone', -1, N],
-    ] as const) {
-      const p = iso(x, y);
-      this.img(k, p.x, p.y).setDepth(depthOf(x, y) + 2);
+    // the food on the counter, stacked
+    const ct = r.counter[0];
+    if (ct) {
+      const f = r.furniture.find((x) => x.x === ct.x && x.y === ct.y)!;
+      const p = iso(ct.x, ct.y);
+      const top =
+        p.y - (KITCHEN_META.counterTopZ[ITEM_BY_ID[f.item].art] ?? 36);
+      r.counter.forEach((c, i) =>
+        this.counterDishes.push(
+          propImage(
+            this,
+            DISH_BY_ID[c.dish].icon,
+            p.x - 6 + i * 12,
+            top - 2 - i * 5,
+          ).setDepth(depthOf(ct.x, ct.y) + 3 + i * 0.1),
+        ),
+      );
     }
   }
 
   private fitCamera() {
+    const r = this.ctl.raid;
+    if (!r) return;
     const cam = this.cameras.main;
     const dpr = window.devicePixelRatio || 1;
     const cssW = this.scale.width / dpr;
     const cssH = this.scale.height / dpr;
-    const w = (ARENA_N + 4) * TILE_W;
-    const h = (ARENA_N + 4) * TILE_H + WALL_H;
-    const z = Math.min((cssW - 150) / w, (cssH - 70) / h) * 1.15;
+    const w = (r.room.w + r.room.h + 6) * HW;
+    const h = (r.room.w + r.room.h) * (TILE_H / 2) + WALL_H + 40;
+    const z = Math.min((cssW - 40) / w, (cssH - 120) / h) * 1.12;
     this.baseZoom = z * dpr;
     cam.setZoom(this.baseZoom);
-    const c = iso(ARENA_N / 2 + 0.8, ARENA_N / 2 - 0.2);
-    cam.centerOn(c.x, c.y - 20);
+    const c = iso(r.room.w / 2 + 0.6, r.room.h / 2 - 1.2);
+    cam.centerOn(c.x, c.y - 30);
   }
 
-  /** Action cam: once zombies are in, drift toward the brawl and zoom in so the fighting reads on a phone. */
+  /** Action cam: once zombies are in, drift toward the brawl and zoom in so the fight reads on a phone. */
   private followAction(dt: number) {
     const r = this.ctl.raid!;
     if (this.drag?.moved || this.t - this.lastUserPan < 4) return;
-    const active = r.units.filter((u) => u.side === 'z' && u.hp > 0 && u.state !== 'queued' && u.state !== 'gone');
+    const active = r.units.filter(
+      (u) =>
+        u.side === "z" &&
+        u.hp > 0 &&
+        u.state !== "queued" &&
+        u.state !== "gone",
+    );
     const cam = this.cameras.main;
     let tz = this.baseZoom;
-    let tx = cam.midPoint.x;
-    let ty = cam.midPoint.y;
-    if (active.length && r.phase === 'fight') {
-      let sx = 0, sy = 0;
+    let tx: number;
+    let ty: number;
+    if (active.length && r.phase === "fight") {
+      let sx = 0;
+      let sy = 0;
       for (const u of active) {
         const p = iso(u.x, u.y);
         sx += p.x;
         sy += p.y;
       }
       tx = sx / active.length;
-      ty = sy / active.length - 40;
-      tz = this.baseZoom * 1.7;
+      ty = sy / active.length - 50;
+      tz = this.baseZoom * 1.45;
     } else {
-      const c = iso(ARENA_N / 2 + 0.8, ARENA_N / 2 - 0.2);
+      const c = iso(r.room.w / 2 + 0.6, r.room.h / 2 - 1.2);
       tx = c.x;
-      ty = c.y - 20;
+      ty = c.y - 30;
     }
-    const k = 1 - Math.exp(-dt * 2.2);
+    const k = 1 - Math.exp(-dt * 2);
     cam.setZoom(cam.zoom + (tz - cam.zoom) * k);
-    cam.centerOn(cam.midPoint.x + (tx - cam.midPoint.x) * k, cam.midPoint.y + (ty - cam.midPoint.y) * k);
+    cam.centerOn(
+      cam.midPoint.x + (tx - cam.midPoint.x) * k,
+      cam.midPoint.y + (ty - cam.midPoint.y) * k,
+    );
   }
 
   private setupInput() {
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       const cam = this.cameras.main;
-      this.drag = { x: p.x, y: p.y, sx: cam.scrollX, sy: cam.scrollY, moved: false };
+      this.drag = {
+        x: p.x,
+        y: p.y,
+        sx: cam.scrollX,
+        sy: cam.scrollY,
+        moved: false,
+      };
     });
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
       if (!this.drag || !p.isDown) return;
       const dx = p.x - this.drag.x;
       const dy = p.y - this.drag.y;
@@ -189,10 +275,13 @@ export class RaidScene extends Phaser.Scene {
       if (this.drag.moved) {
         this.lastUserPan = this.t;
         const cam = this.cameras.main;
-        cam.setScroll(this.drag.sx - dx / cam.zoom, this.drag.sy - dy / cam.zoom);
+        cam.setScroll(
+          this.drag.sx - dx / cam.zoom,
+          this.drag.sy - dy / cam.zoom,
+        );
       }
     });
-    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
       if (this.drag && !this.drag.moved) this.tap(p.worldX, p.worldY);
       this.drag = null;
     });
@@ -200,68 +289,102 @@ export class RaidScene extends Phaser.Scene {
 
   private tap(wx: number, wy: number) {
     const r = this.ctl.raid;
-    if (!r || r.phase !== 'fight') return;
-    // units: front-most hit wins
-    let best: { u: RaidUnit; depth: number } | null = null;
+    if (!r || r.phase !== "fight") return;
+    // whoever's body is closest to the finger
+    let best: { u: RaidUnit; score: number } | null = null;
     for (const u of r.units) {
       const v = this.views.get(u.id);
-      if (!v || !v.holder.visible || u.hp <= 0) continue;
-      const h = v.puppet?.height ?? 60;
-      if (Math.abs(wx - v.holder.x) < 24 && wy < v.holder.y + 8 && wy > v.holder.y - h - 8) {
-        if (!best || v.holder.depth > best.depth) best = { u, depth: v.holder.depth };
+      if (
+        !v ||
+        !v.holder.visible ||
+        u.hp <= 0 ||
+        u.state === "gone" ||
+        u.state === "down"
+      )
+        continue;
+      const h = (v.puppet?.height ?? 90) * v.holder.scaleY;
+      if (
+        Math.abs(wx - v.holder.x) < 26 &&
+        wy < v.holder.y + 10 &&
+        wy > v.holder.y - h - 8
+      ) {
+        const score =
+          (wx - v.holder.x) ** 2 + ((wy - (v.holder.y - h * 0.45)) * 0.7) ** 2;
+        if (!best || score < best.score) best = { u, score };
       }
     }
+    const sel = this.ctl.raidSel;
     if (best) {
       const u = best.u;
-      if (u.side === 'z') {
-        if (u.state === 'queued') {
-          sendOne(r, u.id);
-          sfx('groan', { pitch: 0.8 + Math.random() * 0.4 });
+      if (u.side === "z") {
+        this.ctl.selectRaider(sel === u.id ? null : u.id);
+        sfx("groan", { pitch: 0.8 + Math.random() * 0.4 });
+        return;
+      }
+      if (sel) {
+        const err = order(r, sel, { kind: "target", id: u.id });
+        if (err) this.ctl.toast(err, false);
+        else {
+          sfx("tap");
+          this.ctl.info(u.side === "c" ? "Lunch!" : `Get the ${u.name}!`);
         }
+        this.ctl.selectRaider(null);
         return;
       }
       focusTarget(r, u.id);
-      sfx('tap');
-      this.ctl.info(u.side === 'c' ? 'Dinner time!' : `Everybody on the ${u.name}!`);
+      sfx("tap");
+      this.ctl.info(
+        u.side === "c" ? "Dinner time!" : `Everybody on the ${u.name}!`,
+      );
       return;
     }
-    // the counter: steal a dish
-    const t = worldToIso(wx, wy + 20, TILE_W, TILE_H);
-    const slot = r.counter.findIndex((c) => Math.round(t.x) === c.x && Math.round(t.y) === c.y);
-    if (slot >= 0) {
-      const err = stealDish(r, slot);
+    // the counter: swipe the food
+    for (const off of [0, 20, 40]) {
+      const t = worldToIso(wx, wy + off, TILE_W, TILE_H);
+      if (
+        !r.counter.some(
+          (c) => Math.round(t.x) === c.x && Math.round(t.y) === c.y,
+        )
+      )
+        continue;
+      const slot = r.counter.findIndex((c) => c.servings > 0);
+      if (slot < 0) return this.ctl.toast("Nothing left to steal!", false);
+      const err = sel
+        ? order(r, sel, { kind: "steal", slot })
+        : stealDish(r, slot);
       if (err) this.ctl.toast(err, false);
       else {
-        sfx('tap');
-        this.ctl.info('Swipe that dish!');
+        sfx("tap");
+        this.ctl.info("Swipe that dish!");
       }
+      this.ctl.selectRaider(null);
+      return;
     }
   }
+
+  // ---------- units ----------
 
   private view(u: RaidUnit): UnitView {
     let v = this.views.get(u.id);
     if (v) return v;
     const holder = this.add.container(0, 0);
+    const shadow = this.add.ellipse(0, 0, 34, 11, 0x16120c, 0.28);
+    const ring = this.add
+      .ellipse(0, 0, 46, 16)
+      .setStrokeStyle(2, 0xd9b44a, 1)
+      .setVisible(false);
     const bar = this.add.graphics();
-    v = { holder, puppet: null, bar, barQ: -1, koT: -1 };
-    if (u.kind === 'zapper' || u.kind === 'gate') {
-      if (u.kind === 'zapper') {
-        v.img = this.img('bug_zapper', 0, 0);
-        holder.add(v.img);
-      }
-    } else if (charLoaded(this, u.art)) {
-      const a = charArt(u.art);
-      if (a) {
-        v.puppet = new Puppet(this, a);
-        holder.add(v.puppet.root);
-        if (u.kind === 'summon') holder.setScale(1.15);
-      }
-    }
-    holder.add(bar);
-    if (u.side === 'z') {
-      v.alert = this.img('fx_alert', 12, -90);
-      holder.add(v.alert);
-    }
+    holder.add([ring, shadow, bar]);
+    v = {
+      holder,
+      puppet: null,
+      charId: artFor(u.art),
+      bar,
+      barQ: -1,
+      shadow,
+      ring,
+    };
+    if (u.kind === "summon") holder.setScale(1.15);
     this.views.set(u.id, v);
     return v;
   }
@@ -274,9 +397,34 @@ export class RaidScene extends Phaser.Scene {
     v.barQ = q;
     const g = v.bar;
     g.clear();
-    if (u.side === 'c') return;
-    g.fillStyle(0x2b1b17, 1).fillRoundedRect(-16, 0, 32, 6, 3);
-    g.fillStyle(u.side === 'z' ? 0xe2403a : 0x6fcf3a, 1).fillRoundedRect(-15, 1, Math.max(1, 30 * f), 4, 2);
+    if (u.side === "c") return;
+    g.fillStyle(0x16120c, 0.9).fillRect(-16, 0, 32, 5);
+    g.fillStyle(u.side === "z" ? 0x7a9a32 : 0xa3342a, 1).fillRect(
+      -15,
+      1,
+      Math.max(1, 30 * f),
+      3,
+    );
+  }
+
+  /** A diner still on their chair: sat on the seat, facing the table (backs to us on ne chairs). */
+  private seatPose(r: RaidState, u: RaidUnit) {
+    if (!u.seatId) return null;
+    const seat = r.furniture.find((f) => f.id === u.seatId);
+    if (!seat || Math.abs(u.x - seat.x) > 0.05 || Math.abs(u.y - seat.y) > 0.05)
+      return null;
+    const p = iso(seat.x, seat.y);
+    const dir = seat.dir ?? "sw";
+    const off = FURN_META.seatOffset[dir];
+    const fam = chairFamilyOf(furnArt(seat.item, dir).key) ?? "plain";
+    const hip = this.views.get(u.id)?.puppet?.hipY ?? 20;
+    return {
+      x: p.x + off.dx,
+      y: p.y + off.dy - (FURN_META.seatZ[fam] ?? 18) + hip,
+      facing: (dir === "se" || dir === "ne" ? 1 : -1) as 1 | -1,
+      back: dir === "ne" || dir === "nw",
+      depth: depthOf(seat.x, seat.y) + 4,
+    };
   }
 
   update(_time: number, deltaMs: number) {
@@ -285,165 +433,275 @@ export class RaidScene extends Phaser.Scene {
     this.t += dt;
     const r = this.ctl.raid;
     this.followAction(dt);
+    const buff = r.buff && r.t < r.buff.until ? r.buff.kind : null;
     for (const u of r.units) {
-      if (u.kind === 'gate') {
-        this.gateImg?.setAlpha(u.hp > 0 ? 1 : 0).setTint(r.t - u.hitAt < 0.12 ? 0xff9090 : 0xffffff);
-        continue;
-      }
       const v = this.view(u);
-      const p = iso(u.x, u.y);
-      const gone = u.state === 'gone' || u.state === 'hidden';
-      v.holder.setVisible(!gone).setPosition(p.x, p.y).setDepth(depthOf(u.x, u.y) + 5);
+      const gone = u.state === "gone";
+      v.holder.setVisible(!gone);
       if (gone) continue;
-      if (!v.puppet && u.kind !== 'zapper' && charLoaded(this, u.art)) {
-        const a = charArt(u.art);
+      const seat =
+        (u.state === "idle" || u.state === "scream") && u.kind === "customer"
+          ? this.seatPose(r, u)
+          : null;
+      const p = seat ?? iso(u.x, u.y);
+      v.holder
+        .setPosition(p.x, p.y)
+        .setDepth(seat ? seat.depth : moverDepth(u.x, u.y, 4));
+      if (!v.puppet && charLoaded(this, v.charId)) {
+        const a = charArt(v.charId);
         if (a) {
           v.puppet = new Puppet(this, a);
-          v.holder.addAt(v.puppet.root, 0);
+          v.holder.addAt(v.puppet.root, 2);
         }
       }
-      const down = u.hp <= 0;
-      const top = v.puppet ? -v.puppet.height * (u.kind === 'summon' ? 1.15 : 1) - 8 : -(RAID_META.zapperCoilZ + 12);
+      const down = u.hp <= 0 || u.state === "down";
+      const top = -(v.puppet?.height ?? 90) - 8;
       this.drawBar(v, u, down ? -30 : top);
-      v.alert?.setVisible(u.state === 'queued').setY(top - 14 + Math.sin(this.t * 4) * 2);
-      if (v.puppet) {
-        v.puppet.setFacing(u.facing, !!u.back && u.state === 'walk');
-        const zombie = u.side === 'z' && (u.kind === 'zombie' || u.kind === 'summon');
-        const attackT = r.t - u.attackAt;
-        const moving = u.state === 'walk' || u.state === 'flee';
-        let pose: Parameters<Puppet['pose']>[0] = 'idle';
-        if (down) pose = 'lie';
-        else if (u.state === 'flee') pose = 'run';
-        else if (u.state === 'eat' || u.state === 'steal') pose = 'eat';
-        else if (attackT < 0.5) pose = 'attack';
-        else if (moving && r.t - u.attackAt > 0.6) pose = 'walk';
-        if (u.side === 'c' && u.state === 'idle') pose = 'sit';
-        v.puppet.pose(pose, dt, { zombie, attackT, speed: u.speed / 1.5 });
-        const face = down ? 'dazed' : u.state === 'flee' ? 'scream' : u.state === 'eat' ? 'chomp' : zombie && attackT < 0.5 ? 'chomp' : u.side === 'r' && r.t - u.hitAt < 0.4 ? 'scream' : u.kind === 'boss' && !down ? 'happy' : undefined;
-        v.puppet.setFace(face as never);
-        if (r.t - u.hitAt < 0.12) v.puppet.setTint(0xff9090);
-        else if (u.side === 'z' && r.t < r.redUntil) v.puppet.setTint(0xff6a6a);
-        else if (r.focus === u.id) v.puppet.setTint(0xfff2a0);
-        else v.puppet.clearTint();
-      } else if (v.img) v.img.setTint(r.t - u.hitAt < 0.12 ? 0xff9090 : 0xffffff).setAlpha(down ? 0.4 : 1);
+      v.shadow.setVisible(!seat && !down);
+      v.ring
+        .setVisible(
+          this.ctl.raidSel === u.id ||
+            (u.state === "queued" &&
+              !this.ctl.raidSel &&
+              u ===
+                r.units.find((x) => x.side === "z" && x.state === "queued")),
+        )
+        .setAlpha(
+          this.ctl.raidSel === u.id
+            ? 1
+            : 0.35 + Math.abs(Math.sin(this.t * 3)) * 0.4,
+        );
+      if (!v.puppet) continue;
+      if (seat) v.puppet.setFacing(seat.facing, seat.back);
+      else
+        v.puppet.setFacing(
+          u.facing,
+          !!u.back && (u.state === "walk" || u.state === "flee"),
+        );
+      const zombie =
+        u.side === "z" && (u.kind === "zombie" || u.kind === "summon");
+      const attackT = r.t - u.attackAt;
+      let pose: Parameters<Puppet["pose"]>[0] = "idle";
+      if (down) pose = "lie";
+      else if (seat) pose = "sit";
+      else if (u.state === "flee") pose = "run";
+      else if (u.state === "grabbed") pose = "shiver";
+      else if (u.state === "eat" || u.state === "steal") pose = "eat";
+      else if (attackT < 0.5) pose = "attack";
+      else if (u.state === "walk" && u.path.length) pose = "walk";
+      v.puppet.pose(pose, dt, {
+        zombie,
+        attackT,
+        speed: u.speed / 1.5,
+        seated: !!seat,
+      });
+      const face = down
+        ? "dazed"
+        : u.state === "flee" || u.state === "scream" || u.state === "grabbed"
+          ? "scream"
+          : u.state === "eat"
+            ? "chomp"
+            : zombie && attackT < 0.5
+              ? "chomp"
+              : u.side === "r" && r.t - u.hitAt < 0.4
+                ? "shock"
+                : u.side === "r" && r.aggro
+                  ? "angry"
+                  : undefined;
+      v.puppet.setFace(face as never);
+      if (r.t - u.hitAt < 0.12) v.puppet.setTint(0xff9090);
+      else if (u.side === "z" && buff)
+        v.puppet.setTint(
+          Math.sin(this.t * 14) > 0
+            ? buff === "str"
+              ? 0xff7a6a
+              : 0x9be36b
+            : 0xffffff,
+        );
+      else if (r.focus === u.id) v.puppet.setTint(0xfff2a0);
+      else v.puppet.clearTint();
     }
-    r.counter.forEach((c, i) => this.counterDishes[i]?.setVisible(c.servings > 0));
+    r.counter.forEach((c, i) =>
+      this.counterDishes[i]?.setVisible(c.servings > 0),
+    );
     // play new events
-    while (this.seenEvents < r.events.length) this.fx(r.events[this.seenEvents++]);
+    while (this.seenEvents < r.events.length)
+      this.fx(r.events[this.seenEvents++]);
     if (r.events.length < this.seenEvents) this.seenEvents = r.events.length;
   }
 
-  private floatText(x: number, y: number, text: string, color: string, size = 13) {
+  // ---------- juice ----------
+
+  private floatText(
+    x: number,
+    y: number,
+    text: string,
+    color: string,
+    size = 13,
+  ) {
     const t = this.add
-      .text(x, y, text, { fontFamily: 'Arial Rounded MT Bold, Arial, sans-serif', fontSize: `${size}px`, fontStyle: 'bold', color, stroke: '#2b1b17', strokeThickness: 3 })
+      .text(x, y, text, {
+        fontFamily: "Arial Black, Arial, sans-serif",
+        fontSize: `${size}px`,
+        color,
+        stroke: "#16120C",
+        strokeThickness: 3,
+      })
       .setResolution(TEX_S)
       .setOrigin(0.5)
-      .setDepth(100000)
+      .setDepth(1e6)
       .setScale(0.4);
-    this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out' });
-    this.tweens.add({ targets: t, y: y - 30, alpha: 0, delay: 400, duration: 700, onComplete: () => t.destroy() });
+    this.tweens.add({ targets: t, scale: 1, duration: 160, ease: "Back.Out" });
+    this.tweens.add({
+      targets: t,
+      y: y - 30,
+      alpha: 0,
+      delay: 400,
+      duration: 700,
+      onComplete: () => t.destroy(),
+    });
   }
 
   private pop(key: string, x: number, y: number, ms = 500) {
-    if (!hasProp(key)) return;
-    const i = this.img(key, x, y).setDepth(100001).setScale(0);
-    this.tweens.add({ targets: i, scale: 1 / TEX_S, duration: 120, ease: 'Back.Out' });
-    this.tweens.add({ targets: i, alpha: 0, delay: ms, duration: 250, onComplete: () => i.destroy() });
+    if (!this.textures.exists(key)) return;
+    const i = propImage(this, key, x, y)
+      .setDepth(1e6 + 1)
+      .setScale(0);
+    this.tweens.add({
+      targets: i,
+      scale: 1 / TEX_S,
+      duration: 120,
+      ease: "Back.Out",
+    });
+    this.tweens.add({
+      targets: i,
+      alpha: 0,
+      delay: ms,
+      duration: 250,
+      onComplete: () => i.destroy(),
+    });
   }
 
   private fx(e: RaidEvent) {
     const r = this.ctl.raid!;
     const unitOf = (id: string) => r.units.find((u) => u.id === id);
     switch (e.t) {
-      case 'hit': {
+      case "hit": {
         const p = iso(e.x, e.y);
         const u = unitOf(e.unit);
+        if (u?.kind === "customer") {
+          this.floatText(p.x, p.y - 80, "SCRATCH!", "#C9A63A", 12);
+          sfx("hit", { volume: 0.4 });
+          break;
+        }
         if (this.t - (this.lastHitText.get(e.unit) ?? -9) > 0.45) {
           this.lastHitText.set(e.unit, this.t);
-          this.floatText(p.x + (Math.random() - 0.5) * 16, p.y - 70, `-${Math.max(1, Math.round(e.dmg))}`, u?.side === 'z' ? '#ff5a4a' : '#ffffff', 12);
+          this.floatText(
+            p.x + (Math.random() - 0.5) * 16,
+            p.y - 90,
+            `-${Math.max(1, Math.round(e.dmg))}`,
+            u?.side === "z" ? "#E06A55" : "#F2E7C4",
+            12,
+          );
         }
-        if (this.t - this.lastPow > 0.3 && Math.random() < 0.5 && (this.lastPow = this.t)) this.pop('fx_hit', p.x, p.y - 50, 180);
+        if (
+          this.t - this.lastPow > 0.3 &&
+          Math.random() < 0.5 &&
+          (this.lastPow = this.t)
+        )
+          this.pop("fx_hit", p.x, p.y - 60, 180);
         const by = unitOf(e.by);
-        if (by?.kind !== 'zapper') sfx(by?.kind === 'boss' ? 'whack' : 'hit', { volume: 0.5 });
+        sfx(by?.kind === "boss" ? "whack" : "hit", { volume: 0.5 });
         break;
       }
-      case 'ko': {
+      case "ko": {
         const p = iso(e.x, e.y);
-        this.pop('fx_ko', p.x, p.y - 34, 1500);
-        sfx('ko', { volume: 0.6 });
-        const u = unitOf(e.unit);
-        if (u?.kind === 'boss') this.cameras.main.shake(400, 0.01);
+        this.pop("fx_skull", p.x, p.y - 40, 1500);
+        sfx("ko", { volume: 0.6 });
+        if (unitOf(e.unit)?.kind === "boss") this.cameras.main.shake(400, 0.01);
         break;
       }
-      case 'zap': {
-        const from = unitOf(e.from);
-        const to = unitOf(e.to);
-        if (from && to) {
-          const a = iso(from.x, from.y);
-          const b = iso(to.x, to.y);
-          const top = { x: a.x, y: a.y - RAID_META.zapperCoilZ };
-          const bolt = this.img('zapper_bolt', b.x, b.y - 30).setDepth(100000);
-          const d = Phaser.Math.Distance.Between(top.x, top.y, b.x, b.y - 30);
-          bolt.setRotation(Math.atan2(top.y - (b.y - 30), top.x - b.x) - Math.PI / 2 + Math.PI);
-          bolt.setScale(1 / TEX_S, ((d / 90) * 1) / TEX_S);
-          this.tweens.add({ targets: bolt, alpha: 0, duration: 220, onComplete: () => bolt.destroy() });
-        }
-        sfx('zap', { volume: 0.6 });
-        break;
-      }
-      case 'eat': {
+      case "scream": {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 60, `CHOMP! +$${e.cash}`, '#ffc83d', 14);
-        this.pop('fx_coin', p.x, p.y - 40);
-        sfx('chomp');
-        setTimeout(() => sfx('scream', { pitch: 1 + Math.random() * 0.3 }), 120);
+        if (Math.random() < 0.6)
+          this.floatText(
+            p.x,
+            p.y - 110,
+            Math.random() < 0.5 ? "AAAH!" : "ZOMBIES!",
+            "#F2E7C4",
+            11,
+          );
+        if (Math.random() < 0.5)
+          sfx("scream", { pitch: 0.9 + Math.random() * 0.5, volume: 0.6 });
         break;
       }
-      case 'steal': {
+      case "eat": {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 70, 'SWIPED!', '#9be36b', 15);
-        this.pop('fx_recipe', p.x, p.y - 50, 900);
-        sfx('cashRegister', { volume: 0.6 });
+        this.floatText(p.x, p.y - 80, `CHOMP! +$${e.cash}`, "#D9C25A", 14);
+        this.pop("fx_cash", p.x, p.y - 60);
+        sfx("chomp");
+        setTimeout(
+          () => sfx("scream", { pitch: 1 + Math.random() * 0.3 }),
+          120,
+        );
         break;
       }
-      case 'gate': {
+      case "escape":
+        break;
+      case "enter":
+        sfx("groan", { pitch: 0.7 + Math.random() * 0.4, volume: 0.6 });
+        break;
+      case "steal": {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 60, 'CRASH!', '#ffffff', 20);
-        this.cameras.main.shake(300, 0.008);
-        sfx('stomp');
+        this.floatText(p.x, p.y - 90, "SWIPED!", "#9BD62E", 15);
+        this.pop(DISH_BY_ID[e.dish].icon, p.x, p.y - 70, 900);
+        sfx("cashRegister", { volume: 0.6 });
         break;
       }
-      case 'boss': {
+      case "boss": {
         const p = iso(e.x, e.y);
         const def = RIVAL_BY_ID[r.rival];
-        this.floatText(p.x, p.y - 100, `${def.chef.toUpperCase()}!`, '#ff5a4a', 20);
+        this.floatText(
+          p.x,
+          p.y - 120,
+          `${def.chef.toUpperCase()}!`,
+          "#E06A55",
+          20,
+        );
         this.ctl.info(`“${def.taunt}”`);
         this.cameras.main.shake(350, 0.006);
-        sfx('summon', { volume: 0.5 });
+        sfx("summon", { volume: 0.5 });
         break;
       }
-      case 'heal':
-        sfx('heal', { volume: 0.5 });
+      case "buff":
+        this.cameras.main.flash(
+          220,
+          e.kind === "str" ? 200 : 120,
+          e.kind === "str" ? 70 : 200,
+          60,
+        );
+        sfx(e.kind === "str" ? "stomp" : "heal");
         break;
-      case 'summon': {
+      case "summon": {
         const u = unitOf(e.unit);
         if (u) {
           const p = iso(u.x, u.y);
-          this.floatText(p.x, p.y - 140, 'BIG FOOT-LONG!', '#ffc83d', 18);
+          this.floatText(p.x, p.y - 150, "BIG FOOT-LONG!", "#D9C25A", 18);
         }
         this.cameras.main.shake(500, 0.01);
-        sfx('summon');
+        sfx("summon");
         break;
       }
-      case 'rage':
-        this.cameras.main.flash(200, 255, 80, 80);
-        sfx('stomp');
-        break;
-      case 'end':
-        sfx(e.result === 'won' ? 'raidWin' : e.result === 'lost' ? 'raidLose' : 'flag');
-        this.game.events.emit('raid-ended');
+      case "end":
+        sfx(
+          e.result === "won"
+            ? "raidWin"
+            : e.result === "lost"
+              ? "raidLose"
+              : "flag",
+        );
+        this.game.events.emit("raid-ended");
         break;
     }
   }
 }
-
