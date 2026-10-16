@@ -49,7 +49,30 @@ const power = (type: string) => {
   return st ? st.power * 2 + st.energy / 25 + st.speed * 0.5 : 0;
 };
 
+/** The next joint on the road, if it can be raided now and the crew is big enough to try.
+ * Like a real player, the bot gives up waiting after a while and goes back to cooking for a bit. */
+const musterTimes = new WeakMap<GameState, { since: number; pauseUntil: number }>();
+function musterFor(s: GameState) {
+  const m = musterTimes.get(s) ?? { since: -1, pauseUntil: 0 };
+  musterTimes.set(s, m);
+  const rv = RIVALS.find((x) => !(s.rivals[x.id]?.wins));
+  const want = rv && !rivalReady(s, rv.id) && zombies(s).length >= RAID_CREW[RIVALS.indexOf(rv)] && s.now >= m.pauseUntil;
+  if (!want) {
+    m.since = -1;
+    return null;
+  }
+  if (m.since < 0) m.since = s.now;
+  if (s.now - m.since > 600) {
+    m.pauseUntil = s.now + 1800;
+    m.since = -1;
+    return null;
+  }
+  return rv;
+}
+
 function bot(s: GameState) {
+  // a player getting ready to raid stops handing out new cooking jobs so the crew can gather
+  const mustering = !!musterFor(s);
   for (const st of s.stoves) if (st.status === 'done' || st.status === 'burnt') plateDish(s, st.id);
   for (const g of activeGoals(s)) if (g.done) claimGoal(s, g.id);
   for (const f of s.furniture) collectPayout(s, f.id);
@@ -63,7 +86,7 @@ function bot(s: GameState) {
   for (const st of s.stoves) {
     if (st.status !== 'empty') continue;
     if (onCounter + inOven > 12 + validSeats(s).length * 4 || freeSlots === 0) break;
-    const cook = s.workers.find((w) => (w.state === 'idle' || w.state === 'daydream') && w.energy > w.stats.energy * 0.45);
+    const cook = s.workers.find((w) => (!mustering || w.kind === 'you') && (w.state === 'idle' || w.state === 'daydream') && w.energy > w.stats.energy * 0.45);
     if (!cook) break;
     const dish = DISHES.filter((d) => d.station === st.kind && dishAvailable(s, d.id) && d.cost <= s.cash * 0.6)
       .sort((a, b) => (b.servings * b.price - b.cost) / b.cookSec - (a.servings * a.price - a.cost) / a.cookSec)[0];

@@ -332,6 +332,11 @@ export function releaseJob(s: GameState, w: Worker) {
     if (c && c.serverId === w.id) c.serverId = undefined;
     w.job = undefined;
   }
+  if (w.state === 'cooking' && w.stoveId) {
+    const st = s.stoves.find((x) => x.id === w.stoveId);
+    if (st?.cookId === w.id) st.cookId = undefined;
+    w.stoveId = undefined;
+  }
   if (w.state === 'toStove' && w.stoveId) {
     const st = s.stoves.find((x) => x.id === w.stoveId);
     if (st && st.status === 'reserved') {

@@ -8,6 +8,7 @@ import {
   retreat,
   rivalReady,
   sendAll,
+  startCooking,
   startRaid,
   stealDish,
   stepRaid,
@@ -53,6 +54,20 @@ describe('raid setup', () => {
     expect(s.workers.filter((w) => w.state === 'raiding')).toHaveLength(2);
     tick(s, 1); // the joint keeps running without them
     expect(s.workers.filter((w) => w.state === 'raiding')).toHaveLength(2);
+  });
+
+  it('a zombie can leave the stove for a raid; the food finishes cooking without them', () => {
+    const s = withCrew(['construction']);
+    const z = s.workers.find((w) => w.kind === 'zombie')!;
+    const grill = s.stoves[0];
+    expect(startCooking(s, z.id, grill.id, 'hotdog')).toBeNull();
+    for (let i = 0; i < 200 && z.state !== 'cooking'; i++) tick(s, 0.1);
+    expect(z.state).toBe('cooking');
+    expect(startRaid(s, 'chuck', [z.id])).toBeTypeOf('object');
+    expect(z.state).toBe('raiding');
+    for (let i = 0; i < 300; i++) tick(s, 0.1);
+    expect(grill.status).toBe('done');
+    expect(z.state).toBe('raiding');
   });
 });
 

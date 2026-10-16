@@ -147,8 +147,9 @@ export function rivalReady(s: GameState, id: RivalId): string | null {
 }
 
 /** Workers that can go raiding: zombies and YOU who aren't cooking, KO'd or already out. */
+/** Anyone conscious and home can go. A cook just walks off: the stove keeps cooking on its own timer. */
 export function raidCandidates(s: GameState) {
-  return s.workers.filter((w) => w.state !== 'cooking' && w.state !== 'toStove' && w.state !== 'down' && w.state !== 'raiding');
+  return s.workers.filter((w) => w.state !== 'down' && w.state !== 'raiding');
 }
 
 // ---------- setup ----------
