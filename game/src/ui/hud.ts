@@ -8,6 +8,11 @@ import {
   activeGoals,
   attackThreshold,
   buyKeepWarm,
+  cancelCooking,
+  discardCounter,
+  finishCost,
+  finishNow,
+  setClosed,
   collectPayout,
   dishAvailable,
   fireZombie,
@@ -53,8 +58,10 @@ export class Hud {
   private lastCash = -1;
   private lastSauce = -1;
   private lastTut = -1;
+  private lastClosed: boolean | null = null;
   private lastStructure = '';
   private fireArmed = '';
+  private cancelArmed = '';
   private modalClose: (() => void) | null = null;
   private pendingLevels: number[] = [];
   readonly edit: EditBar;
@@ -76,6 +83,7 @@ export class Hud {
         <button class="btn-sq" data-k="book" aria-label="Cookbook">${icon('ui_menu', 'bi')}<label>MENU</label></button>
         <button class="btn-sq" data-k="crew" aria-label="Crew">${icon('ui_crew', 'bi')}<label>CREW</label><span class="badge" data-k="crewc"></span></button>
         <button class="btn-sq" data-k="map" aria-label="Raid map">${icon('ui_raid', 'bi')}<label>RAID</label><span class="badge lock" data-k="maplock">${icon('fx_lock', 'ico-s')}</span></button>
+        <button class="btn-sq sign" data-k="sign" aria-label="Open or close the joint"><img class="bi" data-k="signimg" alt=""/><label data-k="signlbl">OPEN</label></button>
       </div>
       <div class="side right play-only">
         <button class="btn-sq" data-k="goals" aria-label="Goals">${icon('ui_goals', 'bi')}<label>GOALS</label><span class="badge ready" data-k="goalc"></span></button>
@@ -108,6 +116,10 @@ export class Hud {
     btn('edit', () => ctl.enterEdit());
     btn('fridge', () => openFridge(this));
     btn('pedia', () => openZombiepedia(this));
+    btn('sign', () => {
+      setClosed(ctl.state, !ctl.state.closed);
+      ctl.info(ctl.state.closed ? 'CLOSED. No new customers; tired zombies nap. Handy before a raid!' : 'OPEN for business! Bring on the brains.');
+    });
     this.el.card.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.edit = new EditBar(this, this.el.editbar);
     this.raid = new RaidUi(this, this.el.raidhud);
@@ -208,6 +220,12 @@ export class Hud {
       this.lastSauce = s.sauce;
     }
     this.el.crewc.textContent = `${zombies(s).length}/${s.crewCap}`;
+    if (this.lastClosed !== !!s.closed) {
+      this.lastClosed = !!s.closed;
+      (this.el.signimg as HTMLImageElement).src = artUrl(s.closed ? 'ui_closed' : 'ui_open');
+      this.el.signlbl.textContent = s.closed ? 'CLOSED' : 'OPEN';
+      this.el.sign.classList.toggle('closed', !!s.closed);
+    }
     this.el.maplock.style.display = s.level < MAP_LEVEL ? '' : 'none';
     const ready = activeGoals(s).filter((g) => g.done).length;
     this.el.goalc.textContent = ready ? String(ready) : '';
@@ -300,7 +318,8 @@ export class Hud {
       if (st.status === 'cooking' && st.dish) {
         const d = DISH_BY_ID[st.dish];
         const p = 1 - ((st.doneAt ?? 0) - s.now) / d.cookSec;
-        body = `<div class="state" data-live="cook">Cooking ${d.name} · ${fmtTime((st.doneAt ?? 0) - s.now)} left</div><div class="bar"><i data-live="cbar" style="width:${p * 100}%;background:#ff8a1f"></i></div>`;
+        body = `<div class="state" data-live="cook">Cooking ${d.name} · ${fmtTime((st.doneAt ?? 0) - s.now)} left</div><div class="bar"><i data-live="cbar" style="width:${p * 100}%;background:#ff8a1f"></i></div>
+          <div class="actions"><button class="btn sauce" data-a="finish">Finish now · ${icon('ui_sauce', 'ico-s')} <span data-live="fcost">${finishCost(s, st.id)}</span></button><button class="btn red small-btn" data-a="cancel">${this.cancelArmed === st.id ? 'Tap again' : 'Cancel'}</button></div><div class="small">Cancel gives back half the ingredients money.</div>`;
       } else if (st.status === 'reserved') body = `<div class="state">The cook is on the way…</div>`;
       else body = `<div class="state">Empty. Tap a cook (YOU or a zombie), then this ${st.kind}.</div>`;
       const lamp = f.keepWarm
@@ -315,6 +334,17 @@ export class Hud {
         .join('');
       const raidLocked = DISHES.filter((d) => d.station === st.kind && d.source === 'raid' && !dishAvailable(s, d.id)).length;
       html = `<h3>What should ${w?.kind === 'you' ? 'you' : esc(w?.name ?? 'they')} cook?</h3><div class="sub">${esc(ITEM_BY_ID[s.furniture.find((f) => f.id === st.furnitureId)!.item].name)}</div>${rows}${raidLocked ? `<div class="small">${raidLocked} more secret recipe${raidLocked > 1 ? 's' : ''} for this station can be stolen in raids.</div>` : ''}`;
+    } else if (sel.kind === 'counter') {
+      const slots = s.counter.filter((c) => c.dish && c.servings > 0);
+      const rows = slots.length
+        ? slots
+            .map((c) => {
+              const d = DISH_BY_ID[c.dish!];
+              return `<div class="fridge-row"><img src="${artUrl(d.icon)}" alt=""/><b>${esc(d.name)}<br/><span class="sub" data-live="sv${c.id}">${c.servings} servings left</span></b><button class="btn red tiny" data-a="discard" data-id="${c.id}">Bin it</button></div>`;
+            })
+            .join('')
+        : '<div class="state">Empty! Tap a cook, then a stove, to make food. Hungry customers walk out.</div>';
+      html = `<h3>Serving Counter</h3><div class="sub">${s.counter.length} spots · ${s.counter.reduce((a, c) => a + (c.dish ? c.servings : 0), 0)} servings</div>${rows}`;
     } else if (sel.kind === 'furniture') {
       const f = s.furniture.find((x) => x.id === sel.id);
       if (!f) return this.ctl.select(null);
@@ -351,7 +381,7 @@ export class Hud {
     this.lastStructure = structure;
     card.innerHTML = full;
     card.classList.remove('hidden');
-    bindActions(card, (a) => this.cardAction(a));
+    bindActions(card, (a, el) => this.cardAction(a, el));
     card.querySelectorAll<HTMLElement>('[data-dish]').forEach((b) => {
       b.onclick = (e) => {
         e.stopPropagation();
@@ -360,7 +390,7 @@ export class Hud {
     });
   }
 
-  private cardAction(a: string) {
+  private cardAction(a: string, el?: HTMLElement) {
     const s = this.ctl.state;
     const sel = this.ctl.selection;
     if (a === 'close') {
@@ -409,6 +439,31 @@ export class Hud {
         sfx('chomp');
         this.ctl.select(null);
       }
+    }
+    if (sel?.kind === 'stove' && a === 'finish') {
+      const err = finishNow(s, sel.id);
+      if (err) this.ctl.toast(err);
+      else sfx('ding');
+    }
+    if (sel?.kind === 'stove' && a === 'cancel') {
+      if (this.cancelArmed !== sel.id) {
+        this.cancelArmed = sel.id;
+        setTimeout(() => (this.cancelArmed = ''), 3000);
+      } else {
+        const err = cancelCooking(s, sel.id);
+        if (err) this.ctl.toast(err);
+        else sfx('sell');
+        this.cancelArmed = '';
+      }
+      this.lastStructure = '';
+      this.renderCard();
+    }
+    if (sel?.kind === 'counter' && a === 'discard' && el?.dataset.id) {
+      const err = discardCounter(s, el.dataset.id);
+      if (err) this.ctl.toast(err);
+      else sfx('burn', { volume: 0.5 });
+      this.lastStructure = '';
+      this.renderCard();
     }
     if (sel?.kind === 'stove' && a === 'lamp') {
       const err = buyKeepWarm(s, sel.id);

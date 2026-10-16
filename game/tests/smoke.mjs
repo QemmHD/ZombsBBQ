@@ -202,6 +202,46 @@ for (const [k, name] of panels) {
   await closeModal();
 }
 
+// ---------- 4b. OPEN/CLOSED sign, counter card, stove finish/cancel ----------
+await tapSel('[data-k="sign"]', 'closed sign');
+check(await page.evaluate(() => window.zbbq.ctl.state.closed === true), 'sign closes the joint');
+await ff(2);
+await wait(600);
+await shot('closed');
+await tapSel('[data-k="sign"]', 'open sign');
+check(await page.evaluate(() => !window.zbbq.ctl.state.closed), 'sign reopens the joint');
+const ctr = await page.evaluate(() => {
+  const s = window.zbbq.ctl.state;
+  s.counter[0].dish = 'hotdog';
+  s.counter[0].servings = 5;
+  const f = s.furniture.find((f) => f.item === 'counter');
+  return { x: f.x, y: f.y };
+});
+let cw = isoW(ctr.x, ctr.y);
+await tapWorld(cw.x, cw.y - 12);
+check((await page.evaluate(() => window.zbbq.ctl.selection?.kind)) === 'counter', 'tapping the counter opens its card');
+await shot('counter-card');
+await tapSel('[data-a="discard"]', 'bin it');
+check(await page.evaluate(() => window.zbbq.ctl.state.counter[0].servings === 0), 'discard empties the slot');
+await page.evaluate(() => window.zbbq.ctl.select(null));
+// cook something, then finish it with Brain Sauce from the stove card
+await page.evaluate(() => {
+  const { ctl, sim } = window.zbbq;
+  const s = ctl.state;
+  const g = s.stoves.find((x) => x.kind === 'grill');
+  if (g.status !== 'empty') sim.plateDish(s, g.id);
+  if (g.status !== 'empty') sim.cancelCooking(s, g.id);
+  const you = s.workers.find((w) => w.kind === 'you');
+  Object.assign(you, { state: 'idle', path: [] });
+  sim.startCooking(s, you.id, g.id, 'burger');
+  for (let i = 0; i < 300 && g.status !== 'cooking'; i++) ctl.update(0.1);
+});
+await tapWorld(gp.x, gp.y - 10);
+await shot('stove-cooking-card');
+await tapSel('[data-a="finish"]', 'finish now');
+check(await page.evaluate(() => window.zbbq.ctl.state.stoves.find((x) => x.kind === 'grill').status === 'done'), 'finish now completes the dish');
+await page.evaluate(() => window.zbbq.ctl.select(null));
+
 // ---------- 5. shop: every tab, buy + place a table ----------
 await tapSel('[data-k="shop"]', 'shop');
 for (const tab of ['featured', 'decor', 'kitchen', 'furniture', 'walls', 'special', 'storage']) {
@@ -373,6 +413,71 @@ log.textures = await page.evaluate(() => {
   return { count: n, mb: Math.round((px * 4) / 1048576) };
 });
 check(log.textures.mb < 250, `texture memory ${log.textures.mb} MB`);
+// ---------- 8. move furniture with a real finger drag ----------
+await tapSel('[data-k="edit"]', 'decorate');
+const pt = await page.evaluate(() => {
+  const s = window.zbbq.ctl.state;
+  const f = s.furniture.find((f) => f.item === 'table_diner');
+  return { id: f.id, x: f.x, y: f.y };
+});
+let wp = isoW(pt.x, pt.y);
+await tapWorld(wp.x, wp.y);
+await tapSel('.eb-btn[data-a="move"]', 'move');
+// drag it one tile toward the front by finding a free tile next to it
+const dest = await page.evaluate((pt) => {
+  const { ctl } = window.zbbq;
+  for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1], [2, 0], [0, 2], [1, 1], [-1, 1], [1, -1]]) {
+    ctl.movePlacement(pt.x + dx, pt.y + dy);
+    if (!ctl.placementProblem()) {
+      ctl.movePlacement(pt.x, pt.y);
+      return { x: pt.x + dx, y: pt.y + dy };
+    }
+  }
+  ctl.movePlacement(pt.x, pt.y);
+  return null;
+}, pt);
+check(!!dest, 'a free tile to move the table to');
+if (dest) {
+  const a = await screenOf(wp.x, wp.y);
+  const bw = isoW(dest.x, dest.y);
+  const b = await screenOf(bw.x, bw.y);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) {
+    await page.mouse.move(a.x + ((b.x - a.x) * i) / 8, a.y + ((b.y - a.y) * i) / 8);
+    await wait(60);
+  }
+  await page.mouse.up();
+  await wait(300);
+  log.dragPlacing = await page.evaluate(() => window.zbbq.ctl.placing && { x: window.zbbq.ctl.placing.x, y: window.zbbq.ctl.placing.y });
+  await shot('drag-move');
+  await tapSel('.eb-btn[data-a="ok"]', 'confirm move');
+  const moved = await page.evaluate((id) => {
+    const f = window.zbbq.ctl.state.furniture.find((f) => f.id === id);
+    return { x: f.x, y: f.y };
+  }, pt.id);
+  check(moved.x === dest.x && moved.y === dest.y, `drag moved the table to ${dest.x},${dest.y} (got ${moved.x},${moved.y})`);
+}
+if (await page.locator('.eb-btn[data-a="desel"]').count()) await tapSel('.eb-btn[data-a="desel"]');
+await tapSel('.eb-btn[data-a="done"]', 'done decorating');
+
+// ---------- 9. come back two hours later ----------
+await page.evaluate(() => {
+  window.zbbq.ctl.save();
+  const k = 'zombsbbq.save.v1';
+  const f = JSON.parse(localStorage.getItem(k));
+  f.savedAt -= 2 * 3600 * 1000;
+  localStorage.setItem(k, JSON.stringify(f));
+  window.zbbq.ctl.save = () => {}; // don't let the unload save overwrite the doctored file
+});
+await page.reload();
+await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
+await wait(1000);
+log.offline = await page.evaluate(() => document.querySelector('.modal h2')?.textContent);
+check(/Welcome back/.test(log.offline ?? ''), 'welcome-back popup after time away');
+await shot('welcome-back');
+while (await modalOpen()) await closeModal();
+
 log.final = await page.evaluate(() => {
   const s = window.zbbq.ctl.state;
   return { level: s.level, cash: Math.floor(s.cash), crew: s.workers.map((w) => `${w.type}:${w.state}`), stars: window.zbbq.sim.stars(s) };

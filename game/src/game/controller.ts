@@ -35,6 +35,7 @@ export type Selection =
   | { kind: 'customer'; id: string }
   | { kind: 'stove'; id: string }
   | { kind: 'furniture'; id: string }
+  | { kind: 'counter'; id: string }
   | { kind: 'dishPicker'; workerId: string; stoveId: string }
   | null;
 

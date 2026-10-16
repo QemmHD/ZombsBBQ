@@ -3,6 +3,12 @@ import {
   DOOR_X,
   TUNING,
   attackThreshold,
+  cancelCooking,
+  discardCounter,
+  finishCost,
+  finishNow,
+  makeWorker,
+  setClosed,
   createInitialState,
   deserialize,
   edgeBlocked,
@@ -197,5 +203,63 @@ describe('saving and offline progress', () => {
 
   it('starts fresh on garbage', () => {
     expect(deserialize('{nope', 0).state.level).toBe(1);
+  });
+});
+
+describe('stove + counter + sign controls', () => {
+  const cookingGrill = () => {
+    const s = createInitialState(3);
+    s.cash = 500;
+    expect(startCooking(s, you(s).id, grill(s).id, 'hotdog')).toBeNull();
+    for (let i = 0; i < 200 && grill(s).status !== 'cooking'; i++) tick(s, 0.1);
+    expect(grill(s).status).toBe('cooking');
+    return s;
+  };
+
+  it('Brain Sauce finishes a dish instantly, priced by the time left', () => {
+    const s = cookingGrill();
+    s.sauce = 0;
+    expect(finishNow(s, grill(s).id)).toMatch(/Brain Sauce/);
+    s.sauce = 3;
+    const cost = finishCost(s, grill(s).id);
+    expect(cost).toBe(1);
+    expect(finishNow(s, grill(s).id)).toBeNull();
+    expect(grill(s).status).toBe('done');
+    expect(s.sauce).toBe(3 - cost);
+    expect(you(s).state).toBe('idle');
+  });
+
+  it('cancelling refunds half the ingredients and frees the cook', () => {
+    const s = cookingGrill();
+    const cash = s.cash;
+    expect(cancelCooking(s, grill(s).id)).toBeNull();
+    expect(s.cash).toBe(cash + Math.floor(10 * TUNING.sellBack));
+    expect(grill(s).status).toBe('empty');
+    expect(you(s).state).toBe('idle');
+    expect(cancelCooking(s, grill(s).id)).not.toBeNull();
+  });
+
+  it('discarding empties a counter slot', () => {
+    const s = createInitialState(3);
+    s.counter[0].dish = 'hotdog';
+    s.counter[0].servings = 4;
+    expect(discardCounter(s, s.counter[0].id)).toBeNull();
+    expect(s.counter[0].servings).toBe(0);
+    expect(discardCounter(s, s.counter[0].id)).not.toBeNull();
+  });
+
+  it('a closed joint gets no new customers, and tired idle zombies go nap', () => {
+    const s = createInitialState(3);
+    const z = makeWorker(s, 'zombie', 'teen', { x: 4, y: 4 });
+    z.energy = 40;
+    s.workers.push(z);
+    setClosed(s, true);
+    expect(['toRest', 'resting']).toContain(z.state);
+    s.customers = [];
+    run(s, 120);
+    expect(s.customers).toHaveLength(0);
+    setClosed(s, false);
+    run(s, 60);
+    expect(s.customers.length).toBeGreaterThan(0);
   });
 });

@@ -223,6 +223,8 @@ export const UI_KEYS: string[] = [
   'ui_expand',
   'ui_sound_on',
   'ui_sound_off',
+  'ui_open',
+  'ui_closed',
 ];
 
 /** The raid map background (1600x900, anchor 0,0) and building icons placed on it (~160x140, anchor 0.5,1). */

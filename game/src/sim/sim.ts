@@ -218,6 +218,54 @@ export function plateDish(s: GameState, stoveId: string): string | null {
   return null;
 }
 
+/** Brain Sauce to finish a dish right now: 1 per started 2 minutes still to go. */
+export function finishCost(s: GameState, stoveId: string): number {
+  const st = s.stoves.find((x) => x.id === stoveId);
+  if (!st || st.status !== 'cooking') return 0;
+  return Math.max(1, Math.ceil(((st.doneAt ?? s.now) - s.now) / 120));
+}
+
+export function finishNow(s: GameState, stoveId: string): string | null {
+  const st = s.stoves.find((x) => x.id === stoveId);
+  if (!st || st.status !== 'cooking') return 'Nothing cooking there.';
+  const cost = finishCost(s, stoveId);
+  if (s.sauce < cost) return `Needs ${cost} Brain Sauce.`;
+  s.sauce -= cost;
+  st.doneAt = s.now;
+  updateStove(s, st);
+  return null;
+}
+
+/** Scrap a dish mid-cook: half the ingredients money comes back. */
+export function cancelCooking(s: GameState, stoveId: string): string | null {
+  const st = s.stoves.find((x) => x.id === stoveId);
+  if (!st || st.status !== 'cooking' || !st.dish) return 'Nothing cooking there.';
+  s.cash += Math.floor(DISH_BY_ID[st.dish].cost * TUNING.sellBack);
+  const cook = s.workers.find((w) => w.id === st.cookId);
+  if (cook?.state === 'cooking') {
+    cook.state = 'idle';
+    cook.stoveId = undefined;
+  }
+  st.status = 'empty';
+  st.dish = st.cookId = st.doneAt = st.burnAt = undefined;
+  return null;
+}
+
+/** Bin whatever is left in a counter slot (stale food, or to make room for a better dish). */
+export function discardCounter(s: GameState, slotId: string): string | null {
+  const slot = s.counter.find((c) => c.id === slotId);
+  if (!slot?.dish || slot.servings <= 0) return 'That spot is already empty.';
+  slot.dish = undefined;
+  slot.servings = 0;
+  return null;
+}
+
+/** Flip the OPEN/CLOSED sign. Closing also sends anyone idle off for a nap. */
+export function setClosed(s: GameState, closed: boolean) {
+  s.closed = closed;
+  if (closed) for (const w of s.workers) if (w.kind === 'zombie' && (w.state === 'idle' || w.state === 'daydream') && w.energy < w.stats.energy) rest(s, w.id);
+}
+
 export function addToCounter(s: GameState, dishId: string, servings: number): string | null {
   const slot = s.counter.find((c) => c.dish === dishId && c.servings > 0) ?? s.counter.find((c) => !c.dish || c.servings <= 0);
   if (!slot) return 'The counter is full! Buy another counter in the Shop.';
@@ -382,6 +430,7 @@ function freeSeats(s: GameState): Furniture[] {
 }
 
 function spawnCustomers(s: GameState, dt: number) {
+  if (s.closed) return;
   s.spawnCooldown -= dt;
   if (s.spawnCooldown > 0) return;
   // the original: roughly 1 customer inside per half-star of rating, +1

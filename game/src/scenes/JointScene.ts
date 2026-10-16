@@ -75,6 +75,7 @@ export class JointScene extends Phaser.Scene {
   ctl!: Controller;
   ready = false;
   private actors = new Map<string, Actor>();
+  private closedSign?: Phaser.GameObjects.Image;
   private staticLayer: Phaser.GameObjects.GameObject[] = [];
   private furnViews = new Map<string, Phaser.GameObjects.Image>();
   private wallViews = new Map<string, Phaser.GameObjects.Image>();
@@ -424,10 +425,7 @@ export class JointScene extends Phaser.Scene {
       const st = s.stoves.find((x) => x.furnitureId === f.id);
       if (st) return this.ctl.tapStove(st.id);
       const k = itemOf(f).kind;
-      if (k === 'counter') {
-        const total = s.counter.reduce((a, c) => a + (c.dish ? c.servings : 0), 0);
-        return this.ctl.info(total ? `${total} servings on the counter.` : 'The counter is empty! Cook something.');
-      }
+      if (k === 'counter') return this.ctl.select({ kind: 'counter', id: f.id });
       if (k === 'fridge') return this.game.events.emit('open-fridge');
       if (k === 'moneymaker' && payoutReady(s, f.id)) return this.game.events.emit('collect', f.id);
       if (k === 'moneymaker' || k === 'keg' || k === 'pethouse') return this.ctl.select({ kind: 'furniture', id: f.id });
@@ -674,6 +672,18 @@ export class JointScene extends Phaser.Scene {
     if (sig !== this.layoutSig) {
       this.layoutSig = sig;
       this.rebuild();
+    }
+    // the CLOSED sign swings on the front door while the joint is shut
+    if (s.closed && !this.closedSign && this.textures.exists('ui_closed')) {
+      this.closedSign = this.add.image(0, 0, 'ui_closed').setScale(0.42 / TEX_S).setOrigin(0.5, 0.1);
+    }
+    if (this.closedSign) {
+      const c = iso(DOOR_X, 0);
+      this.closedSign
+        .setVisible(!!s.closed)
+        .setPosition(c.x + TILE_W / 4, c.y - WALL_H * 0.62)
+        .setDepth(depthOf(DOOR_X, 0) - 4)
+        .setRotation(Math.sin(this.t * 2.2) * 0.06);
     }
     const alive = new Set<string>();
     for (const w of s.workers) {

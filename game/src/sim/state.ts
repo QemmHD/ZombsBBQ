@@ -169,6 +169,8 @@ export interface GameState {
   spawnCooldown: number;
   /** last few customer types, to keep the crowd varied */
   recentTypes: string[];
+  /** OPEN/CLOSED sign: closed joints get no new customers (the crew can nap in peace before a raid) */
+  closed?: boolean;
   tut: number;
   tutTimer: number;
   freeInfects: number;

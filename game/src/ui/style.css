@@ -350,6 +350,12 @@ img.ico-s {
   letter-spacing: 0.3px;
   pointer-events: none;
 }
+.btn-sq.sign.closed {
+  background: linear-gradient(#ffe1dc, #f6c2b8);
+}
+.btn-sq.sign.closed label {
+  color: var(--red);
+}
 .badge {
   position: absolute;
   top: -8px;
@@ -429,6 +435,7 @@ img.ico-s {
   bottom: var(--safe-b);
   width: min(340px, 46vw);
   max-height: calc(100vh - var(--safe-t) - var(--safe-b) - 70px);
+  max-height: calc(100dvh - var(--safe-t) - var(--safe-b) - 70px);
   overflow-y: auto;
   background: var(--cream);
   border: 2.5px solid var(--ink);
@@ -763,6 +770,7 @@ h4 {
   padding: 12px 16px 14px;
   width: min(560px, 92vw);
   max-height: calc(100vh - var(--safe-t) - var(--safe-b) - 16px);
+  max-height: calc(100dvh - var(--safe-t) - var(--safe-b) - 16px);
   overflow-y: auto;
   box-shadow: 0 5px 0 rgba(43, 27, 23, 0.4);
   animation: pop 0.25s cubic-bezier(0.2, 1.5, 0.4, 1);
@@ -1188,6 +1196,7 @@ h4 {
 /* ---------- raid map ---------- */
 .modal.map {
   width: min(96vw, calc((100vh - 24px) * 16 / 9));
+  width: min(96vw, calc((100dvh - 24px) * 16 / 9));
   padding: 6px;
 }
 .map-wrap {
@@ -1374,6 +1383,7 @@ h4 {
   display: grid;
   gap: 4px;
   max-height: calc(100vh - 140px);
+  max-height: calc(100dvh - 140px);
   overflow-y: auto;
 }
 .tray-u {

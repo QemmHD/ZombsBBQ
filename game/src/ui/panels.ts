@@ -198,7 +198,7 @@ function collectUnlocks(level: number, unlocks: string[]) {
 
 export function openOffline(hud: Hud, r: { sec: number; cash: number }) {
   hud.openModal(
-    `<h2>Welcome back, Boss!</h2><p>The crew kept the joint running for ${fmtTime(r.sec)}${r.sec >= 8 * 3600 ? ' (8h max)' : ''}.</p><p class="big-num">${priceHtml({ cash: Math.max(0, r.cash) })}</p><div class="actions"><button class="btn green" data-close>Let’s cook</button></div>`,
+    `<h2>Welcome back, Boss!</h2><p>The crew kept the joint running for ${fmtTime(r.sec)}${r.sec >= 8 * 3600 ? ' (8h max)' : ''}.</p><p class="big-num">${priceHtml({ cash: Math.max(0, r.cash) })}</p>${r.cash <= 0 ? '<p class="small">Tip: stack the counter with food before you go. The crew serves whatever’s there while you’re away.</p>' : ''}<div class="actions"><button class="btn green" data-close>Let’s cook</button></div>`,
     { cls: 'narrow' },
   );
 }

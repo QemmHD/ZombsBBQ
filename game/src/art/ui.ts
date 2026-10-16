@@ -518,7 +518,27 @@ function tools(): ArtAsset[] {
   return out;
 }
 
+// ------------------------------------------------------------------ open / closed door sign
+function signs(): ArtAsset[] {
+  const sign = (d: Doc, open: boolean) => {
+    const board = open ? C.green : C.red;
+    const boardD = open ? C.greenD : C.redD;
+    let s = rod('M32,7L13,26M32,7L51,26', 1.6, '#6B4A2E', 1.2); // string
+    s += d.shaded(ell(32, 7, 3.4), C.steel, C.steelD, O2, [-0.8, -0.8]); // nail
+    // board hangs a little crooked when closed (it's been slammed)
+    s += `<g transform="rotate(${open ? 0 : -6} 32 40)">`;
+    s += d.shaded(rrect(5, 24, 54, 30, 6), board, boardD, O, [-2, -2]);
+    s += S(rrect(9.5, 28.5, 45, 21, 3.5), 1.6, open ? C.greenL : '#FF8A80');
+    s += txt(32, open ? 45.6 : 44.8, open ? 'OPEN' : 'CLOSED', open ? 15 : 11.6, '#FFFFFF', { sw: 2.6, extra: open ? '' : 'textLength="40" lengthAdjust="spacingAndGlyphs"' });
+    s += hl(14, 29, 6, 1.4, 0, 0.55);
+    if (!open) s += P('M44,52Q47,59 44,62Q41,59 44,52Z', C.green, O2); // a zombie drip, because of course
+    s += '</g>';
+    return s;
+  };
+  return [icon('ui_open', (d) => sign(d, true)), icon('ui_closed', (d) => sign(d, false))];
+}
+
 export function buildUiIcons(): ArtAsset[] {
-  return [...hud(), ...tabs(), ...tools()];
+  return [...hud(), ...tabs(), ...tools(), ...signs()];
 }
 

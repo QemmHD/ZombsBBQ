@@ -161,7 +161,8 @@ function addTexture(scene: Phaser.Scene, key: string, svg: string, w: number, h:
 /** Rasterize every joint prop (tiles, walls, furniture, dishes, fx). */
 export function loadProps(scene: Phaser.Scene, onProgress?: (f: number) => void): Promise<void> {
   initArt();
-  const list = [...props.values()];
+  // the door's CLOSED sign reuses the HUD icon
+  const list = [...props.values(), ...['ui_closed'].map((k) => ui.get(k)!).filter(Boolean)];
   let done = 0;
   return Promise.all(
     list.map((a) =>
