@@ -1,5 +1,37 @@
 # 04 — Tech Plan (getting it on your iPhone)
 
+## 0. Decision (Oct 2026 research update): build web-first, wrap for the App Store
+
+After more research, we're **building Zombs BBQ as a TypeScript + Phaser 4 game** that runs in iPhone Safari right away and gets wrapped into a real App Store app with **Capacitor**. Why this beats starting in Unity:
+
+| | Web-first (Phaser 4 + Capacitor) | Unity |
+|---|---|---|
+| Play on your iPhone | **Today**, via a link (and "Add to Home Screen") | Needs a Mac + Xcode build for every test |
+| App Store path | Capacitor wraps the same code into a native iOS app (Phaser's own documented route). A Mac is only needed at that final step. | Native export (Mac needed) |
+| Engine maturity | Phaser 4.0 shipped Apr 2026 with a rebuilt WebGL renderer and mobile speed/memory gains. We use 4.2.1. | Very mature |
+| Cost | Free, MIT licensed | Free tier, with license rules |
+| Fits this game | 2D isometric sim with tweened "cutout" animation, which is exactly Phaser's sweet spot | Overkill for 2D |
+
+**Known iOS web limits and how we handle them:**
+- Storage can be cleared for sites you don't visit. Home Screen web apps are exempt, and we add cloud saves later. The Capacitor app is unaffected.
+- There's no background sync on iOS web. That's fine, because the game computes offline progress from timestamps when you come back.
+- Push notifications need the Home Screen app (iOS 16.4+) or the Capacitor app. They'll be used for "your ribs are ready!" alerts.
+
+**Code layout:**
+```
+game/
+  src/sim/      pure TypeScript game rules (no graphics): unit-tested, deterministic, runs offline catch-up
+  src/art/      vector (SVG) sprite generators in the Zombs BBQ style, turned into textures at boot
+  src/scenes/   Phaser scenes: Boot → Joint (isometric world) + HUD (UI overlay)
+  tests/        Vitest unit tests for the sim + a Playwright smoke test that screenshots an iPhone viewport
+```
+
+The original Unity plan below stays as the alternative if we ever outgrow the web stack.
+
+Sources: [Phaser 3 vs Phaser 4](https://phaser.io/news/2026/05/phaser-3-vs-phaser-4), [Migrating from Phaser 3 to 4](https://phaser.io/news/2026/04/migrating-from-phaser-3-to-phaser-4-what-you-need-to-know), [Phaser 4.0.0 changelog](https://raw.githubusercontent.com/phaserjs/phaser/HEAD/changelog/v4/4.0/CHANGELOG-v4.0.0.md), [Bring your Phaser game to iOS and Android with Capacitor](https://phaser.io/tutorials/bring-your-phaser-game-to-ios-and-android-with-capacitor), [PWA iOS limitations](https://www.magicbell.com/blog/pwa-ios-limitations-safari-support-complete-guide), [PWAs on iOS](https://monterail.com/blog/pwa-for-apple-ios)
+
+---
+
 ## 1. Recommended stack
 
 | Layer | Choice | Why |
