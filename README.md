@@ -6,6 +6,10 @@ Zombs BBQ is an iPhone restaurant sim and spiritual successor to *Zombie Café* 
 
 ![Logo](art/concepts/logo.svg)
 
+## Play the prototype
+
+The game lives in [`game/`](game/) (TypeScript + Phaser 4). `cd game && npm install && npm run dev` to run it, `npm test` for tests. See [07 — Build Log](docs/07-build-log.md).
+
 ## The plan
 
 | Doc | What's inside |
@@ -15,6 +19,7 @@ Zombs BBQ is an iPhone restaurant sim and spiritual successor to *Zombie Café* 
 | [03 — Art & Animation](docs/03-art-and-animation.md) | Style rules, palette, UI, Spine animation list, juice checklist, pipeline |
 | [04 — Tech Plan](docs/04-tech-plan.md) | Unity 6 + Spine stack, architecture, what you need for iPhone |
 | [05 — Roadmap](docs/05-roadmap.md) | Step-by-step phases from setup to App Store and live ops |
+| [07 — Build Log](docs/07-build-log.md) | What's playable now, how it's tested, what's next |
 | [06 — Menus, Unlocks, Customers & Raid Rules](docs/06-menus-unlocks-customers.md) | Every screen and button, store tabs, level 1–50 unlock tree, full customer roster with rare spawns, raid and friend rules |
 
 ## Concept art

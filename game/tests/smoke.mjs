@@ -37,7 +37,7 @@ const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(`http://localhost:${port}/index.html`);
-await page.waitForFunction(() => window.zbbq?.game?.scene?.isActive('joint'), null, { timeout: 20000 });
+await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 30000 });
 await page.waitForTimeout(1500);
 await page.screenshot({ path: join(out, '01-start.png') });
 

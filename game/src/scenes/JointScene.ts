@@ -59,16 +59,39 @@ export class JointScene extends Phaser.Scene {
     this.ctl = data.ctl;
   }
 
-  preload() {
-    for (const a of buildProps()) this.load.svg(a.key, svgData(a.svg), { width: a.w * TEX_S, height: a.h * TEX_S });
+  /**
+   * Rasterize every SVG into a texture at TEX_S scale. Images are created directly (not through the
+   * Phaser loader) so it works under strict content-security policies (embedded pages, app shells).
+   */
+  private loadArt(): Promise<void> {
+    const jobs: Promise<void>[] = [];
+    const add = (key: string, svg: string, w: number, h: number) => {
+      const sized = svg.replace(/<svg([^>]*?) width="[^"]*" height="[^"]*"/, `<svg$1 width="${w * TEX_S}" height="${h * TEX_S}"`);
+      jobs.push(
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            if (!this.textures.exists(key)) this.textures.addImage(key, img);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = svgData(sized);
+        }),
+      );
+    };
+    for (const a of buildProps()) {
+      add(a.key, a.svg, a.w, a.h);
+      this.propMeta.set(a.key, a);
+    }
     for (const id of CHAR_IDS) {
       const art = buildChar(id);
       this.charArt.set(id, art);
-      for (const p of art.parts) this.load.svg(p.key, svgData(p.svg), { width: p.w * TEX_S, height: p.h * TEX_S });
+      for (const p of art.parts) add(p.key, p.svg, p.w, p.h);
     }
-    this.propMeta = new Map(buildProps().map((a) => [a.key, a]));
+    return Promise.all(jobs).then(() => undefined);
   }
   private propMeta = new Map<string, { w: number; h: number; ox: number; oy: number }>();
+  private ready = false;
 
   private img(key: string, x: number, y: number) {
     const m = this.propMeta.get(key);
@@ -79,6 +102,10 @@ export class JointScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#7cb342');
+    void this.loadArt().then(() => this.build());
+  }
+
+  private build() {
     this.buildGround();
     this.buildWalls();
     this.buildFurniture();
@@ -86,6 +113,7 @@ export class JointScene extends Phaser.Scene {
     this.setupInput();
     this.ctl.onEvent((e) => this.fx(e));
     this.scale.on('resize', () => this.applyZoom(true));
+    this.ready = true;
   }
 
   // ---------- static world ----------
@@ -472,6 +500,7 @@ export class JointScene extends Phaser.Scene {
   // ---------- per-frame ----------
 
   update(_time: number, deltaMs: number) {
+    if (!this.ready) return;
     const dt = Math.min(deltaMs / 1000, 0.1);
     this.t += dt;
     this.ctl.update(dt);

@@ -15,3 +15,11 @@ for (const m of [...html.matchAll(/<script type="module"[^>]*src="\.\/([^"]+)"[^
 }
 await writeFile(join(dist, 'zombs-bbq.html'), html);
 console.log(`dist/zombs-bbq.html ${(html.length / 1024).toFixed(0)} KB`);
+
+// Embeddable variant (no <html>/<head>/<body> wrapper) for hosts that supply their own document skeleton.
+const title = html.match(/<title>[\s\S]*?<\/title>/)?.[0] ?? '<title>Zombs BBQ</title>';
+const styles = [...html.matchAll(/<style>[\s\S]*?<\/style>/g)].map((m) => m[0]).join('\n');
+const scripts = [...html.matchAll(/<script type="module">[\s\S]*?<\/script>/g)].map((m) => m[0]).join('\n');
+const embed = `${title}\n${styles}\n<div id="game"></div>\n<div id="hud"></div>\n${scripts}\n`;
+await writeFile(join(dist, 'zombs-bbq.embed.html'), embed);
+console.log(`dist/zombs-bbq.embed.html ${(embed.length / 1024).toFixed(0)} KB`);

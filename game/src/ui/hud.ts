@@ -190,11 +190,18 @@ export class Hud {
     this.showModal(
       `<h2>Settings</h2><p>Zombs BBQ prototype · build ${__BUILD__}</p><div class="actions"><button class="btn blue" data-reset>Start a new joint</button></div><p class="small">Your progress saves on this device automatically.</p>`,
     );
-    this.el.modal.querySelector<HTMLElement>('[data-reset]')!.onclick = () => {
-      if (confirm('Wipe this joint and start over?')) {
+    // in-page two-step confirm (embedded pages and app shells block window.confirm)
+    const btn = this.el.modal.querySelector<HTMLButtonElement>('[data-reset]')!;
+    btn.onclick = () => {
+      if (btn.dataset.armed) {
         this.ctl.reset();
         this.el.modal.innerHTML = '';
+        this.ctl.toast('Fresh joint, fresh start. Grab the tongs!');
+        return;
       }
+      btn.dataset.armed = '1';
+      btn.textContent = 'Tap again to wipe your joint';
+      btn.classList.remove('blue');
     };
   }
 
