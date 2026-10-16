@@ -9,7 +9,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "smoke": "node tests/smoke.mjs",
-    "gallery": "node tests/gallery.mjs"
+    "gallery": "node tests/gallery.mjs",
+    "devices": "node tests/devices.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

@@ -402,7 +402,11 @@ img.ico-s {
   pointer-events: none;
 }
 .card-open .hint {
-  max-width: calc(100vw - min(340px, 46vw) - var(--safe-l) - var(--safe-r) - 84px);
+  /* only room for the hint if the card leaves some; otherwise it steps aside */
+  max-width: calc(100vw - min(340px, calc(100vw - var(--safe-l) - var(--safe-r) - 260px)) - var(--safe-l) - var(--safe-r) - 150px);
+}
+.card-open .hint .bubble {
+  font-size: 12px;
 }
 .hint img {
   width: 54px;
@@ -431,9 +435,10 @@ img.ico-s {
 /* ---------- context card ---------- */
 .card {
   position: absolute;
-  right: var(--safe-r);
+  /* sits beside the right-hand button column, never on top of it */
+  right: calc(var(--safe-r) + 64px);
   bottom: var(--safe-b);
-  width: min(340px, 46vw);
+  width: min(340px, calc(100vw - var(--safe-l) - var(--safe-r) - 260px));
   max-height: calc(100vh - var(--safe-t) - var(--safe-b) - 70px);
   max-height: calc(100dvh - var(--safe-t) - var(--safe-b) - 70px);
   overflow-y: auto;
@@ -759,11 +764,14 @@ h4 {
   inset: 0;
   background: rgba(43, 27, 23, 0.5);
   display: grid;
+  /* one track as wide as the safe area, so a modal can never be wider than the screen */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: max(8px, var(--safe-t)) var(--safe-r) var(--safe-b) var(--safe-l);
 }
 .modal {
   position: relative;
+  max-width: 100%;
   background: var(--cream);
   border: 3px solid var(--ink);
   border-radius: 18px;
