@@ -181,11 +181,11 @@ Priority reflects (a) how much it changes the feel of play compared with the ori
     - Dirty items count against you.
     - Closed or out-of-food penalties.
     - Green or red blinking stars on return.
-12. **Purple bonus stars** from a 4-task to-do list; the reviewer bribe.
+12. **Purple bonus stars** from a 4-task to-do list; the reviewer bribe. *(Done in v3.)*
 13. **Cash items** at $/h with a cap; "$" and "!" markers; no earnings while closed.
 14. **Zombie levels** from serving and raiding (+5% max energy per level).
 15. **Recipe ladder** modelled on the original's economics: long timers, thin margins, XP-heavy. Our own BBQ dishes and names.
-16. **Rare variants** (Bulk, Quick, Spicy, Fancy, Frozen, Fresh) from raids, plus UNLOCK in the fridge.
+16. **Rare variants** (Bulk, Quick, Spicy, Fancy, Frozen, Fresh) from raids, plus UNLOCK in the fridge. *(Done in v3.)*
 17. **Tombstones** as placed outdoor items with 5-second glow buffs and 5 uses per 24 h.
 18. **Rival rotation:** a beaten café closes and is replaced later; a neglected rival steals customers; a special boss café appears after Lv 5.
 19. **HUD layout** closer to the original (icon row at the top-left, crew head with count, storage crate), still fitted to the iPhone safe areas.

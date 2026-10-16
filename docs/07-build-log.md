@@ -77,6 +77,22 @@ Researched against the original's real gameplay and its decoded animation and la
 - You select a zombie, then tap a target or the counter. You can also use ATTACK ALL, tombstones (5-second buffs) and summons.
 - A neglected rival steals your customers. A boss food truck turns up from level 5.
 
+**Bonus stars and rare dishes**
+- **Gus's to-do list (from level 6):** 4 tasks drawn from your situation: serve, cook, clear plates, earn, win a raid, infect, decorate. Finishing the list earns a **purple star**, up to 3 at once. The timer is 48 h for the first star, then +36 h and +24 h.
+  - **Each purple star:** customers arrive 15% more often, one more customer can come in at a time, and tips go up 15%.
+  - **Bribe the reviewer:** 2 Brain Sauce ticks off a task.
+- **Rare variants:** Bulk, Quick, Spicy, Fancy, Frozen and Fresh versions of a known dish.
+  - A dish you steal in a raid has a 30% chance to come home as a variant.
+  - UNLOCK it in the fridge, and it then shows in the dish picker and cookbook.
+
+**Raids, continued**
+- **Diners:** a café starts with the original's per-level diner count instead of every chair full. More diners trickle in every 5–20 s; if they walk into a brawl, they scream and run.
+- **Eating:** an eaten diner drops while the zombie bends over the body (the original's feast clip).
+
+**Characters, continued**
+- **Proportions:** real bodies now, measured against the original's part sizes. The legs show below the shirt, the torso is taller and the arms reach mid-thigh; the head is about half the figure.
+- **Raid cast:** waiters, waitresses, head chefs with kitchen weapons, Big Foot-Long and Werewoof are on the same rig and in the same style.
+
 **Fixes**
 - Phaser 4.2.1's multi-texture shader compared an interpolated texture id with exact float equality, so half of a rotated sprite could vanish. It's patched at build time (`vite.config.ts`).
 - Servers no longer walk into unreachable pockets.
