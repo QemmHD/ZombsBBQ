@@ -1,17 +1,38 @@
+/**
+ * The shop catalog (v3). Like the original, every buildable item fills exactly one tile; tables seat
+ * one customer at a time with a separate chair beside them; walls and floors are bought one segment /
+ * tile at a time; star items speed up the rating instead of setting it. Prices follow the original's
+ * ladder (see docs/08-original-deep-dive.md); names and art are our own.
+ */
 import type { StationKind } from './data';
 
+/** Facings. Most items have two (front toward screen lower-left 'sw' or lower-right 'se'); chairs have four. */
 export type Dir = 'se' | 'sw' | 'ne' | 'nw';
-/** Unit step in the direction a seat faces (toward its table). */
+/** Unit step in the direction an item faces (a chair faces its table; a stove's cook stands there). */
 export const DIR_STEP: Record<Dir, { x: number; y: number }> = {
   se: { x: 1, y: 0 },
   nw: { x: -1, y: 0 },
   sw: { x: 0, y: 1 },
   ne: { x: 0, y: -1 },
 };
-export const DIR_ORDER: Dir[] = ['se', 'sw', 'nw', 'ne'];
+export const DIR4: Dir[] = ['sw', 'se', 'ne', 'nw'];
+export const DIR2: Dir[] = ['sw', 'se'];
 
 export type StoreTab = 'featured' | 'decor' | 'kitchen' | 'furniture' | 'walls' | 'special';
-export type ItemKind = 'table' | 'seat' | 'counter' | 'stove' | 'fridge' | 'decor' | 'wall' | 'moneymaker' | 'keg' | 'pethouse';
+export type ItemKind =
+  | 'stove'
+  | 'counter'
+  | 'sink'
+  | 'fridge'
+  | 'table'
+  | 'chair'
+  | 'divider'
+  | 'decor'
+  | 'moneymaker'
+  | 'keg'
+  | 'pethouse'
+  | 'tombstone'
+  | 'wall';
 
 export interface ItemDef {
   id: string;
@@ -21,99 +42,180 @@ export interface ItemDef {
   level: number;
   cash?: number;
   sauce?: number;
-  decor: number;
-  /** art key; seats use `${art}_${dir}`; wall hangings use `${art}_l` / `${art}_r` */
+  /** star bonus: the rating rises faster and falls slower (original "RatingBonus"); negative for grime */
+  rating: number;
+  /** XP for buying it */
+  xp: number;
+  /** art key (floor items are drawn facing sw and mirrored for se; chairs add _ne art) */
   art: string;
-  /** seats: which facing directions exist */
-  dirs?: Dir[];
-  /** tables: which sides take seats (default all four) */
-  seatSides?: Dir[];
+  facing: 'none' | 'two' | 'four';
+  /** placed outside on the front lawn (tombstones, pet houses) */
+  outdoor?: boolean;
   station?: StationKind;
-  payout?: { cash: number; everySec: number };
+  /** stoves: cook-speed multiplier */
+  speed?: number;
+  /** money-makers: cash per hour, up to a maximum (original) */
+  payout?: { perHour: number; max: number };
   pet?: 'pug' | 'rotweiler';
+  /** tombstones: which raid boost */
+  boost?: 'str' | 'hp';
   max?: number;
+  /** only comes with the starting café (not sold) */
+  starter?: boolean;
   blurb: string;
 }
 
-const ALL: Dir[] = ['se', 'sw', 'ne', 'nw'];
+const I = (d: Omit<ItemDef, 'rating' | 'xp' | 'facing'> & Partial<Pick<ItemDef, 'rating' | 'xp' | 'facing'>>): ItemDef => ({
+  rating: 0,
+  xp: Math.max(0, Math.round((d.cash ?? 0) / 65 + (d.sauce ?? 0) * 40)),
+  facing: 'two',
+  ...d,
+});
+
+export const TINTS = [
+  { id: 'white', name: 'White' },
+  { id: 'cream', name: 'Cream' },
+  { id: 'sage', name: 'Sage' },
+  { id: 'slate', name: 'Slate' },
+  { id: 'oxblood', name: 'Oxblood' },
+  { id: 'charcoal', name: 'Charcoal' },
+] as const;
 
 export const ITEMS: ItemDef[] = [
-  // ----- furniture -----
-  { id: 'table_picnic', name: 'Picnic Table', tab: 'furniture', kind: 'table', level: 1, cash: 60, decor: 3, art: 'table', seatSides: ['se', 'nw'], blurb: 'Seats two on benches. Splinters free.' },
-  { id: 'bench', name: 'Picnic Bench', tab: 'furniture', kind: 'seat', level: 1, cash: 25, decor: 1, art: 'bench', dirs: ['se', 'nw'], blurb: 'Goes on the long side of a picnic table.' },
-  { id: 'chair_wood', name: 'Wooden Chair', tab: 'furniture', kind: 'seat', level: 2, cash: 40, decor: 2, art: 'chair_wood', dirs: ALL, blurb: 'Rotate it to face a table.' },
-  { id: 'table_diner', name: 'Chrome Diner Table', tab: 'furniture', kind: 'table', level: 3, cash: 150, decor: 5, art: 'table_diner', blurb: 'Seats four. Shiny enough to see your rot.' },
-  { id: 'chair_diner', name: 'Diner Chair', tab: 'furniture', kind: 'seat', level: 3, cash: 60, decor: 2, art: 'chair_diner', dirs: ALL, blurb: 'Red vinyl. Wipe-clean, thank goodness.' },
-  { id: 'table_barrel', name: 'Barrel Table', tab: 'furniture', kind: 'table', level: 5, cash: 220, decor: 6, art: 'table_barrel', blurb: 'Roadhouse classic. Seats four.' },
-  { id: 'table_coffin', name: 'Coffin Table', tab: 'furniture', kind: 'table', level: 8, cash: 500, decor: 9, art: 'table_coffin', blurb: 'Seats four. Occupant optional.' },
-  { id: 'chair_bone', name: 'Bone Chair', tab: 'furniture', kind: 'seat', level: 8, cash: 180, decor: 4, art: 'chair_bone', dirs: ALL, blurb: 'Ergonomic, if you are a skeleton.' },
-  // ----- kitchen -----
-  { id: 'grill', name: 'Rusty Grill', tab: 'kitchen', kind: 'stove', level: 1, cash: 150, decor: 1, art: 'grill', station: 'grill', blurb: 'Hot dogs, burgers, wings.' },
-  { id: 'smoker', name: 'Barrel Smoker', tab: 'kitchen', kind: 'stove', level: 4, cash: 600, decor: 2, art: 'smoker', station: 'smoker', blurb: 'Low and slow. Big money.' },
-  { id: 'fryer', name: 'Deep Fryer', tab: 'kitchen', kind: 'stove', level: 6, cash: 900, decor: 2, art: 'fryer', station: 'fryer', blurb: 'If it moves, fry it.' },
-  { id: 'counter', name: 'Serving Counter', tab: 'kitchen', kind: 'counter', level: 1, cash: 80, decor: 1, art: 'counter', blurb: 'Holds one stack of dishes.' },
-  { id: 'counter_chrome', name: 'Chrome Counter', tab: 'kitchen', kind: 'counter', level: 5, cash: 250, decor: 3, art: 'counter_chrome', blurb: 'Same job, more sparkle.' },
-  { id: 'fridge', name: 'The Fridge', tab: 'kitchen', kind: 'fridge', level: 1, cash: 200, decor: 2, art: 'fridge', max: 1, blurb: 'Stolen dishes go here.' },
+  // ----- kitchen: stoves, counters, sinks, fridges -----
+  I({ id: 'stove_dirty', name: 'Grimy Stove', tab: 'kitchen', kind: 'stove', level: 1, cash: 50, rating: -0.01, xp: 0, art: 'stove_dirty', station: 'stove', speed: 1, starter: true, blurb: 'One burner works. Mostly.' }),
+  I({ id: 'stove_plain', name: 'Plain Stove', tab: 'kitchen', kind: 'stove', level: 1, cash: 500, art: 'stove_plain', station: 'stove', speed: 1, blurb: 'Cooks the house menu. Every joint needs two.' }),
+  I({ id: 'stove_steel', name: 'Stainless Stove', tab: 'kitchen', kind: 'stove', level: 5, cash: 25000, rating: 0.02, art: 'stove_steel', station: 'stove', speed: 1.1, blurb: '10% faster. 100% shinier.' }),
+  I({ id: 'stove_super', name: 'Souped-Up Stove', tab: 'kitchen', kind: 'stove', level: 7, sauce: 20, rating: 0.01, art: 'stove_super', station: 'stove', speed: 1.2, blurb: 'Hot-rod pipes. 20% faster.' }),
+  I({ id: 'grill', name: 'Rusty BBQ Grill', tab: 'kitchen', kind: 'stove', level: 2, cash: 1200, art: 'grill', station: 'grill', speed: 1, blurb: 'Unlocks the Grill cookbook: burgers, wings, kebabs.' }),
+  I({ id: 'smoker', name: 'Barrel Smoker', tab: 'kitchen', kind: 'stove', level: 4, cash: 3000, art: 'smoker', station: 'smoker', speed: 1, blurb: 'Unlocks the Smoker cookbook. Low and slow.' }),
+  I({ id: 'fryer', name: 'Deep Fryer', tab: 'kitchen', kind: 'stove', level: 6, cash: 5000, art: 'fryer', station: 'fryer', speed: 1, blurb: 'Unlocks the Fryer cookbook. If it moves, fry it.' }),
+  I({ id: 'counter_plain', name: 'Serving Counter', tab: 'kitchen', kind: 'counter', level: 1, cash: 500, art: 'counter_plain', blurb: 'Plate food here. Dishes stack: one counter holds them all.' }),
+  I({ id: 'counter_steel', name: 'Stainless Counter', tab: 'kitchen', kind: 'counter', level: 5, cash: 15000, rating: 0.01, art: 'counter_steel', blurb: 'Same job, more sparkle.' }),
+  I({ id: 'counter_bar', name: 'Bar Counter', tab: 'kitchen', kind: 'counter', level: 8, cash: 2000, rating: 0.01, art: 'counter_bar', blurb: 'Dark wood. Sticky in all the right places.' }),
+  I({ id: 'sink_dirty', name: 'Grimy Sink', tab: 'kitchen', kind: 'sink', level: 1, cash: 50, rating: -0.01, xp: 0, art: 'sink_dirty', starter: true, blurb: 'Servers dump dirty plates here.' }),
+  I({ id: 'sink_plain', name: 'Plain Sink', tab: 'kitchen', kind: 'sink', level: 1, cash: 500, art: 'sink_plain', blurb: 'Servers clear dirty plates to the nearest sink.' }),
+  I({ id: 'sink_steel', name: 'Stainless Sink', tab: 'kitchen', kind: 'sink', level: 5, cash: 25000, rating: 0.02, art: 'sink_steel', blurb: 'Sparkling. Suspiciously so.' }),
+  I({ id: 'trash_red', name: 'Red Trash Can', tab: 'kitchen', kind: 'sink', level: 1, cash: 1500, art: 'trash_red', blurb: 'Plates go in. Questions do not come out.' }),
+  I({ id: 'trash_green', name: 'Wheelie Bin', tab: 'kitchen', kind: 'sink', level: 10, cash: 3000, art: 'trash_green', blurb: 'Big enough for a body. Hypothetically.' }),
+  I({ id: 'fridge_dirty', name: 'Grimy Fridge', tab: 'kitchen', kind: 'fridge', level: 1, cash: 50, rating: -0.01, xp: 0, art: 'fridge_dirty', starter: true, blurb: 'Stolen food goes here. "DON\'T EAT STAFF."' }),
+  I({ id: 'fridge_plain', name: 'Plain Fridge', tab: 'kitchen', kind: 'fridge', level: 1, cash: 500, art: 'fridge_plain', blurb: 'Holds raid loot and gifts.' }),
+  I({ id: 'fridge_steel', name: 'Stainless Fridge', tab: 'kitchen', kind: 'fridge', level: 5, cash: 25000, rating: 0.02, art: 'fridge_steel', blurb: 'Hums a little tune.' }),
+  I({ id: 'keg_toxic', name: 'Toxic Barrel', tab: 'special', kind: 'keg', level: 1, sauce: 50, art: 'keg_toxic', blurb: 'Resting zombies recover faster. Stacks!' }),
+  // ----- furniture: one-seat tables + separate chairs (the original's rule) -----
+  ...TINTS.map((t, i) =>
+    I({ id: `table_plain_${t.id}`, name: `Plain Table (${t.name})`, tab: 'furniture', kind: 'table', level: 1 + Math.floor(i / 2), cash: 150 + Math.floor(i / 2) * 50, art: `table_plain_${t.id}`, facing: 'none', blurb: 'Seats one customer, with a chair beside it.' }),
+  ),
+  ...TINTS.map((t, i) =>
+    I({ id: `chair_plain_${t.id}`, name: `Plain Chair (${t.name})`, tab: 'furniture', kind: 'chair', level: 1 + Math.floor(i / 2), cash: 75 + Math.floor(i / 2) * 25, art: `chair_plain_${t.id}`, facing: 'four', blurb: 'Put it next to a table, facing it.' }),
+  ),
+  I({ id: 'table_diner', name: 'Diner Table', tab: 'furniture', kind: 'table', level: 3, cash: 350, art: 'table_diner', facing: 'none', blurb: 'Chrome edge. Speckled top. Gum underneath.' }),
+  I({ id: 'chair_diner', name: 'Diner Chair', tab: 'furniture', kind: 'chair', level: 3, cash: 150, art: 'chair_diner', facing: 'four', blurb: 'Red vinyl. Wipe-clean, thank goodness.' }),
+  I({ id: 'table_wood', name: 'Rustic Table', tab: 'furniture', kind: 'table', level: 6, cash: 1000, art: 'table_wood', facing: 'none', blurb: 'Hand-hewn planks. Splinters free.' }),
+  I({ id: 'chair_wood', name: 'Ladder-back Chair', tab: 'furniture', kind: 'chair', level: 6, cash: 500, art: 'chair_wood', facing: 'four', blurb: 'Country charm, undead clientele.' }),
+  I({ id: 'table_barrel', name: 'Barrel Table', tab: 'furniture', kind: 'table', level: 9, cash: 1400, art: 'table_barrel', facing: 'none', blurb: 'Roadhouse classic.' }),
+  I({ id: 'chair_barrel', name: 'Barrel Stool', tab: 'furniture', kind: 'chair', level: 9, cash: 600, art: 'chair_barrel', facing: 'four', blurb: 'Sit on it. Do not open it.' }),
+  I({ id: 'table_coffin', name: 'Coffin Table', tab: 'furniture', kind: 'table', level: 12, sauce: 2, rating: 0.01, art: 'table_coffin', facing: 'none', blurb: 'Occupant optional.' }),
+  I({ id: 'chair_bone', name: 'Bone Throne', tab: 'furniture', kind: 'chair', level: 12, sauce: 2, rating: 0.01, art: 'chair_bone', facing: 'four', blurb: 'Ergonomic, if you are a skeleton.' }),
+  I({ id: 'divider_plain', name: 'Plain Divider', tab: 'furniture', kind: 'divider', level: 4, cash: 200, art: 'divider_plain', blurb: 'Wall off the kitchen. Nobody wants to see that.' }),
+  I({ id: 'divider_brick', name: 'Brick Half-wall', tab: 'furniture', kind: 'divider', level: 7, cash: 500, art: 'divider_brick', blurb: 'Sturdy. Mostly.' }),
+  I({ id: 'divider_wood', name: 'Wood Divider', tab: 'furniture', kind: 'divider', level: 9, cash: 750, art: 'divider_wood', blurb: 'Saloon-style.' }),
   // ----- floor decor -----
-  { id: 'plant', name: 'Potted Plant', tab: 'decor', kind: 'decor', level: 1, cash: 40, decor: 4, art: 'plant', blurb: 'The only living thing in here.' },
-  { id: 'tombstone', name: 'Tombstone', tab: 'decor', kind: 'decor', level: 2, cash: 60, decor: 4, art: 'tombstone', blurb: 'Here lies Gary. Gary works here now.' },
-  { id: 'cactus', name: 'Cactus', tab: 'decor', kind: 'decor', level: 2, cash: 70, decor: 5, art: 'cactus', blurb: 'Hug at your own risk.' },
-  { id: 'flamingo_zombie', name: 'Zombie Flamingo', tab: 'decor', kind: 'decor', level: 3, cash: 120, decor: 6, art: 'flamingo_zombie', blurb: 'Pink, plastic, peckish.' },
-  { id: 'hay_bale', name: 'Hay Bale', tab: 'decor', kind: 'decor', level: 3, cash: 90, decor: 5, art: 'hay_bale', blurb: 'Roadhouse vibes. Itchy.' },
-  { id: 'barrel_stack', name: 'Barrel Stack', tab: 'decor', kind: 'decor', level: 4, cash: 110, decor: 6, art: 'barrel_stack', blurb: 'Contents: sauce. Probably.' },
-  { id: 'lamp_post', name: 'Lamp Post', tab: 'decor', kind: 'decor', level: 4, cash: 150, decor: 7, art: 'lamp_post', blurb: 'Moody lighting for moody customers.' },
-  { id: 'gnome_zombie', name: 'Zombie Gnome', tab: 'decor', kind: 'decor', level: 5, cash: 200, decor: 8, art: 'gnome_zombie', blurb: 'Guards the garden. Eats the garden.' },
-  { id: 'pumpkin_pile', name: 'Pumpkin Pile', tab: 'decor', kind: 'decor', level: 6, cash: 250, decor: 9, art: 'pumpkin_pile', blurb: 'Spooky season is every season.' },
-  { id: 'skeleton_statue', name: 'Skeleton Grill-Master', tab: 'decor', kind: 'decor', level: 7, cash: 400, decor: 12, art: 'skeleton_statue', blurb: 'Employee of the Month, 1987.' },
-  { id: 'coffin_upright', name: 'Peek-a-Boo Coffin', tab: 'decor', kind: 'decor', level: 8, cash: 500, decor: 14, art: 'coffin_upright', blurb: 'Someone in there is watching.' },
-  { id: 'slime_fountain', name: 'Slime Fountain', tab: 'decor', kind: 'decor', level: 10, sauce: 8, decor: 20, art: 'slime_fountain', blurb: 'Make a wish. Lose a coin. Gain a rash.' },
-  // ----- wall hangings -----
-  { id: 'wall_bottles', name: 'Bottle Shelf', tab: 'walls', kind: 'wall', level: 1, cash: 50, decor: 3, art: 'wall_bottles', blurb: 'An old-school classic. Rating without the floor space.' },
-  { id: 'wall_specials', name: 'Specials Board', tab: 'walls', kind: 'wall', level: 2, cash: 90, decor: 4, art: 'wall_specials', blurb: "Today's special: brains." },
-  { id: 'wall_license', name: 'License Plates', tab: 'walls', kind: 'wall', level: 2, cash: 80, decor: 4, art: 'wall_license', blurb: 'From all 50 states of decay.' },
-  { id: 'wall_clock', name: 'Bone Clock', tab: 'walls', kind: 'wall', level: 2, cash: 100, decor: 4, art: 'wall_clock', blurb: 'Always says dinner time.' },
-  { id: 'wall_antlers', name: 'Antlers', tab: 'walls', kind: 'wall', level: 3, cash: 120, decor: 5, art: 'wall_antlers', blurb: 'The deer took it personally.' },
-  { id: 'wall_dartboard', name: 'Dartboard', tab: 'walls', kind: 'wall', level: 3, cash: 150, decor: 5, art: 'wall_dartboard', blurb: 'Zombies have bad aim. Duck.' },
-  { id: 'wall_guitar', name: 'Wall Guitar', tab: 'walls', kind: 'wall', level: 4, cash: 180, decor: 6, art: 'wall_guitar', blurb: 'Signed by a dead rock star. Literally.' },
-  { id: 'wall_poster', name: 'B-Movie Poster', tab: 'walls', kind: 'wall', level: 5, cash: 220, decor: 7, art: 'wall_poster', blurb: 'ATTACK OF THE 50 FT GRANDMA.' },
-  { id: 'wall_neon_pig', name: 'Neon Pig', tab: 'walls', kind: 'wall', level: 6, cash: 400, decor: 10, art: 'wall_neon_pig', blurb: 'Buzzes. Flickers. Judges.' },
-  { id: 'wall_skull', name: 'Longhorn Skull', tab: 'walls', kind: 'wall', level: 7, cash: 300, decor: 8, art: 'wall_skull', blurb: 'Texas certified.' },
-  // ----- special -----
-  { id: 'vending', name: 'Brain-ade Machine', tab: 'special', kind: 'moneymaker', level: 3, cash: 800, decor: 3, art: 'vending', payout: { cash: 60, everySec: 1200 }, blurb: 'Pays $60 every 20 min. Tap to collect.' },
-  { id: 'atm', name: 'Haunted ATM', tab: 'special', kind: 'moneymaker', level: 4, cash: 1500, decor: 3, art: 'atm', payout: { cash: 120, everySec: 1800 }, blurb: 'Pays $120 every 30 min. Fees: one soul.' },
-  { id: 'barrel_keg', name: 'Brain Sauce Keg', tab: 'special', kind: 'keg', level: 5, cash: 1200, decor: 3, art: 'barrel_keg', max: 1, blurb: 'Zombies nap twice as fast. (The original Toxin Barrel.)' },
-  { id: 'pethouse_pug', name: 'Pug House', tab: 'special', kind: 'pethouse', level: 5, cash: 1000, decor: 4, art: 'pethouse_pug', pet: 'pug', max: 1, blurb: 'Adopts a Zombie Pug. It sniffs out coins.' },
-  { id: 'jukebox', name: 'Graveyard Jukebox', tab: 'special', kind: 'moneymaker', level: 6, cash: 2000, decor: 8, art: 'jukebox', payout: { cash: 200, everySec: 2700 }, blurb: 'Pays $200 every 45 min. Only plays Thriller.' },
-  { id: 'pethouse_kennel', name: 'Spiked Kennel', tab: 'special', kind: 'pethouse', level: 7, sauce: 10, decor: 5, art: 'pethouse_kennel', pet: 'rotweiler', max: 1, blurb: 'Adopts a Rot-weiler. Fast, fierce raid buddy.' },
-  { id: 'arcade', name: 'Zombie Panic Arcade', tab: 'special', kind: 'moneymaker', level: 8, cash: 3500, decor: 10, art: 'arcade', payout: { cash: 400, everySec: 3600 }, blurb: 'Pays $400 every hour. High score: BRAINS.' },
+  I({ id: 'plant_dead', name: 'Dead Plant', tab: 'decor', kind: 'decor', level: 1, cash: 5, rating: -0.01, xp: 0, art: 'plant_dead', starter: true, blurb: 'It died of embarrassment.' }),
+  I({ id: 'plant_potted', name: 'Potted Plant', tab: 'decor', kind: 'decor', level: 1, cash: 100, art: 'plant_potted', blurb: 'The only living thing in here.' }),
+  I({ id: 'lamp_floor', name: 'Standing Lamp', tab: 'decor', kind: 'decor', level: 2, cash: 300, art: 'lamp_floor', blurb: 'Flickers ominously.' }),
+  I({ id: 'gnome_zombie', name: 'Zombie Gnome', tab: 'decor', kind: 'decor', level: 3, cash: 600, art: 'gnome_zombie', blurb: 'Guards the brains.' }),
+  I({ id: 'plant_tree', name: 'Potted Tree', tab: 'decor', kind: 'decor', level: 4, cash: 500, art: 'plant_tree', blurb: 'Mostly alive.' }),
+  I({ id: 'flamingo_zombie', name: 'Zombie Flamingo', tab: 'decor', kind: 'decor', level: 4, cash: 900, art: 'flamingo_zombie', blurb: 'Pink. Ish.' }),
+  I({ id: 'hay_bale', name: 'Hay Bale', tab: 'decor', kind: 'decor', level: 5, cash: 400, art: 'hay_bale', blurb: 'Something lives in it.' }),
+  I({ id: 'barrel_stack', name: 'Barrel Stack', tab: 'decor', kind: 'decor', level: 5, cash: 700, art: 'barrel_stack', blurb: 'Contents: classified.' }),
+  I({ id: 'tombstone_deco_1', name: 'Tombstone', tab: 'decor', kind: 'decor', level: 5, cash: 1500, rating: 0.02, art: 'tombstone_deco_1', blurb: 'Here lies Gary. Gary works here now.' }),
+  I({ id: 'tombstone_deco_2', name: 'Fancy Tombstone', tab: 'decor', kind: 'decor', level: 5, sauce: 10, rating: 0.04, art: 'tombstone_deco_2', blurb: 'Star item: rating climbs faster.' }),
+  I({ id: 'tombstone_deco_3', name: 'Mausoleum Gate', tab: 'decor', kind: 'decor', level: 5, sauce: 15, rating: 0.06, art: 'tombstone_deco_3', blurb: 'Star item: rating climbs much faster.' }),
+  I({ id: 'cactus', name: 'Cactus', tab: 'decor', kind: 'decor', level: 6, cash: 800, art: 'cactus', blurb: 'Hug at your own risk.' }),
+  I({ id: 'pumpkin_pile', name: 'Pumpkin Pile', tab: 'decor', kind: 'decor', level: 6, cash: 1200, art: 'pumpkin_pile', blurb: 'One of them blinked.' }),
+  I({ id: 'skeleton_statue', name: 'Skeleton Grill-Master', tab: 'decor', kind: 'decor', level: 7, cash: 4000, rating: 0.01, art: 'skeleton_statue', blurb: 'Employee of the month, every month.' }),
+  I({ id: 'coffin_upright', name: 'Peek-a-Boo Coffin', tab: 'decor', kind: 'decor', level: 8, sauce: 5, rating: 0.02, art: 'coffin_upright', blurb: 'Knock knock.' }),
+  I({ id: 'aquarium', name: 'Murky Aquarium', tab: 'decor', kind: 'decor', level: 9, cash: 8000, rating: 0.01, art: 'aquarium', blurb: 'One fish. Zero pulse.' }),
+  I({ id: 'cauldron', name: 'Bubbling Cauldron', tab: 'decor', kind: 'decor', level: 10, cash: 6000, rating: 0.01, art: 'cauldron', blurb: 'Soup of the day. Every day.' }),
+  I({ id: 'slime_fountain', name: 'Slime Fountain', tab: 'decor', kind: 'decor', level: 19, cash: 50000, rating: 0.03, art: 'slime_fountain', blurb: 'Make a wish. Lose a hand.' }),
+  // ----- wall items (hung on a wall segment) -----
+  I({ id: 'window_boarded', name: 'Boarded Window', tab: 'walls', kind: 'wall', level: 1, cash: 50, xp: 1, art: 'window_boarded', starter: true, blurb: 'Keeps the living out.' }),
+  I({ id: 'window_small', name: 'Small Window', tab: 'walls', kind: 'wall', level: 1, cash: 200, art: 'window_small', blurb: 'A view of the apocalypse.' }),
+  I({ id: 'menu_board', name: 'Menu Chalkboard', tab: 'walls', kind: 'wall', level: 1, cash: 250, art: 'menu_board', blurb: 'Today: brains. Tomorrow: brains.' }),
+  I({ id: 'poster_wanted', name: '"Wanted: Brains" Poster', tab: 'walls', kind: 'wall', level: 2, cash: 400, art: 'poster_wanted', blurb: 'Reward: more brains.' }),
+  I({ id: 'clock', name: 'Cracked Clock', tab: 'walls', kind: 'wall', level: 3, cash: 1500, rating: 0.01, art: 'clock', blurb: 'Always lunchtime.' }),
+  I({ id: 'license_plates', name: 'License Plates', tab: 'walls', kind: 'wall', level: 4, cash: 800, art: 'license_plates', blurb: 'From cars that stopped by. Permanently.' }),
+  I({ id: 'antlers', name: 'Antlers', tab: 'walls', kind: 'wall', level: 5, cash: 1200, art: 'antlers', blurb: 'The deer lost.' }),
+  I({ id: 'sign_neon', name: 'ZOMBS BBQ Neon', tab: 'walls', kind: 'wall', level: 5, cash: 20000, rating: 0.02, art: 'sign_neon', blurb: 'Star item. Buzzes like a fly.' }),
+  I({ id: 'bottle_shelf', name: 'Bottle Shelf', tab: 'walls', kind: 'wall', level: 6, cash: 2500, rating: 0.01, art: 'bottle_shelf', blurb: 'Hot sauce, cold sauce, brain sauce.' }),
+  I({ id: 'poster_bmovie', name: 'B-Movie Poster', tab: 'walls', kind: 'wall', level: 7, cash: 1500, art: 'poster_bmovie', blurb: '"ATTACK OF THE 50 FT ENTRÉE"' }),
+  I({ id: 'wall_guitar', name: 'Wall Guitar', tab: 'walls', kind: 'wall', level: 8, cash: 1800, art: 'wall_guitar', blurb: 'Signed by a dead rock star. Literally.' }),
+  I({ id: 'neon_pig', name: 'Neon Pig', tab: 'walls', kind: 'wall', level: 11, sauce: 8, rating: 0.03, art: 'neon_pig', blurb: 'Star item. Oink.' }),
+  I({ id: 'skull_longhorn', name: 'Longhorn Skull', tab: 'walls', kind: 'wall', level: 14, cash: 1500, art: 'skull_longhorn', blurb: 'Yee-haw. Forever.' }),
+  I({ id: 'dartboard', name: 'Dartboard', tab: 'walls', kind: 'wall', level: 15, cash: 2000, art: 'dartboard', blurb: 'Mind the eyeballs.' }),
+  I({ id: 'tv_wall', name: 'Old Wall TV', tab: 'walls', kind: 'wall', level: 1, cash: 16000, rating: 0.02, art: 'tv_wall', blurb: 'Star item. All static, all day.' }),
+  I({ id: 'painting_zombie', name: 'Portrait of a Zombie', tab: 'walls', kind: 'wall', level: 20, cash: 250000, rating: 0.12, art: 'painting_zombie', blurb: 'A masterpiece. The eyes follow you. Slowly.' }),
+  // ----- money-makers (cash per hour up to a cap; tap to collect, like the original) -----
+  I({ id: 'vending', name: 'Snack Machine', tab: 'special', kind: 'moneymaker', level: 1, cash: 16000, art: 'vending', payout: { perHour: 25, max: 250 }, blurb: 'Earns $25/hour, holds up to $250.' }),
+  I({ id: 'arcade', name: 'Zombie Panic Arcade', tab: 'special', kind: 'moneymaker', level: 1, cash: 50000, art: 'arcade', payout: { perHour: 75, max: 1000 }, blurb: 'Earns $75/hour, holds up to $1,000.' }),
+  I({ id: 'atm', name: 'Haunted ATM', tab: 'special', kind: 'moneymaker', level: 1, sauce: 60, art: 'atm', payout: { perHour: 200, max: 5000 }, blurb: 'Earns $200/hour, holds up to $5,000.' }),
+  I({ id: 'jukebox', name: 'Graveyard Jukebox', tab: 'special', kind: 'moneymaker', level: 5, cash: 40000, art: 'jukebox', payout: { perHour: 55, max: 1500 }, blurb: 'Earns $55/hour, holds up to $1,500.' }),
+  I({ id: 'comic_rack', name: 'Comic Rack', tab: 'special', kind: 'moneymaker', level: 6, cash: 18000, art: 'comic_rack', payout: { perHour: 30, max: 300 }, blurb: 'Earns $30/hour, holds up to $300.' }),
+  I({ id: 'phonebooth', name: 'Phone Booth', tab: 'special', kind: 'moneymaker', level: 9, sauce: 20, art: 'phonebooth', payout: { perHour: 80, max: 1900 }, blurb: 'Earns $80/hour, holds up to $1,900.' }),
+  I({ id: 'slot_machine', name: 'One-Armed Bandit', tab: 'special', kind: 'moneymaker', level: 12, cash: 100000, art: 'slot_machine', payout: { perHour: 150, max: 1800 }, blurb: 'Earns $150/hour. The arm is real.' }),
+  I({ id: 'pinball', name: 'Pinball', tab: 'special', kind: 'moneymaker', level: 13, sauce: 25, art: 'pinball', payout: { perHour: 100, max: 1200 }, blurb: 'Earns $100/hour, holds up to $1,200.' }),
+  I({ id: 'foosball', name: 'Foosball Table', tab: 'special', kind: 'moneymaker', level: 15, cash: 60000, art: 'foosball', payout: { perHour: 90, max: 1000 }, blurb: 'Earns $90/hour, holds up to $1,000.' }),
+  // ----- outdoor: pets and raid tombstones live on the front lawn -----
+  I({ id: 'pethouse_pug', name: 'Pug House', tab: 'special', kind: 'pethouse', level: 4, cash: 1000, art: 'pethouse_pug', pet: 'pug', outdoor: true, max: 1, blurb: 'Adopt a Zombie Pug. It sniffs out loose change.' }),
+  I({ id: 'pethouse_kennel', name: 'Spiked Kennel', tab: 'special', kind: 'pethouse', level: 8, sauce: 10, art: 'pethouse_kennel', pet: 'rotweiler', outdoor: true, max: 1, blurb: 'Adopt a Rot-weiler. It fights in raids.' }),
+  I({ id: 'tombstone_str', name: 'Strength Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_str', outdoor: true, boost: 'str', blurb: 'Raid boost: tap it mid-raid and your horde hits harder for 5 s. 5 uses a day.' }),
+  I({ id: 'tombstone_hp', name: 'Health Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_hp', outdoor: true, boost: 'hp', blurb: 'Raid boost: tap it mid-raid and your horde heals for 5 s. 5 uses a day.' }),
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
-export type ThemeId = 'shack' | 'roadhouse' | 'diner' | 'graveyard';
-export interface ThemeDef {
-  id: ThemeId;
+/** Wall finishes, bought per wall segment. 'dirty' is the starting grime. */
+export interface FinishDef {
+  id: string;
   name: string;
   level: number;
-  cash?: number;
-  sauce?: number;
-  decor: number;
-  blurb: string;
+  cash: number;
+  rating: number;
+  art: string;
 }
-export const THEMES: ThemeDef[] = [
-  { id: 'shack', name: 'Burnt Shack', level: 1, cash: 0, decor: 0, blurb: 'Where it all began. Smells like it, too.' },
-  { id: 'roadhouse', name: 'Texas Roadhouse', level: 4, cash: 1500, decor: 10, blurb: 'Log walls, dark planks, lanterns.' },
-  { id: 'diner', name: "50s Diner", level: 6, cash: 2500, decor: 14, blurb: 'Checkerboard floors and chrome.' },
-  { id: 'graveyard', name: 'Graveyard Garden', level: 9, sauce: 15, decor: 18, blurb: 'Crypt walls, mossy stones. Cozy!' },
+export const WALL_FINISHES: FinishDef[] = [
+  { id: 'dirty', name: 'Grimy Plaster', level: 0, cash: 0, rating: -0.002, art: 'dirty' },
+  { id: 'plaster', name: 'Fresh Plaster', level: 1, cash: 30, rating: 0, art: 'plaster' },
+  { id: 'tile', name: 'Diner Tile', level: 6, cash: 250, rating: 0, art: 'tile' },
+  { id: 'brick', name: 'Brick', level: 7, cash: 250, rating: 0, art: 'brick' },
+  { id: 'wood', name: 'Wood Panelling', level: 12, cash: 500, rating: 0, art: 'wood' },
+  { id: 'stone', name: 'Crypt Stone', level: 15, cash: 600, rating: 0, art: 'stone' },
 ];
-export const THEME_BY_ID: Record<string, ThemeDef> = Object.fromEntries(THEMES.map((t) => [t.id, t]));
+/** Floor finishes, bought per tile. 'dirty' tiles come with the café; stains and loose tiles count against you. */
+export const FLOOR_FINISHES: FinishDef[] = [
+  { id: 'dirty', name: 'Old Tile', level: 0, cash: 0, rating: 0, art: 'dirty' },
+  { id: 'stain', name: 'Stained Tile', level: 0, cash: 0, rating: -0.01, art: 'dirty' },
+  { id: 'loose', name: 'Loose Tile', level: 0, cash: 0, rating: -0.01, art: 'dirty' },
+  { id: 'tile', name: 'Clean Tile', level: 1, cash: 10, rating: 0, art: 'tile' },
+  { id: 'checker', name: 'Checkered Tile', level: 4, cash: 40, rating: 0, art: 'checker' },
+  { id: 'wood', name: 'Hardwood', level: 6, cash: 125, rating: 0, art: 'wood' },
+  { id: 'stone', name: 'Flagstone', level: 13, cash: 200, rating: 0, art: 'stone' },
+];
+export const WALL_BY_ID: Record<string, FinishDef> = Object.fromEntries(WALL_FINISHES.map((f) => [f.id, f]));
+export const FLOOR_BY_ID: Record<string, FinishDef> = Object.fromEntries(FLOOR_FINISHES.map((f) => [f.id, f]));
 
-/** Room sizes, in tiles. The last expansions need Brain Sauce, like the original. */
-export const EXPANSIONS: { size: number; level: number; cash?: number; sauce?: number }[] = [
-  { size: 9, level: 3, cash: 2000 },
-  { size: 10, level: 5, cash: 6000 },
-  { size: 11, level: 8, cash: 15000 },
-  { size: 12, level: 10, sauce: 20 },
+/** Room sizes (width along the north-east wall x depth along the north-west wall). Original ladder. */
+export const START_SIZE = { w: 7, h: 6 };
+export const EXPANSIONS: { w: number; h: number; level: number; cash?: number; sauce?: number }[] = [
+  { w: 8, h: 7, level: 1, cash: 3500 },
+  { w: 9, h: 8, level: 1, cash: 25000 },
+  { w: 10, h: 9, level: 1, cash: 75000 },
+  { w: 11, h: 10, level: 1, cash: 100000 },
+  { w: 12, h: 11, level: 1, cash: 120000 },
+  { w: 13, h: 12, level: 1, cash: 150000 },
+  { w: 14, h: 13, level: 1, cash: 150000 },
+  { w: 15, h: 14, level: 1, cash: 150000 },
 ];
 
 export interface GoalDef {
@@ -123,30 +225,31 @@ export interface GoalDef {
 }
 /** Story goals, shown three at a time in order (the clipboard button). Checked in progress.ts. */
 export const GOALS: GoalDef[] = [
-  { id: 'cook1', text: 'Cook your first dish', reward: { cash: 50, xp: 10 } },
-  { id: 'serve10', text: 'Serve 10 customers', reward: { cash: 80, xp: 15 } },
-  { id: 'infect1', text: 'Infect your first customer', reward: { sauce: 1, xp: 15 } },
-  { id: 'buydecor', text: 'Buy something from the Shop', reward: { cash: 100, xp: 15 } },
-  { id: 'zombies2', text: 'Have 2 zombies on the crew', reward: { cash: 120, xp: 20 } },
-  { id: 'wall1', text: 'Hang something on a wall', reward: { cash: 100, xp: 20 } },
-  { id: 'level3', text: 'Reach level 3', reward: { sauce: 1, xp: 0 } },
-  { id: 'raid1', text: "Raid Chuck Wagon's Chow Hall", reward: { cash: 200, xp: 40 } },
+  { id: 'cook1', text: 'Cook your first dish', reward: { cash: 50, xp: 5 } },
+  { id: 'serve10', text: 'Serve 10 customers', reward: { cash: 80, xp: 10 } },
+  { id: 'infect1', text: 'Infect your first customer', reward: { sauce: 1, xp: 10 } },
+  { id: 'clean5', text: 'Clear 5 dirty plates', reward: { cash: 100, xp: 10 } },
+  { id: 'seats3', text: 'Have 3 tables with chairs', reward: { cash: 150, xp: 15 } },
+  { id: 'floor1', text: 'Replace a stained floor tile', reward: { cash: 60, xp: 10 } },
+  { id: 'wall1', text: 'Hang something on a wall', reward: { cash: 100, xp: 15 } },
+  { id: 'level3', text: 'Reach level 3', reward: { sauce: 1 } },
+  { id: 'zombies2', text: 'Have 2 zombies on the crew', reward: { cash: 200, xp: 20 } },
+  { id: 'grill', text: 'Buy a BBQ Grill', reward: { cash: 300, xp: 25 } },
+  { id: 'raid1', text: 'Win your first raid', reward: { cash: 200, xp: 40 } },
   { id: 'study1', text: 'Study a stolen dish from the Fridge', reward: { sauce: 2, xp: 30 } },
-  { id: 'stars2', text: 'Reach a 2-star rating', reward: { cash: 200, xp: 30 } },
-  { id: 'expand1', text: 'Expand the joint', reward: { cash: 300, xp: 40 } },
-  { id: 'smoker', text: 'Smoke some Pulled Pork(ish)', reward: { cash: 250, xp: 40 } },
+  { id: 'stars2', text: 'Reach a 2-star rating', reward: { cash: 300, xp: 30 } },
+  { id: 'cleanfloor', text: 'Get rid of every stain and loose tile', reward: { cash: 400, xp: 40 } },
+  { id: 'expand1', text: 'Expand the café', reward: { cash: 500, xp: 50 } },
+  { id: 'smoker', text: 'Smoke some Pulled Pork(ish)', reward: { cash: 400, xp: 40 } },
+  { id: 'zombies4', text: 'Have 4 zombies on the crew', reward: { cash: 600, xp: 50 } },
   { id: 'money1', text: 'Buy a money-maker (Special tab)', reward: { sauce: 2, xp: 40 } },
-  { id: 'zombies4', text: 'Have 4 zombies on the crew', reward: { cash: 400, xp: 50 } },
-  { id: 'raid2', text: "Beat Big Hank's Burger Barn", reward: { sauce: 3, xp: 60 } },
-  { id: 'theme1', text: 'Redecorate with a new theme', reward: { cash: 500, xp: 60 } },
+  { id: 'raid3', text: 'Win 3 raids', reward: { sauce: 3, xp: 80 } },
   { id: 'pet1', text: 'Adopt a pet', reward: { sauce: 2, xp: 60 } },
-  { id: 'stars3', text: 'Reach a 3-star rating', reward: { cash: 800, xp: 80 } },
+  { id: 'stars3', text: 'Reach a 3-star rating', reward: { cash: 1000, xp: 80 } },
   { id: 'rare1', text: 'Infect a rare customer', reward: { sauce: 3, xp: 80 } },
-  { id: 'raid3', text: "Beat Vegan Vera's Salad Fortress", reward: { sauce: 4, xp: 100 } },
   { id: 'fryer', text: 'Fry up some Onion Rings of Fire', reward: { cash: 900, xp: 100 } },
   { id: 'zombies7', text: 'Have 7 zombies on the crew', reward: { sauce: 5, xp: 120 } },
-  { id: 'raid4', text: "Beat Colonel Crunch's Chicken Shack", reward: { sauce: 5, xp: 150 } },
   { id: 'stars4', text: 'Reach a 4-star rating', reward: { sauce: 6, xp: 200 } },
-  { id: 'raid5', text: 'Beat Le Snob Bistro', reward: { sauce: 10, xp: 300 } },
+  { id: 'raid10', text: 'Win 10 raids', reward: { sauce: 10, xp: 300 } },
   { id: 'stars5', text: 'Reach a 5-star rating', reward: { sauce: 15, xp: 500 } },
 ];

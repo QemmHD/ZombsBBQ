@@ -9,8 +9,8 @@
  * Pure and deterministic (own RNG): the scene renders it, tests drive it.
  */
 import { DISH_BY_ID, TUNING } from './data';
-import type { GameState } from './state';
-import { addXp, releaseJob } from './sim';
+import { maxEnergy, type GameState } from './state';
+import { addXp, outsideSpot, releaseJob } from './sim';
 import { refreshDaily } from './progress';
 import type { Pt } from './grid';
 
@@ -35,7 +35,7 @@ export interface RivalDef {
 }
 
 export const RIVALS: RivalDef[] = [
-  { id: 'chuck', name: "Chuck Wagon's Chow Hall", chef: 'Chef Chuck', level: 2, staff: { count: 3, hp: 32, dmg: 3 }, boss: { hp: 230, dmg: 9 }, dogs: 0, zappers: 0, gateHp: 60, customers: 3, cashPerCustomer: 15, dishes: ['hotdog', 'chili'], signature: 'chili', reward: { cash: 250, xp: 60, sauceChance: 0.25 }, taunt: 'Git along, little zombie!' },
+  { id: 'chuck', name: "Chuck Wagon's Chow Hall", chef: 'Chef Chuck', level: 2, staff: { count: 3, hp: 32, dmg: 3 }, boss: { hp: 230, dmg: 9 }, dogs: 0, zappers: 0, gateHp: 60, customers: 3, cashPerCustomer: 15, dishes: ['sliders', 'chili'], signature: 'chili', reward: { cash: 250, xp: 60, sauceChance: 0.25 }, taunt: 'Git along, little zombie!' },
   { id: 'hank', name: "Big Hank's Burger Barn", chef: 'Big Hank', level: 4, staff: { count: 4, hp: 48, dmg: 4 }, boss: { hp: 420, dmg: 13 }, dogs: 1, zappers: 0, gateHp: 100, customers: 4, cashPerCustomer: 25, dishes: ['burger', 'smash'], signature: 'smash', reward: { cash: 600, xp: 120, sauceChance: 0.3 }, taunt: 'You want fries with that beatdown?' },
   { id: 'vera', name: "Vegan Vera's Salad Fortress", chef: 'Vegan Vera', level: 6, staff: { count: 5, hp: 62, dmg: 5 }, boss: { hp: 640, dmg: 16 }, dogs: 1, zappers: 1, gateHp: 150, customers: 4, cashPerCustomer: 35, dishes: ['wings', 'salad'], signature: 'salad', reward: { cash: 1200, xp: 220, sauceChance: 0.35 }, taunt: 'Brains are NOT plant-based!' },
   { id: 'crunch', name: "Colonel Crunch's Chicken Shack", chef: 'Colonel Crunch', level: 8, staff: { count: 6, hp: 70, dmg: 5 }, boss: { hp: 800, dmg: 16 }, dogs: 2, zappers: 1, gateHp: 200, customers: 5, cashPerCustomer: 50, dishes: ['rings', 'chicken'], signature: 'chicken', reward: { cash: 2400, xp: 380, sauceChance: 0.4 }, taunt: 'My secret recipe stays SECRET!' },
@@ -221,7 +221,7 @@ export function startRaid(s: GameState, rivalId: RivalId, workerIds: string[], p
       x: LINE_X,
       y: -1 + i * 0.9,
       hp: Math.max(1, w.energy),
-      maxHp: w.stats.energy,
+      maxHp: maxEnergy(w),
       dmg: 3 + w.stats.power * 1.6,
       speed: 0.9 + w.stats.speed * 0.12,
       cdMax: 0.9,
@@ -629,9 +629,14 @@ export function finishRaid(s: GameState, r: RaidState): RaidResult {
       w.energy = 0;
       w.state = 'down';
       w.downUntil = s.now + TUNING.reanimateSec;
+      // KO'd zombies are dumped on the sidewalk out front to reanimate
+      const spot = outsideSpot(s, w);
+      w.x = spot.x;
+      w.y = spot.y;
+      w.restSpot = spot;
       out.kos.push(w.name);
     } else {
-      w.energy = Math.min(w.stats.energy, Math.round(u.hp));
+      w.energy = Math.min(maxEnergy(w), Math.round(u.hp));
       w.state = 'idle';
     }
   }

@@ -1,9 +1,12 @@
 /**
- * Game content tables. Timers are tuned for phone play sessions (seconds → hours as you level);
- * every number here is meant to be balanced via tests/economy.test.ts, not by guesswork.
+ * Game content tables (v3). Numbers follow the original game's own data tables (see
+ * docs/08-original-deep-dive.md): customer stats on its 1–10 scales with ~100 energy, dishes on its
+ * real-time ladder (2 min … a day) with thin margins, a crew that starts at one zombie, burn time =
+ * cook time, and a slow energy economy. Names and dishes are our own.
  */
 
-export type StationKind = 'grill' | 'smoker' | 'fryer';
+/** Which cookbook a dish belongs to; 'stove' dishes cook on any stove, the rest need that station. */
+export type StationKind = 'stove' | 'grill' | 'smoker' | 'fryer';
 
 export interface DishDef {
   id: string;
@@ -21,33 +24,63 @@ export interface DishDef {
   blurb: string;
 }
 
+const M = 60;
+const H = 3600;
+const D = (id: string, name: string, station: StationKind, source: 'level' | 'raid', level: number, cookSec: number, cost: number, servings: number, price: number, xp: number, blurb: string): DishDef => ({
+  id,
+  name,
+  station,
+  source,
+  level,
+  cost,
+  cookSec,
+  servings,
+  price,
+  xp,
+  icon: `dish_${id}`,
+  blurb,
+});
+
 export const DISHES: DishDef[] = [
-  { id: 'hotdog', name: 'Charred Hot Dog', station: 'grill', source: 'level', level: 1, cost: 10, cookSec: 20, servings: 6, price: 4, xp: 3, icon: 'dish_hotdog', blurb: 'Mostly hot. Mostly dog.' },
-  { id: 'burger', name: 'Brain Burger', station: 'grill', source: 'level', level: 2, cost: 40, cookSec: 60, servings: 12, price: 6, xp: 8, icon: 'dish_burger', blurb: 'Medium-rare. Medium-brain.' },
-  { id: 'wings', name: "Finger-Lickin' Wings", station: 'grill', source: 'level', level: 3, cost: 90, cookSec: 180, servings: 18, price: 8, xp: 16, icon: 'dish_wings', blurb: 'Count your fingers after.' },
-  { id: 'pork', name: 'Pulled Pork(ish)', station: 'smoker', source: 'level', level: 4, cost: 200, cookSec: 600, servings: 30, price: 11, xp: 35, icon: 'dish_pork', blurb: "Don't ask what the 'ish' is." },
-  { id: 'rings', name: 'Onion Rings of Fire', station: 'fryer', source: 'level', level: 6, cost: 260, cookSec: 420, servings: 32, price: 12, xp: 40, icon: 'dish_rings', blurb: 'Hurts going in. Hurts going out.' },
-  { id: 'ribs', name: 'Rib Rack of Doom', station: 'smoker', source: 'level', level: 6, cost: 650, cookSec: 1800, servings: 50, price: 20, xp: 90, icon: 'dish_ribs', blurb: 'Fall-off-the-bone. Bone not included.' },
-  { id: 'nuggets', name: 'Deep-Fried Brain Nuggets', station: 'fryer', source: 'level', level: 8, cost: 900, cookSec: 2400, servings: 60, price: 22, xp: 120, icon: 'dish_nuggets', blurb: 'Smart food.' },
-  { id: 'brisket', name: '24-Hour Brisket', station: 'smoker', source: 'level', level: 9, cost: 2400, cookSec: 7200, servings: 110, price: 36, xp: 320, icon: 'dish_brisket', blurb: 'Takes 2 hours. The name is aspirational.' },
-  // stolen in raids, then studied from the Fridge
-  { id: 'chili', name: 'Chili Con Carnage', station: 'grill', source: 'raid', level: 1, cost: 120, cookSec: 240, servings: 24, price: 10, xp: 30, icon: 'dish_chili', blurb: "Chuck Wagon's secret. Now yours." },
-  { id: 'smash', name: 'Smash Burger', station: 'grill', source: 'raid', level: 1, cost: 300, cookSec: 600, servings: 36, price: 15, xp: 60, icon: 'dish_smash', blurb: 'Big Hank smashed. You stole.' },
-  { id: 'salad', name: "Kale-ing Spree Salad", station: 'grill', source: 'raid', level: 1, cost: 500, cookSec: 900, servings: 44, price: 19, xp: 85, icon: 'dish_salad', blurb: 'Vegan Vera wept.' },
-  { id: 'chicken', name: 'Crunchy Coop Bucket', station: 'fryer', source: 'raid', level: 1, cost: 1100, cookSec: 2400, servings: 70, price: 27, xp: 170, icon: 'dish_chicken', blurb: "The Colonel's 11 secret spleens." },
-  { id: 'foie', name: 'Foie Gross', station: 'smoker', source: 'raid', level: 1, cost: 3000, cookSec: 5400, servings: 120, price: 45, xp: 420, icon: 'dish_foie', blurb: 'Très gross. Très délicieux.' },
+  // the house cookbook: cooks on any stove
+  D('sliders', 'Mystery Sliders', 'stove', 'level', 1, 2 * M, 10, 12, 5, 2, "Three tiny burgers. Don't count the eyes."),
+  D('hobodog', 'Hobo Hot Dog', 'stove', 'level', 1, 5 * M, 30, 20, 6, 4, 'Found it. Grilled it. Band-aid optional.'),
+  D('gumbo', 'Gutter Gumbo', 'stove', 'level', 2, 15 * M, 100, 45, 7, 8, 'Fished fresh from the storm drain.'),
+  D('tacos', 'Toe-tally Tacos', 'stove', 'level', 3, 60 * M, 250, 150, 7, 15, 'Ten little piggies, extra crunchy.'),
+  D('lasagut', 'Leftover Lasagut', 'stove', 'level', 3, 8 * H, 500, 300, 9, 65, 'Layers of pasta. Layers of… other things.'),
+  D('broth', 'Bone Broth Bucket', 'stove', 'level', 4, 90 * M, 250, 120, 8, 20, 'Simmered from 206 locally sourced bones.'),
+  D('meatloaf', 'Meatloaf of the Dead', 'stove', 'level', 5, 30 * M, 200, 80, 8, 12, 'It twitches. That means it’s fresh.'),
+  D('goulash', 'Ghoul-ash', 'stove', 'level', 6, 24 * H, 1200, 650, 12, 95, 'Grandma’s recipe. Grandma’s in it.'),
+  // the grill cookbook
+  D('burger', 'Brain Burger', 'grill', 'level', 2, 20 * M, 150, 70, 9, 12, 'Medium-rare. Medium-brain.'),
+  D('wings', "Finger-Lickin' Wings", 'grill', 'level', 5, 40 * M, 220, 100, 9, 15, 'Count your fingers after.'),
+  D('kebab', 'Ke-blob Kebab', 'grill', 'level', 7, 2 * H, 400, 150, 11, 30, 'Meat on a stick. Stick also meat.'),
+  D('smash', 'Smash Burger', 'grill', 'raid', 1, 45 * M, 250, 100, 11, 25, 'Big Hank smashed. You stole.'),
+  D('chili', 'Chili Con Carnage', 'grill', 'raid', 1, 3 * H, 400, 200, 11, 65, "Chuck Wagon's secret. Now yours."),
+  D('salad', 'Kale-ing Spree Salad', 'grill', 'raid', 1, 6 * H, 600, 320, 12, 100, 'Vegan Vera wept.'),
+  // the smoker cookbook
+  D('pork', 'Pulled Pork(ish)', 'smoker', 'level', 4, 2 * H, 350, 160, 11, 50, "Don't ask what the 'ish' is."),
+  D('ribs', 'Rib Rack of Doom', 'smoker', 'level', 6, 5 * H, 500, 260, 12, 45, 'Fall-off-the-bone. Bone not included.'),
+  D('brisket', '24-Hour Brisket', 'smoker', 'level', 8, 12 * H, 700, 420, 14, 60, 'Takes 12 hours. The name is aspirational.'),
+  D('foie', 'Foie Gross', 'smoker', 'raid', 1, 14 * H, 800, 420, 16, 80, 'Très gross. Très délicieux.'),
+  // the fryer cookbook
+  D('rings', 'Onion Rings of Fire', 'fryer', 'level', 6, 15 * M, 100, 50, 8, 6, 'They bite back.'),
+  D('nuggets', 'Brain Nuggets', 'fryer', 'level', 7, 45 * M, 250, 110, 10, 14, 'Smart food.'),
+  D('fries', 'Finger Fries', 'fryer', 'level', 9, 150 * M, 300, 190, 10, 40, 'Hand-cut. Literally.'),
+  D('chicken', 'Crunchy Coop Bucket', 'fryer', 'raid', 1, 4 * H, 450, 240, 12, 40, "The Colonel's 11 secret spleens."),
 ];
 
 export const DISH_BY_ID: Record<string, DishDef> = Object.fromEntries(DISHES.map((d) => [d.id, d]));
 
-/** Zombie stats use the original game's six stats (1..10 scale except energy). */
+/** The original's stats: Energy (~100), and Speed / Power / Tips / Recharge / Focus / Patience on 1..10. */
 export interface ZombieStats {
   energy: number; // max energy (= health in raids)
   speed: number;
   power: number;
   tips: number;
-  focus: number;
-  patience: number;
+  recharge: number; // how fast they recover while resting
+  focus: number; // low = daydreams a lot
+  patience: number; // low = bites customers sooner when tired
 }
 
 export type Tier = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -76,7 +109,7 @@ const C = (
   weight: number,
   spend: number,
   infect: { cash?: number; sauce?: number },
-  s: [number, number, number, number, number, number],
+  s: [number, number, number, number, number, number, number],
   gag: string,
 ): CustomerDef => ({
   id,
@@ -88,66 +121,80 @@ const C = (
   weight,
   spend,
   infect,
-  stats: { energy: s[0], speed: s[1], power: s[2], tips: s[3], focus: s[4], patience: s[5] },
+  stats: { energy: s[0], speed: s[1], power: s[2], tips: s[3], recharge: s[4], focus: s[5], patience: s[6] },
   gag,
 });
 
-// stats: [energy, speed, power, tips, focus, patience]
+// stats: [energy, speed, power, tips, recharge, focus, patience]
 export const CUSTOMERS: CustomerDef[] = [
-  C('accountant', 'Accountant', 'Zombie Accountant', 'common', 1, 0, 10, 1.0, { cash: 0 }, [100, 4, 3, 4, 6, 5], 'Still itemizes the brains.'),
-  C('yoga', 'Yoga Instructor', 'Zombie Yogi', 'common', 1, 0, 10, 1.0, { cash: 0 }, [100, 5, 2, 3, 9, 7], 'Namaste... hungry.'),
-  C('teen', 'Teenager', 'Zombie Teen', 'common', 1, 0, 9, 0.9, { cash: 50 }, [100, 7, 3, 2, 3, 2], 'Was a zombie before it was cool.'),
-  C('politician', 'Politician', 'Zombie Politician', 'common', 2, 1, 6, 1.2, { cash: 100 }, [100, 4, 3, 8, 5, 4], 'Promises brains for every voter.'),
-  C('construction', 'Construction Worker', 'Hardhat Zombie', 'common', 2, 1, 7, 1.0, { cash: 250 }, [120, 5, 7, 3, 5, 5], 'Naps face-down on tables.'),
-  C('nurse', 'Nurse', 'Nurse Zombie', 'common', 3, 1.5, 5, 1.1, { cash: 600 }, [110, 6, 3, 5, 6, 9], 'Takes your pulse, then your lunch.'),
-  C('cop', 'Cop', 'Officer Rot', 'uncommon', 4, 2, 4, 1.2, { sauce: 1 }, [100, 5, 4, 3, 6, 6], 'Arrests customers who don’t tip.'),
-  C('ceo', 'CEO', 'Zombie CEO', 'uncommon', 5, 2, 3, 1.6, { cash: 2500 }, [100, 3, 3, 10, 7, 4], 'Outsourced his own brain.'),
-  C('trafficcop', 'Traffic Cop', 'Zombie Traffic Cop', 'uncommon', 6, 2.5, 3, 1.2, { sauce: 2 }, [100, 8, 4, 4, 5, 5], 'Whistles at slow eaters.'),
-  C('benchwarmer', 'Benchwarmer', 'Zombie Benchwarmer', 'rare', 7, 3, 2, 1.1, { cash: 5000 }, [160, 3, 6, 4, 4, 8], 'Finally got off the bench. Shambling.'),
-  C('lumberjack', 'Lumberjack', 'Lumberjacked', 'rare', 7, 3, 2, 1.3, { cash: 5000 }, [130, 5, 8, 4, 5, 6], 'Axe stuck in his own hat.'),
-  C('cheerleader', 'Cheerleader', 'Fear-leader', 'rare', 7, 3, 2, 1.3, { cash: 6000 }, [100, 8, 4, 7, 4, 4], 'Gimme a B! Gimme an R-A-I-N-S!'),
-  C('critic', 'Food Critic', 'Food Crypt-ic', 'rare', 8, 3.5, 2, 2.0, { sauce: 5 }, [100, 5, 3, 9, 8, 5], 'Notepad reads: BRAINS 5/5.'),
-  C('boxer', 'Boxer', 'Zombie Boxer', 'rare', 8, 3, 2, 1.2, { sauce: 15 }, [150, 6, 10, 3, 6, 4], 'Floats like a butterfly. Rots like a bee.'),
-  C('grandma', 'Grandma', 'Grave Granny', 'rare', 9, 3.5, 2, 1.5, { cash: 15000 }, [110, 2, 5, 10, 9, 10], 'Knits scarves of goo.'),
-  C('moviestar', 'Movie Star', 'Zombie Movie Star', 'rare', 10, 4, 1.5, 1.6, { sauce: 10 }, [110, 9, 3, 8, 6, 6], 'Signs autographs in slime.'),
-  C('sumo', 'Sumo Wrestler', 'Zombie Sumo', 'epic', 11, 4, 1.2, 1.4, { sauce: 30 }, [220, 3, 10, 4, 7, 7], 'One belly-bump, three waiters down.'),
-  C('influencer', 'Influencer', 'Zombie Influencer', 'epic', 12, 4, 1.2, 1.5, { sauce: 20 }, [100, 7, 3, 9, 3, 3], '#BrainFood. 0 followers alive.'),
-  C('celebrity', 'Celebrity', 'Zombie Celebrity', 'epic', 13, 4.5, 1, 2.2, { sauce: 40 }, [120, 7, 4, 10, 5, 5], 'Velvet rope included.'),
-  C('champ', 'The Champ', 'Zombie Champ', 'legendary', 15, 4.5, 0.6, 1.8, { sauce: 80 }, [250, 8, 10, 6, 8, 8], 'Undefeated. Also undead.'),
+  C('joe', 'Average Joe', 'Zombie Joe', 'common', 1, 0, 10, 1.0, {}, [100, 4, 4, 3, 3, 5, 5], 'Just your average, brain-hungry guy.'),
+  C('jane', 'Average Jane', 'Zombie Jane', 'common', 1, 0, 10, 1.0, {}, [100, 4, 4, 3, 3, 5, 5], 'Came for lunch. Stayed forever.'),
+  C('hipster', 'Hipster', 'Zombie Hipster', 'common', 1, 0, 7, 1.0, {}, [100, 4, 4, 3, 3, 5, 5], 'Ate brains before it was cool.'),
+  C('senior', 'Senior', 'Zombie Senior', 'common', 1, 0, 5, 1.1, {}, [70, 1, 2, 6, 3, 2, 10], 'Slow, sweet, tips in butterscotch.'),
+  C('accountant', 'Accountant', 'Zombie Accountant', 'common', 1, 0, 6, 1.0, {}, [100, 4, 4, 2, 3, 6, 6], 'Still itemizes the brains.'),
+  C('yoga', 'Yoga Instructor', 'Zombie Yogi', 'common', 1, 0, 5, 1.0, {}, [100, 4, 5, 3, 5, 4, 4], 'Namaste… hungry.'),
+  C('teen', 'Teenager', 'Zombie Teen', 'common', 1, 0, 6, 0.9, {}, [85, 7, 4, 1, 6, 2, 2], 'Fast. Lazy. Bitey.'),
+  C('politician', 'Politician', 'Zombie Politician', 'uncommon', 2, 1, 5, 1.2, { cash: 100 }, [90, 4, 3, 5, 3, 6, 6], 'Promises brains for every voter.'),
+  C('construction', 'Construction Worker', 'Hardhat Zombie', 'common', 3, 0, 6, 1.0, { cash: 250 }, [140, 3, 9, 1, 2, 3, 2], 'Strong. Slow to recharge. Bites first.'),
+  C('nurse', 'Nurse', 'Nurse Zombie', 'uncommon', 3, 1, 5, 1.1, { cash: 600 }, [110, 6, 3, 5, 4, 6, 9], 'Takes your pulse, then your lunch.'),
+  C('cop', 'Cop', 'Officer Rot', 'uncommon', 5, 1, 6, 1.2, { sauce: 1 }, [140, 6, 7, 2, 3, 7, 9], 'Arrests customers who don’t tip.'),
+  C('ceo', 'CEO', 'Zombie CEO', 'uncommon', 5, 1.5, 4, 1.6, { cash: 2500 }, [90, 4, 3, 8, 3, 4, 6], 'Outsourced his own brain.'),
+  C('trafficcop', 'Traffic Cop', 'Zombie Traffic Cop', 'uncommon', 6, 2, 4, 1.2, { sauce: 2 }, [100, 8, 4, 4, 4, 5, 5], 'Whistles at slow eaters.'),
+  C('benchwarmer', 'Benchwarmer', 'Zombie Benchwarmer', 'rare', 7, 2, 3, 1.1, { cash: 5000 }, [160, 7, 7, 1, 9, 1, 1], 'Finally off the bench. Never stops moving.'),
+  C('lumberjack', 'Lumberjack', 'Lumberjacked', 'rare', 7, 2, 3, 1.3, { cash: 5000 }, [140, 3, 8, 2, 2, 6, 3], 'Axe stuck in his own hat.'),
+  C('cheerleader', 'Cheerleader', 'Fear-leader', 'rare', 7, 2.5, 3, 1.3, { cash: 6000 }, [100, 8, 4, 6, 5, 4, 4], 'Gimme a B! Gimme an R-A-I-N-S!'),
+  C('critic', 'Food Critic', 'Food Crypt-ic', 'rare', 8, 3, 2, 2.0, { sauce: 5 }, [100, 4, 3, 9, 3, 8, 5], 'Notepad reads: BRAINS 5/5.'),
+  C('boxer', 'Boxer', 'Zombie Boxer', 'rare', 8, 2.5, 3, 1.2, { sauce: 15 }, [150, 6, 10, 2, 5, 6, 4], 'Floats like a butterfly. Rots like a bee.'),
+  C('grandma', 'Grandma', 'Grave Granny', 'rare', 9, 3, 2, 1.5, { cash: 15000 }, [100, 2, 4, 9, 3, 3, 10], 'Knits scarves of goo.'),
+  C('moviestar', 'Movie Star', 'Zombie Movie Star', 'rare', 10, 3.5, 2, 1.6, { sauce: 10 }, [110, 8, 3, 8, 4, 6, 6], 'Signs autographs in slime.'),
+  C('sumo', 'Sumo Wrestler', 'Zombie Sumo', 'epic', 11, 3.5, 1.5, 1.4, { sauce: 30 }, [220, 2, 10, 3, 2, 7, 7], 'One belly-bump, three waiters down.'),
+  C('influencer', 'Influencer', 'Zombie Influencer', 'epic', 12, 4, 1.5, 1.5, { sauce: 20 }, [90, 7, 3, 9, 6, 3, 3], '#BrainFood. 0 followers alive.'),
+  C('celebrity', 'Celebrity', 'Zombie Celebrity', 'epic', 13, 4, 1, 2.2, { sauce: 40 }, [120, 7, 4, 10, 4, 5, 5], 'Velvet rope included.'),
+  C('champ', 'The Champ', 'Zombie Champ', 'legendary', 15, 4.5, 0.6, 1.8, { sauce: 80 }, [250, 8, 10, 6, 6, 8, 8], 'Undefeated. Also undead.'),
 ];
 
 export const CUSTOMER_BY_ID: Record<string, CustomerDef> = Object.fromEntries(CUSTOMERS.map((c) => [c.id, c]));
 
-export const YOU_STATS: ZombieStats = { energy: 100, speed: 6, power: 2, tips: 4, focus: 10, patience: 10 };
+export const YOU_STATS: ZombieStats = { energy: 100, speed: 5, power: 3, tips: 4, recharge: 5, focus: 10, patience: 10 };
 
 /** Tuning knobs, gathered in one place for balancing. */
 export const TUNING = {
-  startCash: 150,
+  startCash: 300,
   startSauce: 5, // the original also started you with 5 Toxin vials
-  startCrewCap: 4,
-  customerWaitSec: 50,
-  eatSec: 7,
-  fleeSpeed: 3.2,
-  baseWalkSpeed: 1.3, // tiles/sec at speed 0
-  walkSpeedPerStat: 0.13,
-  energyPerServe: 3,
+  /** how long a seated customer waits for food before leaving unhappy */
+  customerWaitSec: 75,
+  eatSec: 12,
+  fleeSpeed: 3.0,
+  baseWalkSpeed: 1.0, // tiles/sec at speed 0
+  walkSpeedPerStat: 0.12,
+  energyPerServe: 1.5,
+  energyPerClear: 0.6,
   energyCookPerSec: 1 / 20, // original: cooks burn 1 energy / 20 s
-  restRegenPerSec: 1 / 5,
-  kegMultiplier: 2, // original Toxin Barrel doubled recharge
-  biteEnergyGain: 35,
+  restRegenPerSec: 1 / 16, // ~3.75/min at average recharge (original ~3/min)
+  /** each Toxic Barrel adds this much to the rest recharge rate (they stack) */
+  kegBonus: 0.6,
+  biteEnergyGain: 20,
   daydreamBaseSec: 100, // original: focus 1 ~ every 100 s
   daydreamMaxSec: 25,
   offlineCapSec: 8 * 3600,
-  burnFactor: 1, // dish burns after waiting cookSec * burnFactor once done (original: 2x total)
-  burnGraceSec: 15,
+  /** a finished dish burns once it has waited as long as it took to cook (original), never sooner than this */
+  burnMinSec: 5 * 60,
   keepWarmFactor: 1.5,
-  ratingStart: 34,
-  /** service rating is a rolling average of recent customers' moods (100 = all happy) */
-  ratingRate: 0.025,
+  /** rating: popularity 0..1 (= 0..5 stars) drifts toward each customer's verdict */
+  ratingStart: 0.3,
+  ratingRate: 0.03,
+  /** star items: rating rises (1 + bonus*K)x faster and falls that much slower */
+  ratingDecorK: 8,
   /** a bite counts as this many angry customers */
   ratingAttackWeight: 3,
-  reanimateSec: 15 * 60, // raid KO: original went from 8 h to 1 h; shorter for phone sessions
+  /** a closed café's rating slowly sags (per second) */
+  closedDriftPerSec: 0.00002,
+  reanimateSec: 60 * 60, // raid KO (original went from 8 h to 1 h)
+  reanimateEnergy: 20, // comes back with 20 energy (original)
   sellBack: 0.5,
+  /** zombie levels: XP needed for each level; every level adds 5% max energy */
+  zombieLevelXp: [0, 20, 50, 100, 170, 260, 380, 530, 720, 950],
+  zombieLevelEnergy: 0.05,
 };
 
 /** Patience 1 attacks at ~20% energy, patience 10 holds out until ~2% (original game). */
@@ -159,22 +206,35 @@ export function walkSpeed(speedStat: number): number {
   return TUNING.baseWalkSpeed + speedStat * TUNING.walkSpeedPerStat;
 }
 
-export const LEVEL_CAP = 30;
-
-export function xpToNext(level: number): number {
-  return Math.round(40 * Math.pow(level, 1.5));
+/** Rest recharge multiplier from the Recharge stat (5 = 1x; teens recover fast, hardhats slowly). */
+export function rechargeMult(recharge: number): number {
+  return 0.4 + recharge * 0.12;
 }
 
+export const LEVEL_CAP = 40;
+
+const XP_TABLE = [10, 30, 60, 110, 180, 270, 380, 520, 700, 950];
+export function xpToNext(level: number): number {
+  if (level <= XP_TABLE.length) return XP_TABLE[level - 1];
+  return Math.round(950 * Math.pow(1.22, level - 10));
+}
+
+/** Crew slots: one zombie at the start, about ten by level 20, thirteen late (original). */
 export function crewCapForLevel(level: number): number {
-  return Math.min(13, TUNING.startCrewCap + Math.floor((level - 1) / 3));
+  if (level <= 20) return 1 + Math.floor(level * 0.45);
+  return Math.min(13, 10 + Math.floor((level - 20) / 11));
 }
 
 /** Rare customers get more common the further your stars exceed their requirement (original behavior). */
-/** Decor points needed for each half-star step from 1★ to 5★ (wall hangings and themes count too). */
-export const DECOR_STARS = [0, 30, 60, 100, 150, 210, 280, 360, 450];
-
 export function spawnWeight(def: CustomerDef, stars: number): number {
   const over = Math.max(0, stars - def.minStars);
   const boost = def.tier === 'common' ? 1 : 1 + over * 2;
   return def.weight * boost;
+}
+
+/** Zombie level from its XP (1..10). */
+export function zombieLevel(xp: number): number {
+  let lv = 1;
+  for (let i = 1; i < TUNING.zombieLevelXp.length; i++) if (xp >= TUNING.zombieLevelXp[i]) lv = i + 1;
+  return lv;
 }

@@ -1,217 +1,161 @@
 import { describe, expect, it } from 'vitest';
 import {
   DOOR_X,
+  EXPANSIONS,
+  ITEMS,
+  ITEM_BY_ID,
   buyAndPlace,
-  buyKeepWarm,
-  buyTheme,
+  buyCheck,
   buyWall,
   canPlace,
   createInitialState,
-  decorPoints,
   expand,
-  furnAt,
+  grimeCount,
   moveFurniture,
-  moveWall,
   nextExpansion,
+  paintAll,
+  paintFloor,
+  paintWall,
   placeFromStorage,
+  ratingBonus,
+  ratingMult,
   rotateFurniture,
   sellFurniture,
-  startCooking,
-  stars,
+  sellValue,
   storeFurniture,
-  storeWall,
-  tick,
   validSeats,
+  wallSlotFree,
   type GameState,
 } from '../src/sim';
 
-const rich = (seed = 3): GameState => {
+const rich = (seed = 1) => {
   const s = createInitialState(seed);
-  s.cash = 100000;
-  s.sauce = 100;
-  s.level = 12;
+  s.cash = 1_000_000;
+  s.sauce = 500;
+  s.level = 20;
   return s;
 };
-const run = (s: GameState, sec: number) => {
-  for (let t = 0; t < sec; t += 0.25) tick(s, 0.25);
-};
+const at = (s: GameState, item: string) => s.furniture.find((f) => f.item === item)!;
 
-describe('shop placement rules', () => {
-  it('buys and places decor, which raises decor points', () => {
+describe('the catalog matches the original rules', () => {
+  it('every item fills one tile; tables seat one with a separate chair; chairs turn four ways', () => {
+    for (const d of ITEMS) expect(['none', 'two', 'four']).toContain(d.facing);
+    expect(ITEMS.filter((d) => d.kind === 'chair').every((d) => d.facing === 'four')).toBe(true);
+    expect(ITEMS.filter((d) => d.kind === 'table').every((d) => d.facing === 'none')).toBe(true);
+    expect(ITEMS.filter((d) => d.kind === 'table').length).toBeGreaterThanOrEqual(10); // 6 plain tints + 4 styles
+  });
+
+  it('expansions follow the original ladder: 8x7 for $3,500 up to 15x14', () => {
+    expect(EXPANSIONS[0]).toMatchObject({ w: 8, h: 7, cash: 3500 });
+    expect(EXPANSIONS.at(-1)).toMatchObject({ w: 15, h: 14 });
+  });
+
+  it('the starter junk cannot be bought, and sells for $25', () => {
     const s = rich();
-    const d0 = decorPoints(s);
-    expect(buyAndPlace(s, 'cactus', 6, 6)).toBeNull();
-    expect(decorPoints(s)).toBe(d0 + 5);
-    expect(s.stats.purchases).toBe(1);
-  });
-
-  it('enforces level, money and max-count limits', () => {
-    const s = createInitialState(1);
-    expect(buyAndPlace(s, 'slime_fountain', 6, 6)).toMatch(/level 10/);
-    s.cash = 10;
-    expect(buyAndPlace(s, 'plant', 6, 6)).toMatch(/cash/);
-    const r = rich();
-    expect(buyAndPlace(r, 'fridge', 6, 6)).toMatch(/only have 1/);
-  });
-
-  it('never lets you block the door, stack items, or leave the room', () => {
-    const s = rich();
-    expect(canPlace(s, 'plant', DOOR_X, 0)).toMatch(/door/);
-    expect(canPlace(s, 'plant', 2, 0)).toMatch(/already/); // the grill
-    expect(canPlace(s, 'plant', 8, 3)).toMatch(/inside/);
-  });
-
-  it('refuses layouts that wall off a counter or trap a seat', () => {
-    const s = rich();
-    // counters are at (0,2..4); the middle one is only reachable via (1,3), which the bench at (2,3)
-    // already hems in from the right. Plants at (1,2) and (1,4) would seal it.
-    expect(buyAndPlace(s, 'plant', 1, 2)).toBeNull();
-    expect(canPlace(s, 'plant', 1, 4)).toMatch(/wall off/);
-    expect(canPlace(s, 'plant', 1, 3)).toMatch(/wall off/);
-    // and you can't trap a seat: bench (4,3) is reachable only from (4,2), (4,4) and (5,3)
-    expect(buyAndPlace(s, 'plant', 4, 2)).toBeNull();
-    expect(buyAndPlace(s, 'plant', 4, 4)).toBeNull();
-    expect(canPlace(s, 'plant', 5, 3)).toMatch(/trap/);
-  });
-
-  it('chairs only become seats when they face a table that takes seats on that side', () => {
-    const s = rich();
-    const before = validSeats(s).length;
-    expect(buyAndPlace(s, 'table_diner', 6, 6)).toBeNull();
-    expect(buyAndPlace(s, 'chair_wood', 5, 6, 'se')).toBeNull(); // faces +x → the table
-    expect(buyAndPlace(s, 'chair_wood', 6, 7, 'ne')).toBeNull(); // faces -y → the table
-    expect(buyAndPlace(s, 'chair_wood', 7, 6, 'se')).toBeNull(); // faces away → not a seat
-    expect(validSeats(s).length).toBe(before + 2);
-    // picnic tables only take benches on their long sides (x)
-    expect(buyAndPlace(s, 'chair_wood', 3, 2, 'sw')).toBeNull(); // north of (3,3) facing it
-    expect(validSeats(s).length).toBe(before + 2);
-    // rotating fixes the backwards chair
-    const chair = furnAt(s, 7, 6)!;
-    rotateFurniture(s, chair.id); // se → sw
-    rotateFurniture(s, chair.id); // sw → nw
-    expect(chair.dir).toBe('nw');
-    expect(validSeats(s).length).toBe(before + 3);
-  });
-
-  it('customers actually sit at newly placed tables', () => {
-    const s = rich(11);
-    s.counter[0].dish = 'hotdog';
-    s.counter[0].servings = 400;
-    s.ratingPts = 100;
-    for (const [x, y] of [
-      [6, 6],
-      [6, 1],
-    ]) {
-      buyAndPlace(s, 'table_diner', x, y);
-      buyAndPlace(s, 'chair_diner', x - 1, y, 'se');
-      buyAndPlace(s, 'chair_diner', x + 1, y, 'nw');
-    }
-    const newSeats = new Set(validSeats(s).filter((f) => f.item === 'chair_diner').map((f) => f.id));
-    let used = false;
-    for (let i = 0; i < 2400 && !used; i++) {
-      tick(s, 0.25);
-      used = s.customers.some((c) => c.seatId && newSeats.has(c.seatId) && (c.state === 'waiting' || c.state === 'eating'));
-    }
-    expect(used).toBe(true);
-  });
-
-  it('moves, stores, places from storage and sells (half price back)', () => {
-    const s = rich();
-    buyAndPlace(s, 'lamp_post', 6, 6);
-    const f = furnAt(s, 6, 6)!;
-    expect(moveFurniture(s, f.id, 6, 7)).toBeNull();
-    expect(furnAt(s, 6, 7)?.id).toBe(f.id);
-    expect(storeFurniture(s, f.id)).toBeNull();
-    expect(s.storage.lamp_post).toBe(1);
-    expect(placeFromStorage(s, 'lamp_post', 7, 7)).toBeNull();
-    expect(s.storage.lamp_post).toBeUndefined();
-    const cash = s.cash;
-    expect(sellFurniture(s, furnAt(s, 7, 7)!.id)).toBeNull();
-    expect(s.cash).toBe(cash + 75);
-  });
-
-  it('protects busy furniture and the essentials', () => {
-    const s = rich();
-    const you = s.workers[0];
-    const grill = s.stoves[0];
-    startCooking(s, you.id, grill.id, 'hotdog');
-    run(s, 5);
-    const gf = s.furniture.find((f) => f.id === grill.furnitureId)!;
-    expect(storeFurniture(s, gf.id)).toMatch(/cooking|stove/);
-    const fridge = s.furniture.find((f) => f.item === 'fridge')!;
-    expect(sellFurniture(s, fridge.id)).toMatch(/Fridge/);
-    s.counter[0].servings = 5;
-    s.counter[0].dish = 'hotdog';
-    expect(storeFurniture(s, s.counter[0].furnitureId)).toMatch(/Serve/);
+    expect(buyCheck(s, 'stove_dirty')).toMatch(/old café/);
+    expect(sellValue(ITEM_BY_ID.sink_dirty).cash).toBe(25);
   });
 });
 
-describe('walls, themes, expansions, upgrades', () => {
-  it('hangs wall decor (not over the door, one per slot) and counts its decor', () => {
+describe('placing furniture', () => {
+  it('a table plus a chair facing it makes a seat; chairs facing away do not', () => {
     const s = rich();
-    const d0 = decorPoints(s);
-    expect(buyWall(s, 'wall_neon_pig', 'r', 3)).toBeNull();
-    expect(decorPoints(s)).toBe(d0 + 10);
-    expect(buyWall(s, 'wall_clock', 'r', DOOR_X)).toMatch(/door/);
-    expect(buyWall(s, 'wall_clock', 'r', 3)).toMatch(/already/);
-    const w = s.walls.find((x) => x.item === 'wall_neon_pig')!;
-    expect(moveWall(s, w.id, 'l', 6)).toBeNull();
-    expect(storeWall(s, w.id)).toBeNull();
-    expect(s.storage.wall_neon_pig).toBe(1);
+    const seats0 = validSeats(s).length;
+    expect(buyAndPlace(s, 'table_plain_sage', 3, 1)).toBeNull();
+    expect(buyAndPlace(s, 'chair_plain_sage', 3, 2, 'ne')).toBeNull(); // faces -y, toward the table
+    expect(validSeats(s).length).toBe(seats0 + 1);
+    const chair = s.furniture.at(-1)!;
+    expect(rotateFurniture(s, chair.id)).toBeNull(); // now facing away
+    expect(validSeats(s).length).toBe(seats0);
   });
 
-  it('expands the room in steps (last one costs Brain Sauce) and new floor is usable', () => {
+  it('keeps the door clear and the café workable', () => {
     const s = rich();
-    s.sauce = 50;
-    expect(nextExpansion(s)!.size).toBe(9);
-    expect(expand(s)).toBeNull();
-    expect(s.roomN).toBe(9);
-    expect(buyAndPlace(s, 'plant', 8, 8)).toBeNull();
-    expand(s);
-    expand(s);
-    const sauce = s.sauce;
-    expect(expand(s)).toBeNull();
-    expect(s.sauce).toBe(sauce - 20);
-    expect(s.roomN).toBe(12);
-    expect(expand(s)).toMatch(/big as it gets/);
+    expect(canPlace(s, 'plant_potted', DOOR_X, 0)).toMatch(/door/);
+    expect(canPlace(s, 'plant_potted', 9, 9)).toMatch(/inside/);
+    // the cook needs to stand in front of a stove
+    expect(canPlace(s, 'plant_potted', 2, 1)).toMatch(/cook needs room/);
+    // nothing can wall off the sink
+    expect(canPlace(s, 'plant_potted', 1, 4)).toBeNull();
+    s.furniture.push({ id: 'blk1', item: 'plant_potted', x: 1, y: 4 });
+    s.furniture.push({ id: 'blk2', item: 'plant_potted', x: 0, y: 3 });
+    expect(canPlace(s, 'plant_potted', 0, 5)).toMatch(/sink/i);
   });
 
-  it('buys and switches themes, which boost decor', () => {
+  it('outdoor items only go on the front lawn', () => {
     const s = rich();
-    const st0 = decorPoints(s);
-    expect(buyTheme(s, 'diner')).toBeNull();
-    expect(s.theme).toBe('diner');
-    expect(decorPoints(s)).toBe(st0 + 14);
-    expect(buyTheme(s, 'shack')).toBeNull();
-    expect(s.theme).toBe('shack');
+    expect(canPlace(s, 'tombstone_str', 3, 3)).toMatch(/lawn/);
+    expect(canPlace(s, 'tombstone_str', 8, 2)).toBeNull();
+    expect(buyAndPlace(s, 'pethouse_pug', 2, 7)).toBeNull();
+  });
+
+  it('move, store, place back, sell; buying gives XP', () => {
+    const s = rich();
+    const xp0 = s.xp + s.level * 1e6;
+    expect(buyAndPlace(s, 'plant_tree', 6, 2)).toBeNull();
+    expect(s.xp + s.level * 1e6).toBeGreaterThan(xp0);
+    const tree = at(s, 'plant_tree');
+    expect(moveFurniture(s, tree.id, 6, 3)).toBeNull();
+    expect([tree.x, tree.y]).toEqual([6, 3]);
+    expect(storeFurniture(s, tree.id)).toBeNull();
+    expect(s.storage.plant_tree).toBe(1);
+    expect(placeFromStorage(s, 'plant_tree', 6, 2)).toBeNull();
     const cash = s.cash;
-    expect(buyTheme(s, 'diner')).toBeNull(); // already owned: free switch
-    expect(s.cash).toBe(cash);
+    expect(sellFurniture(s, at(s, 'plant_tree').id)).toBeNull();
+    expect(s.cash).toBe(cash + 250);
   });
 
-  it('a heat lamp widens the burn window', () => {
-    const a = rich();
-    const b = rich();
-    buyKeepWarm(b, b.stoves[0].id);
-    for (const s of [a, b]) {
-      startCooking(s, s.workers[0].id, s.stoves[0].id, 'burger');
-      run(s, 70);
-    }
-    expect(b.stoves[0].burnAt! - a.stoves[0].burnAt!).toBeCloseTo(30, 0);
-  });
-
-  it('more decor and good service raise the star rating', () => {
+  it('you always keep at least one stove and one counter', () => {
     const s = rich();
-    s.ratingPts = 100;
-    const st0 = stars(s);
-    for (const [x, y] of [
-      [7, 7],
-      [7, 6],
-      [6, 7],
-      [5, 7],
-    ])
-      buyAndPlace(s, 'skeleton_statue', x, y);
-    for (let i = 0; i < 6; i++) buyWall(s, 'wall_neon_pig', 'r', [0, 2, 3, 4, 6, 7][i]);
-    expect(stars(s)).toBeGreaterThan(st0);
+    expect(sellFurniture(s, at(s, 'stove_dirty').id)).toMatch(/stove/);
+    expect(sellFurniture(s, at(s, 'counter_plain').id)).toMatch(/counter/);
+  });
+});
+
+describe('walls, floors and grime', () => {
+  it('walls and floors are bought one segment / tile at a time; grime counts against the rating', () => {
+    const s = rich();
+    const b0 = ratingBonus(s);
+    expect(b0).toBeLessThan(0); // stains, loose tiles, grimy kit and dirty walls
+    expect(grimeCount(s)).toBe(5);
+    expect(paintFloor(s, 1, 4, 'tile')).toBeNull(); // a stained tile
+    expect(grimeCount(s)).toBe(4);
+    expect(s.stats.floorsFixed).toBe(1);
+    expect(ratingBonus(s)).toBeGreaterThan(b0);
+    expect(paintWall(s, 'l', 0, 'brick')).toBeNull();
+    expect(s.walls.l[0]).toBe('brick');
+    const cash = s.cash;
+    const { done } = paintAll(s, 'floors', 'checker');
+    expect(done).toBe(42);
+    expect(s.cash).toBe(cash - 42 * 40);
+    expect(grimeCount(s)).toBe(0);
+  });
+
+  it('star items make the rating climb faster', () => {
+    const s = rich();
+    const m0 = ratingMult(s);
+    expect(buyWall(s, 'neon_pig', 'r', 1)).toBeNull();
+    expect(ratingMult(s)).toBeGreaterThan(m0);
+  });
+
+  it('wall items need a free slot, and never go on the door', () => {
+    const s = rich();
+    expect(wallSlotFree(s, 'r', DOOR_X)).toMatch(/door/);
+    expect(wallSlotFree(s, 'l', 3)).toMatch(/already/); // the boarded window
+    expect(wallSlotFree(s, 'l', 9)).toMatch(/Off/);
+  });
+});
+
+describe('expansions', () => {
+  it('grow the room toward the front lawn, extending the walls', () => {
+    const s = rich();
+    expect(nextExpansion(s)).toMatchObject({ w: 8, h: 7 });
+    expect(expand(s)).toBeNull();
+    expect([s.roomW, s.roomH]).toEqual([8, 7]);
+    expect(s.walls.r).toHaveLength(8);
+    expect(s.walls.l).toHaveLength(7);
+    while (nextExpansion(s)) expect(expand(s)).toBeNull();
+    expect([s.roomW, s.roomH]).toEqual([15, 14]);
+    expect(expand(s)).toMatch(/big/);
   });
 });

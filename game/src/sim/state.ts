@@ -1,5 +1,5 @@
-import { CUSTOMER_BY_ID, TUNING, YOU_STATS, type StationKind, type ZombieStats } from './data';
-import { ITEM_BY_ID, type Dir, type ThemeId } from './catalog';
+import { CUSTOMER_BY_ID, DISH_BY_ID, TUNING, YOU_STATS, crewCapForLevel, zombieLevel, type StationKind, type ZombieStats } from './data';
+import { ITEM_BY_ID, START_SIZE, type Dir } from './catalog';
 import { DOOR_X, type Pt } from './grid';
 
 export interface Furniture {
@@ -8,12 +8,17 @@ export interface Furniture {
   item: string;
   x: number;
   y: number;
-  /** seats: the direction the sitter faces (toward the table) */
+  /** facing: chairs face their table; stoves/counters/sinks face where the worker stands */
   dir?: Dir;
-  /** money-makers: when the next payout is ready */
-  payoutAt?: number;
+  /** tables: a dirty plate is waiting to be cleared (nobody can sit here until it is) */
+  dirty?: boolean;
+  /** money-makers: cash collected so far (up to the item's max) */
+  bank?: number;
   /** stoves: heat-lamp upgrade widens the burn window */
   keepWarm?: boolean;
+  /** raid tombstones: uses left today, refilled 24 h after the first use */
+  uses?: number;
+  usesResetAt?: number;
 }
 
 export interface WallItem {
@@ -30,7 +35,7 @@ export interface Mover {
   speed: number;
   /** +1 = facing screen-right, -1 = facing screen-left */
   facing: 1 | -1;
-  /** true while moving away from the camera (up the screen) → back view */
+  /** true while facing away from the camera (up the screen) → back view */
   back?: boolean;
 }
 
@@ -41,6 +46,7 @@ export interface Customer extends Mover {
   type: string;
   state: CustomerState;
   seatId?: string;
+  tableId?: string;
   waitLeft: number;
   eatEnd: number;
   serverId?: string;
@@ -53,14 +59,23 @@ export type WorkerState =
   | 'idle'
   | 'toStove'
   | 'cooking'
+  | 'toPickup'
+  | 'carryDish'
   | 'toCounter'
   | 'carrying'
+  | 'toPlate'
+  | 'carryPlate'
   | 'hunting'
   | 'toRest'
   | 'resting'
   | 'daydream'
   | 'raiding'
   | 'down';
+
+export type WorkerJob =
+  | { kind: 'serve'; slotId: string; dish: string; customerId: string }
+  | { kind: 'plate'; tableId: string }
+  | { kind: 'dish'; stoveId: string; dish?: string; servings?: number };
 
 export interface Worker extends Mover {
   id: string;
@@ -70,10 +85,12 @@ export interface Worker extends Mover {
   name: string;
   stats: ZombieStats;
   energy: number;
+  /** zombie XP from serving and raiding; levels add max energy */
+  xp: number;
   state: WorkerState;
   stoveId?: string;
   pendingDish?: string;
-  job?: { slotId: string; dish: string; customerId: string };
+  job?: WorkerJob;
   targetId?: string;
   restSpot?: Pt;
   daydreamEnd?: number;
@@ -82,7 +99,7 @@ export interface Worker extends Mover {
   downUntil?: number;
 }
 
-export type StoveStatus = 'empty' | 'reserved' | 'cooking' | 'done' | 'burnt';
+export type StoveStatus = 'empty' | 'reserved' | 'cooking' | 'paused' | 'done' | 'burnt';
 
 export interface Stove {
   id: string;
@@ -90,9 +107,14 @@ export interface Stove {
   kind: StationKind;
   status: StoveStatus;
   dish?: string;
-  doneAt?: number;
+  /** cook seconds still to go (counts down only while the cook is at the stove) */
+  left?: number;
+  /** total cook seconds (for progress rings) */
+  total?: number;
   burnAt?: number;
   cookId?: string;
+  /** worker on the way to carry the finished dish to a counter */
+  carrierId?: string;
 }
 
 export interface CounterSlot {
@@ -126,11 +148,15 @@ export type GameEvent =
   | { t: 'face'; x: number; y: number; happy: boolean }
   | { t: 'xp'; x: number; y: number; amount: number }
   | { t: 'bite'; x: number; y: number; workerId: string; customerId: string }
+  | { t: 'panic' }
   | { t: 'infected'; workerId: string }
   | { t: 'levelup'; level: number }
+  | { t: 'zombieLevel'; workerId: string; level: number }
   | { t: 'dishDone'; stoveId: string }
+  | { t: 'plated'; stoveId: string }
   | { t: 'burnt'; stoveId: string }
   | { t: 'cookStart'; stoveId: string }
+  | { t: 'cleared'; tableId: string }
   | { t: 'payout'; furnitureId: string; amount: number }
   | { t: 'petFind'; petId: string; amount: number }
   | { t: 'goal'; goalId: string }
@@ -147,12 +173,16 @@ export interface GameState {
   xp: number;
   level: number;
   crewCap: number;
-  ratingPts: number;
-  roomN: number;
-  theme: ThemeId;
-  ownedThemes: ThemeId[];
+  /** popularity 0..1 (shown as 0..5 stars) */
+  rating: number;
+  roomW: number;
+  roomH: number;
+  /** wall finish per segment: l = north-west wall (index = gy), r = north-east wall (index = gx) */
+  walls: { l: string[]; r: string[] };
+  /** floor finish per tile ('x,y' → finish id); missing = 'dirty' */
+  floors: Record<string, string>;
+  wallItems: WallItem[];
   furniture: Furniture[];
-  walls: WallItem[];
   storage: Record<string, number>;
   stoves: Stove[];
   counter: CounterSlot[];
@@ -169,11 +199,11 @@ export interface GameState {
   spawnCooldown: number;
   /** last few customer types, to keep the crowd varied */
   recentTypes: string[];
-  /** OPEN/CLOSED sign: closed joints get no new customers (the crew can nap in peace before a raid) */
-  closed?: boolean;
   tut: number;
   tutTimer: number;
   freeInfects: number;
+  /** the door sign: closed cafés get no customers and slowly lose rating */
+  closed?: boolean;
   stats: {
     served: number;
     earned: number;
@@ -182,6 +212,8 @@ export interface GameState {
     infectedRare: number;
     happy: number;
     angry: number;
+    cleared: number;
+    floorsFixed: number;
     cooked: Record<string, number>;
     purchases: number;
     raidsWon: number;
@@ -190,7 +222,12 @@ export interface GameState {
   events: GameEvent[];
 }
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
+
+export function maxEnergy(w: Worker): number {
+  if (w.kind !== 'zombie') return w.stats.energy;
+  return Math.round(w.stats.energy * (1 + TUNING.zombieLevelEnergy * (zombieLevel(w.xp) - 1)));
+}
 
 export function makeWorker(s: GameState, kind: 'you' | 'zombie', type: string, at: Pt): Worker {
   const def = kind === 'zombie' ? CUSTOMER_BY_ID[type] : undefined;
@@ -202,6 +239,7 @@ export function makeWorker(s: GameState, kind: 'you' | 'zombie', type: string, a
     name: def ? def.zombieName : 'YOU',
     stats,
     energy: stats.energy,
+    xp: 0,
     state: 'idle',
     x: at.x,
     y: at.y,
@@ -212,12 +250,13 @@ export function makeWorker(s: GameState, kind: 'you' | 'zombie', type: string, a
   };
 }
 
-/** Adds a furniture piece and any stove / counter-slot record it needs. */
+/** Adds a furniture piece and any stove / counter record it needs. */
 export function addFurniture(s: GameState, item: string, x: number, y: number, dir?: Dir): Furniture {
   const def = ITEM_BY_ID[item];
   const f: Furniture = { id: `f${s.nextId++}`, item, x, y };
-  if (dir) f.dir = dir;
-  if (def.kind === 'moneymaker' && def.payout) f.payoutAt = s.now + def.payout.everySec;
+  if (def.facing !== 'none') f.dir = dir ?? 'sw';
+  if (def.kind === 'moneymaker') f.bank = 0;
+  if (def.kind === 'tombstone') f.uses = 5;
   s.furniture.push(f);
   if (def.kind === 'stove') s.stoves.push({ id: `s${s.nextId++}`, furnitureId: f.id, kind: def.station!, status: 'empty' });
   if (def.kind === 'counter') s.counter.push({ id: `k${s.nextId++}`, furnitureId: f.id, servings: 0 });
@@ -225,9 +264,10 @@ export function addFurniture(s: GameState, item: string, x: number, y: number, d
 }
 
 export function freshStats(): GameState['stats'] {
-  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0 };
+  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0 };
 }
 
+/** The starting café, as the original handed it over: a grimy 7x6 room with the bare essentials. */
 export function createInitialState(seed = 1234): GameState {
   const s: GameState = {
     version: SAVE_VERSION,
@@ -238,13 +278,14 @@ export function createInitialState(seed = 1234): GameState {
     sauce: TUNING.startSauce,
     xp: 0,
     level: 1,
-    crewCap: TUNING.startCrewCap,
-    ratingPts: TUNING.ratingStart,
-    roomN: 8,
-    theme: 'shack',
-    ownedThemes: ['shack'],
+    crewCap: crewCapForLevel(1),
+    rating: TUNING.ratingStart,
+    roomW: START_SIZE.w,
+    roomH: START_SIZE.h,
+    walls: { l: Array(START_SIZE.h).fill('dirty'), r: Array(START_SIZE.w).fill('dirty') },
+    floors: {},
+    wallItems: [],
     furniture: [],
-    walls: [],
     storage: {},
     stoves: [],
     counter: [],
@@ -258,7 +299,7 @@ export function createInitialState(seed = 1234): GameState {
     rivals: {},
     graves: { day: '', green: 5, red: 5 },
     inventory: { headstone: 1, summon: 0 },
-    spawnCooldown: 4,
+    spawnCooldown: 6,
     recentTypes: [],
     tut: 0,
     tutTimer: 0,
@@ -266,24 +307,28 @@ export function createInitialState(seed = 1234): GameState {
     stats: freshStats(),
     events: [],
   };
-  // Kitchen along the back-right wall, counter along the back-left wall.
-  addFurniture(s, 'grill', 2, 0);
-  for (const y of [2, 3, 4]) addFurniture(s, 'counter', 0, y);
-  addFurniture(s, 'fridge', 0, 6);
-  addFurniture(s, 'plant', 0, 7);
-  addFurniture(s, 'plant', 7, 0);
-  // Picnic tables, each with a bench on either long side (one seat per bench).
-  for (const [tx, ty] of [
-    [3, 3],
-    [6, 4],
-    [3, 6],
-  ]) {
-    addFurniture(s, 'table_picnic', tx, ty);
-    addFurniture(s, 'bench', tx - 1, ty, 'se');
-    addFurniture(s, 'bench', tx + 1, ty, 'nw');
-  }
-  s.walls.push({ id: `wl${s.nextId++}`, item: 'wall_bottles', wall: 'l', index: 3 });
-  s.workers.push(makeWorker(s, 'you', 'you', { x: DOOR_X - 1, y: 2 }));
+  // grime: stained and loose tiles that count against the rating until you replace them
+  for (const [x, y, f] of [
+    [1, 4, 'stain'],
+    [4, 3, 'stain'],
+    [5, 1, 'stain'],
+    [2, 5, 'loose'],
+    [6, 4, 'loose'],
+  ] as [number, number, string][])
+    s.floors[`${x},${y}`] = f;
+  // kitchen against the walls: stove (cook stands in front), counter, sink, fridge
+  addFurniture(s, 'stove_dirty', 2, 0, 'sw');
+  addFurniture(s, 'fridge_dirty', 0, 0, 'sw');
+  addFurniture(s, 'counter_plain', 0, 2, 'se');
+  addFurniture(s, 'sink_dirty', 0, 4, 'se');
+  // two one-seat tables, each with its chair
+  addFurniture(s, 'table_plain_white', 3, 3);
+  addFurniture(s, 'chair_plain_white', 2, 3, 'se');
+  addFurniture(s, 'table_plain_cream', 5, 4);
+  addFurniture(s, 'chair_plain_cream', 5, 3, 'sw');
+  addFurniture(s, 'plant_dead', 6, 0);
+  s.wallItems.push({ id: `wl${s.nextId++}`, item: 'window_boarded', wall: 'l', index: 3 });
+  s.workers.push(makeWorker(s, 'you', 'you', { x: DOOR_X - 1, y: 1 }));
   return s;
 }
 
@@ -292,43 +337,34 @@ export function migrate(raw: unknown): GameState | null {
   const st = raw as (GameState & { version?: number }) | null;
   if (!st || typeof st !== 'object') return null;
   if (st.version === SAVE_VERSION) return st;
-  if (st.version !== 1) return null;
-  // v1 → v2: furniture kinds became catalog items; new progression fields.
-  const fresh = createInitialState(1);
-  type V1Furniture = { id: string; kind: string; x: number; y: number; side?: number };
-  const v1 = st as unknown as Omit<GameState, 'furniture'> & { furniture: V1Furniture[] };
-  const kindToItem: Record<string, string> = { table: 'table_picnic', bench: 'bench', counter: 'counter', grill: 'grill', smoker: 'smoker', fridge: 'fridge', plant: 'plant', keg: 'barrel_keg' };
-  const furniture: Furniture[] = v1.furniture
-    .filter((f: V1Furniture) => !(f.kind === 'smoker' && v1.level < 4))
-    .map((f: V1Furniture) => {
-      const out: Furniture = { id: f.id, item: kindToItem[f.kind] ?? 'plant', x: f.x, y: f.y };
-      if (f.kind === 'bench') out.dir = f.side === -1 ? 'se' : 'nw';
-      return out;
-    });
-  const furnIds = new Set(furniture.map((f) => f.id));
-  const out: GameState = {
-    ...fresh,
-    ...v1,
-    version: SAVE_VERSION,
-    furniture,
-    stoves: v1.stoves.filter((x) => furnIds.has(x.furnitureId)).map((x) => ({ ...x, kind: x.kind ?? 'grill' })),
-    roomN: 8,
-    theme: 'shack',
-    ownedThemes: ['shack'],
-    walls: fresh.walls,
-    storage: {},
-    pets: [],
-    fridge: [],
-    recipes: [],
-    seen: {},
-    goalsDone: [],
-    rivals: {},
-    graves: fresh.graves,
-    inventory: fresh.inventory,
-    recentTypes: [],
-    stats: { ...freshStats(), ...v1.stats, cooked: {} },
-    events: [],
+  if (st.version !== 2) return null;
+  // v2 → v3: the café itself was rebuilt (one-seat tables, sinks, per-tile floors, a corner lot), so
+  // start a fresh grimy café but keep the player's progress: level, money, recipes, crew, collections.
+  const v2 = st as unknown as {
+    level: number;
+    xp: number;
+    cash: number;
+    sauce: number;
+    recipes?: string[];
+    seen?: GameState['seen'];
+    goalsDone?: string[];
+    rivals?: GameState['rivals'];
+    fridge?: FridgeItem[];
+    workers?: { kind: string; type: string }[];
+    stats?: Partial<GameState['stats']>;
   };
-  out.nextId = Math.max(out.nextId, fresh.nextId) + 1;
-  return out;
+  const s = createInitialState(st.rng || 1);
+  s.level = Math.max(1, Math.min(40, v2.level | 0));
+  s.xp = Math.max(0, v2.xp | 0);
+  s.crewCap = crewCapForLevel(s.level);
+  s.cash = Math.max(s.cash, Math.min(v2.cash | 0, 50000));
+  s.sauce = Math.max(s.sauce, v2.sauce | 0);
+  s.recipes = (v2.recipes ?? []).filter((r) => DISH_BY_ID[r]);
+  s.seen = Object.fromEntries(Object.entries(v2.seen ?? {}).filter(([id]) => CUSTOMER_BY_ID[id]));
+  s.rivals = v2.rivals ?? {};
+  s.fridge = (v2.fridge ?? []).filter((f) => DISH_BY_ID[f.dish]);
+  s.stats = { ...freshStats(), ...(v2.stats ?? {}), cooked: {} } as GameState['stats'];
+  const crew = (v2.workers ?? []).filter((w) => w.kind === 'zombie' && CUSTOMER_BY_ID[w.type]).slice(0, s.crewCap);
+  crew.forEach((w, i) => s.workers.push(makeWorker(s, 'zombie', w.type, { x: 1 + (i % 5), y: 1 + Math.floor(i / 5) })));
+  return s;
 }

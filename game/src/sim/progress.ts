@@ -1,15 +1,16 @@
 import { DISH_BY_ID } from './data';
 import { GOALS, type GoalDef } from './catalog';
-import { isInside, key } from './grid';
+import { DOOR_X, isInside, key } from './grid';
+import { grimeCount } from './build';
 import type { GameState, Pet } from './state';
-import { addToCounter, addXp, blockedTiles, furnById, itemOf, move, rand, setPath, stars, zombies } from './sim';
+import { addToCounter, addXp, blockedTiles, chairTable, furnById, itemOf, move, rand, room, setPath, stars, zombies } from './sim';
 
 // ---------- goals (the clipboard) ----------
 
 export function goalComplete(s: GameState, id: string): boolean {
   const z = zombies(s).length;
   const st = stars(s);
-  const beat = (r: string) => (s.rivals[r]?.wins ?? 0) > 0;
+  const wins = s.stats.raidsWon;
   switch (id) {
     case 'cook1':
       return Object.keys(s.stats.cooked).length > 0;
@@ -17,50 +18,52 @@ export function goalComplete(s: GameState, id: string): boolean {
       return s.stats.served >= 10;
     case 'infect1':
       return s.stats.infected >= 1;
-    case 'buydecor':
-      return s.stats.purchases >= 1;
-    case 'zombies2':
-      return z >= 2;
+    case 'clean5':
+      return s.stats.cleared >= 5;
+    case 'seats3':
+      return new Set(s.furniture.map((f) => chairTable(s, f)?.id).filter(Boolean)).size >= 3;
+    case 'floor1':
+      return s.stats.floorsFixed >= 1;
     case 'wall1':
-      return s.walls.length >= 2;
+      return s.wallItems.length >= 2;
     case 'level3':
       return s.level >= 3;
+    case 'zombies2':
+      return z >= 2;
+    case 'grill':
+      return s.furniture.some((f) => f.item === 'grill');
     case 'raid1':
-      return beat('chuck');
+      return wins >= 1;
     case 'study1':
       return s.stats.studied >= 1;
     case 'stars2':
       return st >= 2;
+    case 'cleanfloor':
+      return grimeCount(s) === 0;
     case 'expand1':
-      return s.roomN > 8;
+      return s.roomW > 7;
     case 'smoker':
       return (s.stats.cooked.pork ?? 0) > 0;
-    case 'money1':
-      return s.furniture.some((f) => itemOf(f).kind === 'moneymaker');
     case 'zombies4':
       return z >= 4;
-    case 'raid2':
-      return beat('hank');
-    case 'theme1':
-      return s.ownedThemes.length > 1;
+    case 'money1':
+      return s.furniture.some((f) => itemOf(f).kind === 'moneymaker');
+    case 'raid3':
+      return wins >= 3;
     case 'pet1':
       return s.pets.length > 0;
     case 'stars3':
       return st >= 3;
     case 'rare1':
       return s.stats.infectedRare >= 1;
-    case 'raid3':
-      return beat('vera');
     case 'fryer':
       return (s.stats.cooked.rings ?? 0) > 0;
     case 'zombies7':
       return z >= 7;
-    case 'raid4':
-      return beat('crunch');
     case 'stars4':
       return st >= 4;
-    case 'raid5':
-      return beat('snob');
+    case 'raid10':
+      return wins >= 10;
     case 'stars5':
       return st >= 5;
   }
@@ -110,22 +113,32 @@ export function studyFromFridge(s: GameState, index: number): string | null {
   return null;
 }
 
-// ---------- money-makers ----------
+// ---------- money-makers ($ per hour up to a cap; tap to empty, like the original) ----------
+
+/** '$' once there's at least a dollar to collect, '!' when it's full and has stopped earning. */
+export function payoutState(s: GameState, furnitureId: string): 'none' | 'cash' | 'full' {
+  const f = furnById(s, furnitureId);
+  const p = f && itemOf(f).payout;
+  if (!f || !p) return 'none';
+  const bank = f.bank ?? 0;
+  if (bank >= p.max) return 'full';
+  return bank >= 1 ? 'cash' : 'none';
+}
 
 export function payoutReady(s: GameState, furnitureId: string): boolean {
-  const f = furnById(s, furnitureId);
-  return !!f && f.payoutAt !== undefined && s.now >= f.payoutAt;
+  return payoutState(s, furnitureId) !== 'none';
 }
 
 export function collectPayout(s: GameState, furnitureId: string): number {
   const f = furnById(s, furnitureId);
-  const def = f && itemOf(f);
-  if (!f || !def?.payout || !payoutReady(s, furnitureId)) return 0;
-  s.cash += def.payout.cash;
-  s.stats.earned += def.payout.cash;
-  f.payoutAt = s.now + def.payout.everySec;
-  s.events.push({ t: 'payout', furnitureId, amount: def.payout.cash });
-  return def.payout.cash;
+  if (!f || !itemOf(f).payout) return 0;
+  const amount = Math.floor(f.bank ?? 0);
+  if (amount < 1) return 0;
+  f.bank = (f.bank ?? 0) - amount;
+  s.cash += amount;
+  s.stats.earned += amount;
+  s.events.push({ t: 'payout', furnitureId, amount });
+  return amount;
 }
 
 // ---------- pets ----------
@@ -135,7 +148,8 @@ function syncPets(s: GameState) {
     const def = itemOf(f);
     if (def.kind !== 'pethouse' || !def.pet) continue;
     if (s.pets.some((p) => p.homeId === f.id)) continue;
-    s.pets.push({ id: `p${s.nextId++}`, type: def.pet, homeId: f.id, x: f.x + 1, y: f.y, path: [], speed: 0, facing: 1, nextAction: s.now + 5, state: 'roam' });
+    // pets hang around inside the café, wandering in from their house on the lawn
+    s.pets.push({ id: `p${s.nextId++}`, type: def.pet, homeId: f.id, x: DOOR_X, y: 1, path: [], speed: 0, facing: 1, nextAction: s.now + 5, state: 'roam' });
   }
   s.pets = s.pets.filter((p) => s.furniture.some((f) => f.id === p.homeId));
 }
@@ -155,10 +169,11 @@ function updatePet(s: GameState, p: Pet, dt: number) {
     return;
   }
   const blocked = blockedTiles(s);
+  const r = room(s);
   for (let i = 0; i < 6; i++) {
-    const x = Math.floor(rand(s) * s.roomN);
-    const y = Math.floor(rand(s) * s.roomN);
-    if (blocked.has(key(x, y)) || !isInside(x, y, s.roomN)) continue;
+    const x = Math.floor(rand(s) * r.w);
+    const y = Math.floor(rand(s) * r.h);
+    if (blocked.has(key(x, y)) || !isInside(x, y, r)) continue;
     setPath(s, p, { x, y }, p.type === 'pug' ? 1.6 : 2.4);
     break;
   }

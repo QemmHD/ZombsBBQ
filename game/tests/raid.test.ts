@@ -56,17 +56,19 @@ describe('raid setup', () => {
     expect(s.workers.filter((w) => w.state === 'raiding')).toHaveLength(2);
   });
 
-  it('a zombie can leave the stove for a raid; the food finishes cooking without them', () => {
+  it('a zombie can leave the stove for a raid; the dish waits, paused, until a cook comes back', () => {
     const s = withCrew(['construction']);
     const z = s.workers.find((w) => w.kind === 'zombie')!;
     const grill = s.stoves[0];
-    expect(startCooking(s, z.id, grill.id, 'hotdog')).toBeNull();
+    expect(startCooking(s, z.id, grill.id, 'sliders')).toBeNull();
     for (let i = 0; i < 200 && z.state !== 'cooking'; i++) tick(s, 0.1);
     expect(z.state).toBe('cooking');
     expect(startRaid(s, 'chuck', [z.id])).toBeTypeOf('object');
     expect(z.state).toBe('raiding');
+    const left = grill.left;
     for (let i = 0; i < 300; i++) tick(s, 0.1);
-    expect(grill.status).toBe('done');
+    expect(grill.status).toBe('paused'); // like the original: no cook at the stove, no cooking
+    expect(grill.left).toBe(left);
     expect(z.state).toBe('raiding');
   });
 });
@@ -105,7 +107,9 @@ describe('the fight', () => {
     expect(res.result).toBe('lost');
     expect(z.state).toBe('down');
     expect(s.cash).toBe(cash + res.cash);
-    for (let i = 0; i < 16 * 60; i++) tick(s, 1);
+    for (let i = 0; i < 30 * 60; i++) tick(s, 1);
+    expect(z.state).toBe('down'); // reanimating takes an hour
+    for (let i = 0; i < 31 * 60; i++) tick(s, 1);
     expect(z.state).not.toBe('down');
   });
 
@@ -117,11 +121,11 @@ describe('the fight', () => {
     expect(r.gateBroken).toBe(true);
     expect(stealDish(r, 0)).toBeNull();
     for (let t = 0; t < 30 && !r.stolen.length && r.phase === 'fight'; t += 0.05) stepRaid(r, 0.05);
-    expect(r.stolen).toContain('hotdog');
+    expect(r.stolen).toContain('sliders');
     retreat(r);
     const res = finishRaid(s, r);
     expect(res.result).toBe('retreat');
-    expect(s.fridge.some((f) => f.dish === 'hotdog')).toBe(true);
+    expect(s.fridge.some((f) => f.dish === 'sliders')).toBe(true);
   });
 
   it('focus targeting, grave markers, headstones and the Big Foot-Long summon all work and are limited', () => {
