@@ -80,10 +80,106 @@ The crew cap shows on the HUD as `4/4` early on, and `12/13` at the max level of
 - **Raid items (tombstones, from v1.1.0):** a **green** one boosts zombie health before an attack; a **red** one raises attack temporarily (zombies flash while it lasts). Each can be used 5×/day and recharges at midnight. A **Health Stone** restores +100 Energy to every zombie and pet in the raid over a few seconds, mid-fight. The **Zombie Yeti** could be summoned from a tombstone bought for 75 Toxin, with up to 3 active. The reference raid screen shows counters such as `12/12` tombstones, `10/12` crystals and a `3/3` golem.
 - **Pets in raids:** zombie dogs and werewolves (the `1/6` pet counter), and **5 robot pets that combine into "Amtron"**, which was strong in enemy cafés.
 
-### 3.7 Updates and collectables
+### 3.7 Menus and screens (what you tapped, and what opened)
+
+Reconstructed from the reference screenshots and the fan wikis. **Confirmed** means a source describes it. **From screenshot** means the button is visible but no reachable source explains it, so its function is our best reading.
+
+**Main café screen (landscape)**
+| Where | Button | What it did | Status |
+|---|---|---|---|
+| Top awning | Café name, ★ rating, level number, XP bar (`60/150 XP`), cash, Toxin, ZC logo | Always-visible status bar. Tapping the ZC logo opened the **ZC friends menu**, where you chose which friends' cafés appear. | Confirmed (friends menu); logo placement from screenshot |
+| Left column | **Money bag ($)** | Opens the **Store**. | Confirmed |
+| Left column | **Clipboard + pencil** | Most likely goals/to-do or edit mode. | From screenshot |
+| Left column | **Map** | Leaves the café for the **map of rival cafés and friends**, where you raid or visit. Each rival café shows its **level under the building**. | Confirmed |
+| Left column | **Book with fork & knife** | **Cookbook / recipes**. | From screenshot |
+| Left column | **Zombie head `4/4`** | **Staff list** (current zombies / cap), with stats, rest and refill. | Confirmed by the counter |
+| Left column | **Dog head `6/6`** | **Pets** (only once you own pets). | From screenshot |
+| Right column | **Zombie chef head** | Probably the union rep's tips/goals. | From screenshot |
+| Right column | **Box with red arrow + keyhole** | Probably locked gifts or deliveries. | From screenshot |
+| Right column | **Green zombie book** | **Zombiepedia**: every customer type, which ones visit at your level and rating, and their zombie forms and stats. | Confirmed (Zombiepedia exists) |
+| Right column | **Box with green arrow** | **Storage**: drag unused furniture into it. Forum posts said it was hard to find, located "below the zombie staff icon". | Confirmed |
+
+**Tap menus in the café**
+- **Tap YOU** → a name bar with an Energy bar and the **Photo / Info / Chef** buttons, plus a red X to close (screenshot 1).
+- **Tap a zombie** → stats, Energy, **Rest**, refill with Toxin, then tap a stove to make it cook.
+- **Tap a customer** → **Infect** (shows the cost in cash or Toxin).
+- **Tap a stove** → pick a dish. While it cooks: progress and **Finish** (Toxin). When done: tap the dish to move it to the counter.
+- **Tap furniture** → move it (tap the item, then tap a floor tile), rotate, sell, or store.
+
+**Store tabs (confirmed: 7 sections)**
+1. **Featured**: new and sale items.
+2. **Decor**: wall hangings and novelties (wall items raise rating without using floor).
+3. **Utility**: kitchen equipment such as **stoves** (bought with cash, **upgraded with Toxin**), counters and sinks. Themed stoves **unlock cookbooks**, e.g. the *Tomb Stove* unlocked *Corpse Flakes* and *Cold Feet*, and the *Standard Pizza Oven* (Lv 15) unlocked the Mafia recipes.
+4. **Furniture**: tables and chairs.
+5. **Walls/Floors**: wallpapers, floor tiles, windows.
+6. **Special**: **café expansions**, **money-making items** (ATM, Vending Machine, arcade, jukebox, which pay out over time; players called these the best Toxin investment), **pet houses** (buying one adds that pet), tombstones, the Toxin Barrel, and real-money items.
+7. **Storage**: your stored items.
+
+**Raid screen:** rival name and stars top-left with the **white truce flag**; a left tray of **zombie and pet counts** (`14/14` zombies, `1/6` dogs, werewolf heads); right-side counters for **tombstones / crystals / golem summons** (`12/12`, `10/12`, `3/3`); a **Send all zombies** button bottom-right; your horde lined up on the sidewalk (screenshot 2).
+
+### 3.8 How unlocks worked
+| What | Unlocked by |
+|---|---|
+| Recipes | Player **level** (buy with cash), **buying themed stoves** (which open their cookbook), **raids** (looted dishes in the fridge → unlock), and **friends' cafés** (rare dishes your friends have already unlocked) |
+| Stoves | Level + cash; upgraded with Toxin |
+| Customers (who visits) | **Level + star rating.** The Zombiepedia shows the requirement. Expensive types only appear at high levels and high ratings. |
+| Zombies | Infect a visiting customer (cash or Toxin); the crew cap rises with level |
+| Café size | Expansions in the Special tab. Early ones cost cash; the last ones needed **Toxin (40 for the second-to-last, 50 for the last)** |
+| Pets | **Pet houses** in the Special tab (cash or Toxin; one dog kennel was listed at $50,000), and in the English version also unlocked by **raiding** enemy cafés |
+| Raid boosts | Tombstones in the Special tab (green/red, 5 uses/day); Zombie Yeti tombstone (75 Toxin) |
+| Rival cafés | 20+ raidable cafés by v1.13. Their level is shown on the map. |
+
+### 3.9 Customers, including rare ones
+**Who walks in depends on your level and star rating.** Players estimated the number of customers inside at once as about **1 + the number of half-stars** of your rating, and that the game calculates popularity offline from your tables plus the number and speed of your waiters.
+
+Known types and infection prices (fan sources disagree on several prices; both values shown):
+| Customer | Infect cost | Notes |
+|---|---|---|
+| Accountant | Free | Tutorial-tier |
+| Yoga Instructor | Free | Tutorial-tier |
+| Teenager | Free/cheap | Early |
+| Politician | $100 | |
+| Construction Worker | $250 | "Powerful for the price" |
+| CEO | Paid | Appears from **Lv 12** |
+| Cop | 1 Toxin (another table says 5) | "Weak, don't waste Toxin" |
+| Traffic Cop | 1 Toxin (or 10) | |
+| Boxer | 15 Toxin (or 5) | Best fighter |
+| Sumo Wrestler | 30 Toxin | |
+| Benchwarmer | ? | One of **4 "rare" customers added in an update**: they appear from **Lv 15** and become common with high stars |
+| Movie Star | ? | Strong pure server |
+| Stoogey | ? | High tips, daydreams constantly |
+| Celebrity, Champ | Expensive | Only appear at high levels; the Champ had about 250 Energy |
+| Nurse, construction, police, etc. | | Visible in the reference screenshots |
+
+The most expensive customers topped out at **80 Toxin**, and higher stats meant a higher price.
+
+### 3.10 How a raid actually played, start to finish
+1. **Prepare:** veterans **closed the café and let zombies rest to full Energy** first, because **Energy is their health in a raid**.
+2. Tap **Map** → pick a rival café (check its level under the building; if you're higher, you'll likely win) → choose zombies and pets.
+3. Zombies **line up on the sidewalk** outside the rival's fence. Send them one by one or with **Send all zombies**.
+4. Inside, **tap to direct them**: customers, staff, or the **serving counter to steal a dish**. Zombies also **eat customers and staff**, which **pays cash even if the raid fails**.
+5. The **staff swarm** once fighting starts. Waiters are weak. Use **green/red tombstones**, the **Health Stone** (+100 Energy to everyone, mid-fight), summon the **Yeti**, or combine the **5 robot pets into Amtron** (only after a zombie has entered the café).
+6. **Head Chef / raid boss** comes out once the room is mostly cleared. Guides said to clear the dining room, keep out of the kitchen, then gang up on the chef.
+7. **Win** (boss defeated): food (to the fridge) and cash guaranteed, recipe unlocks, very rarely Toxin.
+   **Lose** (all zombies down): no recipe, but you keep any cash from eaten customers or staff.
+   **Retreat:** white flag.
+8. **Aftermath:** a zombie that hits 0 Energy in a raid **dies and must reanimate** for **8 hours (later reduced to 1 hour)**, or you skip the wait with Toxin. Pets can be injured or killed the same way.
+
+### 3.11 Friends and franchises
+- Link **Game Center** or **Facebook** friends to form a **franchise**: **order food** from each other, **collect fees**, **share recipes**, and **raid each other** (invited raids).
+- **Visit a friend's café** from the map: **give gifts from your fridge**, or **steal food from their serving counter**.
+- With many friends, some didn't show on the map; you picked who to show in the **ZC friends menu**.
+
+### 3.12 Emergent player tricks (the community's favorite jokes)
+- **Trap a customer to get them eaten:** put a spare chair behind a customer and block the exits with furniture, then let a tired zombie at them.
+- **Space-saving kitchens:** two cooks on one tile between two stoves; 6×7 layouts with 9 tables and a circular walkway.
+- **Wall bottles** to raise the rating without losing floor space.
+- **Time-change cheat** (changing the device clock to finish dishes). The community argued about it. Zombs BBQ should use server time for timed rewards.
+
+### 3.13 Updates and collectables
 Themed packs: Victorian Britain, a 50s update (3 new zombies), B-movie monster zombies (v1.2.6), plus costume zombies seen in the raid shot (king, conquistador, caped superhero types, robot suit, cat-ears) and a Mega Man crossover (Capcom). New cookbooks shipped with themes.
 
-### 3.8 Reception
+### 3.14 Reception
 An average of about **4★ on the store (as of v1.13)**. Players loved the humor, collecting and decorating. Complaints were mostly about **glitches/bugs** and the **Energy/Toxin squeeze**.
 
 ---
@@ -117,6 +213,8 @@ The cozy restaurant-sim genre is still healthy on iOS. The **zombie + food + dec
 - [The Zombies Guide, GameFAQs](https://gamefaqs.gamespot.com/boards/620809-zombie-cafe/58189845)
 - [Zombie Cafe Guide, TapGamers](https://www.tapgamers.com/?p=2699)
 - [Zombie Cafe 1.1.0 tombstones update (blog)](https://appworthyblog.wordpress.com/2011/10/25/hello-world/)
+- More fan-wiki pages: [Pets](https://zombiecafe.fandom.com/wiki/Pets), [Rating](https://zombiecafe.fandom.com/wiki/Rating), [Café](https://zombiecafe.fandom.com/wiki/Caf%C3%A9), [Zombie Collection](https://zombiecafe.fandom.com/wiki/Zombie_Collection), [Utility](https://zombiecafe.wikidot.com/utility), [Special](https://zombiecafe.wikidot.com/special), [Zombies List (toxin)](http://zombiecafe.wikidot.com/zombies-list-toxin), [Zombies List forum (rare customers)](https://zombiecafe.wikidot.com/forum/t-313913/zombies-list), [Customer saturation](http://zombiecafe.wikidot.com/forum/t-346837/customer-saturation), [Storing furniture](https://zombiecafe.wikidot.com/forum/t-571321/how-to-store-furniture-when-it-s-not-in-use), [Adding friends](http://zombiecafe.wikidot.com/forum/t-381615)
+- [Long-term Play / Toxin Planning, GameFAQs](https://gamefaqs.gamespot.com/boards/620809-zombie-cafe/58115233)
 - [Zombie Café, TouchArcade](https://toucharcade.com/games/zombie-cafe)
 - [Zombie Café, Apptopia listing (update history)](https://apptopia.com/ios/app/407401359/about)
 - [Zombie Caf 1.2.6: B-movie monster zombies (Softpedia)](https://mac.softpedia.com/blog/Download-Zombie-Caf-1-2-6-iOS-Starring-5-New-B-Movie-Monster-Zombies-319384.shtml)

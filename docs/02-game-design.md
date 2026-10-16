@@ -96,6 +96,9 @@ Level up → unlock recipes, stations, expansions, themes
 | Deep Fryer | Lv 8 | Sides (5–60 min) | Fry-splash animation |
 | Sauce Cauldron | Lv 12 | Sauces that **buff** dishes (+servings/+price) | Bubbling green goo |
 | Pit Oven (2×2) | Lv 20 | Long feasts (8–24 h) | Huge payout, big XP |
+| Pizza Kiln | Lv 15 | Mafioso Pizzeria cookbook | Nod to the original's Pizza Oven → Mafia recipes |
+| Tomb Smoker | Lv 25 | Graveyard Grill cookbook | Coffin-shaped, green smoke |
+| Tiki Fire Pit | Lv 45 | Tiki cookbook | Torches, hula zombie idle |
 | Neon Taco Truck | Lv 30 (event) | Event dishes | Parks outside the joint |
 
 **Who cooks (same as the original):** a stove does nothing by itself. Tap a cook (**YOU** or any zombie), then tap a stove. The cook walks over, picks a dish and cooks it, and burns Energy while doing it. Better cooks (high Speed) work faster. Two cooks can stand on one floor tile between two stoves, the original's well-known space-saving trick, and we keep it on purpose.
@@ -130,21 +133,18 @@ Design rule: **short timers are lower profit per hour but higher XP per hour; lo
 
 ### 3.2 Customers
 
-Customers arrive based on **Star Rating**, **Seats** and **Curb Appeal** (outside decor). Each has a type, patience, spend multiplier and tip chance.
+Who walks in depends on **level and star rating**, as in the original. Customers inside at once ≈ **1 + your half-stars**, capped by free seats. Anyone arriving to a full house leaves with a blue frowny face. Each customer type has patience, a spend multiplier, a tip chance and a unique zombie form.
 
-| Type | Unlock | Spend | Quirk |
-|---|---|---|---|
-| Lumberjack | ★1 | ×1.0 | Eats 2 servings |
-| Construction Worker | ★1 | ×1.0 | Comes in groups at "lunch rush" |
-| Nurse | ★1.5 | ×1.1 | Calms nearby customers (patience+) |
-| Cop | ★2 | ×1.2 | Arrests a misbehaving zombie (stuns it 10 s) |
-| Grandma | ★2.5 | ×1.3 | Huge tips, very slow eater |
-| Cheerleader | ★3 | ×1.3 | Boosts the joint's Vibe while seated |
-| Food Critic | ★3.5 | ×2.0 | Rates your joint: great review = a rush of customers for 1 h |
-| Influencer | ★4 | ×1.5 | Films your joint; your decor score matters ×2 |
-| Boxer | ★3 | ×1.2 | Premium infect (Brain Sauce); a top raid fighter, like the original's 15-Toxin Boxer |
-| Rival Chef (spy) | ★4.5 | ×1.0 | Tries to steal a recipe. Your bouncer catches them for a reward |
-| Celebrity (event) | ★5 | ×5.0 | Rare, limited-time zombie form |
+The **full roster** (common → legendary, the original's level-15 "rare" customers, Brain Sauce-priced specials up to 🧪 80 for The Champ) and the **rare-spawn rules** are in [06 — Menus, Unlocks, Customers & Raid Rules](06-menus-unlocks-customers.md#4-customer-roster).
+
+Special-behavior customers (new to Zombs BBQ):
+| Customer | Quirk |
+|---|---|
+| Cop | Arrests a misbehaving zombie (stuns it 10 s) |
+| Nurse | Calms nearby customers (patience +) |
+| Food Critic | Rates your joint; a great review brings a 1 h rush |
+| Influencer | Films your joint; decor counts ×2 while they're in; a zombie attack on camera "goes viral" for a rush |
+| Rival Chef (spy) | Tries to steal a recipe; a Bouncer catches them for a reward |
 
 **Requests:** about 1 in 6 customers shows a bubble ("Extra sauce!", "Something spicy!", "Hurry!"). Fill it within its timer for tips, Vibe and quest progress.
 
@@ -233,7 +233,9 @@ Higher stars bring more customers, better customer types and bigger tips. The aw
 - **Friends:** a "Friendly Food Fight" with no losses.
 - **Scout** before committing to see the defenders and Head Chef level.
 - **Defenses** you place in your own yard (they double as decor): *Picket Fence* → *Spiked Barricade* (the wooden spike fence in the original raid screen), *Bug Zapper Tower*, *Sprinkler of Holy Water*, *Grease Trap*, *Guard Dog*.
-- **KO, not death:** knocked-out zombies show dizzy stars, sink into the ground, and come home "Patched Up" (bandaged, needing rest). They are never permanently lost.
+- **Eating pays:** raiders **eat rival customers and staff for cash**, which you **keep even if the raid fails** (as in the original).
+- **Down, not dead forever:** a raider at 0 Energy (Energy is raid health) shows dizzy stars, sinks into the ground, and **reanimates for 1 hour** (the original's later timing), or Brain Sauce skips it. Never permanently lost.
+- Full raid rules table: [06 §5](06-menus-unlocks-customers.md#5-raid-rules-faithful-version).
 
 ### 3.7 Pets
 
@@ -251,7 +253,7 @@ Unlock at Lv 10. One active pet roams the joint: *Zombie Pug* (finds coins), *Tw
 ### 3.9 Social
 
 - **Visit** friends' joints (friend codes, Game Center, contacts): leave a **tip** (free daily, small bonus both ways) and "eat" one of their dishes for a buff.
-- **Crews (guilds, Lv 15+):** up to 30 players, crew chat with preset emotes plus text with a profanity filter, weekly **Cook-Off** (a combined servings goal → crew chest), and **Crew Raids** on boss joints with shared HP.
+- **Crews (guilds, Lv 16+):** up to 30 players, crew chat with preset emotes plus text with a profanity filter, weekly **Cook-Off** (a combined servings goal → crew chest), and **Crew Raids** on boss joints with shared HP.
 - **Leaderboards:** Star Rating, Raid Trophies, Event points (weekly, by league).
 - **Share:** Photo Mode → iOS share sheet.
 
@@ -270,13 +272,13 @@ Unlock at Lv 10. One active pet roams the joint: *Zombie Pug* (finds coins), *Tw
 ### 4.2 Pacing targets (first week)
 | Time played | Player level | Stars | Crew | Feels like |
 |---|---|---|---|---|
-| 5 min | 2 | 0.5★ | 1 | Tutorial complete, first zombie |
+| 5 min | 2 | 0.5★ | 2/4 | Tutorial complete, first zombie |
 | 30 min | 5 | 1★ | 4/4 | First raid won, Smoker unlocked |
-| Day 1 end | 8 | 1.5★ | 5 | First expansion, Fryer |
-| Day 3 | 12 | 2.5★ | 7 | Sauces, Chapter 2 boss |
-| Day 7 | 16 | 3★ | 9 | Crews, Brain Sauce Keg, first event |
-| Day 30 | 26 | 4★ | 14 | Mutations, 3rd theme |
-| Day 90 | 40+ | 4.5–5★ | 18+ | Endgame decorating, crew raids |
+| Day 1 end | 8 | 1.5★ | 5/5 | First expansion, Fryer |
+| Day 3 | 12 | 2.5★ | 5/5 | Sauces, Chapter 2 boss |
+| Day 7 | 16 | 3★ | 6/6 | Crews, Brain Sauce Keg, first event |
+| Day 30 | 26 | 4★ | 8/8 | Mutations, 3rd theme |
+| Day 90 | 40+ | 4.5–5★ | 11–13 | Endgame decorating, crew raids |
 
 Level cap at launch: **50** (raised by updates). XP curve: `xp_to_next(L) = round(50 * L^1.65)`.
 
@@ -311,7 +313,7 @@ The tutorial follows the original's order (cook → counter → serve → infect
 
 | Content | Count |
 |---|---|
-| Customer types (each with zombie form) | 16 |
+| Customer types (each with zombie form) | 20 |
 | Special/event/raid-only zombies | 8 |
 | Recipes | 40 (24 level, 10 raid, 6 event) |
 | Stations | 6 |
