@@ -1,4 +1,6 @@
+import { TUNING } from './data';
 import { catchUp } from './sim';
+import { agePurple } from './todo';
 import { createInitialState, migrate, type GameState } from './state';
 
 export const SAVE_KEY = 'zombsbbq.save.v1';
@@ -26,6 +28,8 @@ export function deserialize(raw: string | null, nowMs: number): { state: GameSta
     state.events = [];
     const offlineSec = Math.max(0, (nowMs - file.savedAt) / 1000);
     const offlineCash = offlineSec > 5 ? catchUp(state, offlineSec) : 0;
+    // the purple-star timer runs on real time, beyond the offline simulation cap
+    if (offlineSec > 5) agePurple(state, offlineSec - Math.min(offlineSec, TUNING.offlineCapSec));
     return { state, offlineSec, offlineCash };
   } catch {
     return { state: createInitialState(Math.floor(nowMs) % 2147483647), offlineSec: 0, offlineCash: 0 };

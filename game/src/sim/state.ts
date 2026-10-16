@@ -148,6 +148,26 @@ export interface RivalProgress {
   lastRaid?: number;
 }
 
+/** One job on Gus's to-do list. Progress = the matching counter's growth since the list was drawn. */
+export type TodoKind = 'serve' | 'cook' | 'clear' | 'earn' | 'raid' | 'infect' | 'decor';
+
+export interface TodoTask {
+  kind: TodoKind;
+  target: number;
+  /** the counter's value when the list was drawn */
+  base: number;
+  /** cook tasks: which dish (its variants count too) */
+  dish?: string;
+  /** ticked off by bribing the reviewer */
+  bribed?: boolean;
+}
+
+export interface TodoList {
+  /** how many lists were finished before this one (also seeds the next draw) */
+  n: number;
+  tasks: TodoTask[];
+}
+
 export type GameEvent =
   | { t: 'coin'; x: number; y: number; amount: number; tip: number }
   | { t: 'face'; x: number; y: number; happy: boolean }
@@ -165,6 +185,7 @@ export type GameEvent =
   | { t: 'payout'; furnitureId: string; amount: number }
   | { t: 'petFind'; petId: string; amount: number }
   | { t: 'goal'; goalId: string }
+  | { t: 'purple'; stars: number; gained: boolean }
   | { t: 'daydream'; workerId: string }
   | { t: 'toast'; text: string };
 
@@ -209,6 +230,10 @@ export interface GameState {
   freeInfects: number;
   /** the door sign: closed cafés get no customers and slowly lose rating */
   closed?: boolean;
+  /** Gus's to-do list (from level 6): finish every task for a purple bonus star */
+  todo?: TodoList;
+  /** purple bonus stars (max 3) and the sim time they all drop */
+  purple?: { stars: number; until: number };
   stats: {
     served: number;
     earned: number;
@@ -223,6 +248,8 @@ export interface GameState {
     purchases: number;
     raidsWon: number;
     studied: number;
+    /** decorations bought (decor items and wall hangings) */
+    decor: number;
   };
   events: GameEvent[];
 }
@@ -269,7 +296,7 @@ export function addFurniture(s: GameState, item: string, x: number, y: number, d
 }
 
 export function freshStats(): GameState['stats'] {
-  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0 };
+  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0 };
 }
 
 /** The starting café, as the original handed it over: a grimy 7x6 room with the bare essentials. */
@@ -341,7 +368,12 @@ export function createInitialState(seed = 1234): GameState {
 export function migrate(raw: unknown): GameState | null {
   const st = raw as (GameState & { version?: number }) | null;
   if (!st || typeof st !== 'object') return null;
-  if (st.version === SAVE_VERSION) return st;
+  if (st.version === SAVE_VERSION) {
+    // newer stat counters (e.g. decor) start at zero on older v3 saves
+    st.stats = { ...freshStats(), ...(st.stats ?? {}) };
+    if (st.recipes) st.recipes = st.recipes.filter((r) => DISH_BY_ID[r]);
+    return st;
+  }
   if (st.version !== 2) return null;
   // v2 → v3: the café itself was rebuilt (one-seat tables, sinks, per-tile floors, a corner lot), so
   // start a fresh grimy café but keep the player's progress: level, money, recipes, crew, collections.

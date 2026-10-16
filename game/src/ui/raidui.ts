@@ -290,7 +290,7 @@ export class RaidUi {
         <div>${priceHtml({ cash: res.cash })} cash</div>
         ${res.xp ? `<div>+${res.xp} XP</div>` : ''}
         ${res.sauce ? `<div>${priceHtml({ sauce: res.sauce })} Brain Sauce from the Head Chef!</div>` : ''}
-        ${res.dishes.map((d) => `<div><img class="ico" src="${artUrl(DISH_BY_ID[d].icon)}" alt=""/> ${esc(DISH_BY_ID[d].name)} → Fridge${res.recipeDrop === d ? ' (study it for the recipe!)' : ''}</div>`).join('')}
+        ${res.dishes.map((d) => `<div><img class="ico" src="${artUrl(DISH_BY_ID[d].icon)}" alt=""/> ${esc(DISH_BY_ID[d].name)} → Fridge${res.recipeDrop === d ? ' (study it for the recipe!)' : DISH_BY_ID[d].variant ? ' (RARE! UNLOCK it in the Fridge)' : ''}</div>`).join('')}
         ${res.kos.length ? `<div class="warn">KO’d: ${res.kos.map(esc).join(', ')} (they reanimate in an hour, or revive them with Brain Sauce)</div>` : ''}
       </div>
       <div class="actions"><button class="btn green big-btn" data-a="home">Back to the joint</button></div>`,

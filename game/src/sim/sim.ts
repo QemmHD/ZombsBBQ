@@ -1,12 +1,15 @@
 import {
   CUSTOMERS,
   CUSTOMER_BY_ID,
+  DISHES,
   DISH_BY_ID,
   LEVEL_CAP,
   TUNING,
+  VARIANT_DISHES,
   attackThreshold,
   crewCapForLevel,
   rechargeMult,
+  type DishDef,
   spawnWeight,
   walkSpeed,
   xpToNext,
@@ -158,6 +161,22 @@ export function stars(s: GameState): number {
   return Math.max(0, Math.min(5, Math.floor(s.rating * 10 + 1e-9) / 2));
 }
 
+/** Purple bonus stars still running (0..3); they all drop when the timer runs out. */
+export function purpleStars(s: GameState): number {
+  return s.purple && s.now < s.purple.until ? s.purple.stars : 0;
+}
+
+/** Stars as customers see them: normal stars plus half a star per purple star (who shows up, how rare). */
+export function customerStars(s: GameState): number {
+  return stars(s) + TUNING.purpleStarValue * purpleStars(s);
+}
+
+/** Seconds between customer arrivals: 18 s at zero stars down to 4.5 s at five, faster with purple stars. */
+export function arrivalGap(s: GameState): number {
+  const gap = TUNING.arrivalSlowSec - (TUNING.arrivalSlowSec - TUNING.arrivalFastSec) * s.rating;
+  return gap / (1 + TUNING.purpleArrivalBoost * purpleStars(s));
+}
+
 /** Feed one customer verdict (1 = happy, 0 = unhappy) into the popularity rating. */
 export function addRating(s: GameState, outcome: 0 | 1, weight = 1) {
   const m = ratingMult(s);
@@ -195,6 +214,11 @@ export function dishAvailable(s: GameState, dishId: string): boolean {
   const d = DISH_BY_ID[dishId];
   if (!d) return false;
   return d.source === 'raid' ? s.recipes.includes(dishId) : d.level <= s.level;
+}
+
+/** A dish followed by the rare variants of it the player has learned (for menus and pickers). */
+export function withLearnedVariants(s: GameState, list: DishDef[] = DISHES): DishDef[] {
+  return list.flatMap((d) => [d, ...VARIANT_DISHES.filter((v) => v.base === d.id && s.recipes.includes(v.id))]);
 }
 
 /** Which dishes a stove can cook: its own cookbook (every stove can do the house menu). */
@@ -506,7 +530,7 @@ function leave(s: GameState, c: Customer, mood: 'happy' | 'angry', fast = false,
   c.seatId = undefined;
   c.tableId = undefined;
   if (mood === 'happy') {
-    if (rate) addRating(s, 1);
+    if (rate) addRating(s, 1, weight);
     s.stats.happy++;
   } else {
     if (rate) addRating(s, 0, weight);
@@ -535,21 +559,23 @@ function spawnCustomers(s: GameState, dt: number) {
   s.spawnCooldown -= dt;
   if (s.spawnCooldown > 0) return;
   const st = stars(s);
+  // purple bonus stars: one more diner at a time each, and they count as half a star for who turns up
+  const purple = purpleStars(s);
+  const cst = customerStars(s);
   // the original: more stars, more customers (roughly one per half-star, plus one); a few more than
   // the joint can seat still show up and leave grumbling, which is the nudge to buy more tables
-  const target = Math.min(1 + Math.round(st * 2), validSeats(s).length + 1);
+  const target = Math.min(1 + Math.round(st * 2) + purple, validSeats(s).length + 1);
   if (!validSeats(s).length) return;
   const present = s.customers.filter((c) => ['entering', 'waiting', 'eating', 'turnedAway'].includes(c.state)).length;
   // rivals you've left alone too long are poaching your customers
-  const gap = TUNING.arrivalSlowSec - (TUNING.arrivalSlowSec - TUNING.arrivalFastSec) * s.rating;
-  s.spawnCooldown = gap * (0.75 + rand(s) * 0.5) * (1 + 0.25 * stealingRivals(s).length);
+  s.spawnCooldown = arrivalGap(s) * (0.75 + rand(s) * 0.5) * (1 + 0.25 * stealingRivals(s).length);
   if (present >= target) return;
-  const pool = CUSTOMERS.filter((d) => d.minLevel <= s.level && d.minStars <= st);
+  const pool = CUSTOMERS.filter((d) => d.minLevel <= s.level && d.minStars <= cst);
   // gentle anti-streak: recently seen types are less likely, so the crowd stays varied
   const recent = s.recentTypes;
   const w = (id: string, base: number) => base * (recent.includes(id) ? 0.25 : 1);
-  let r = rand(s) * pool.reduce((a, d) => a + w(d.id, spawnWeight(d, st)), 0);
-  const def = pool.find((d) => (r -= w(d.id, spawnWeight(d, st))) < 0) ?? pool[0];
+  let r = rand(s) * pool.reduce((a, d) => a + w(d.id, spawnWeight(d, cst)), 0);
+  const def = pool.find((d) => (r -= w(d.id, spawnWeight(d, cst))) < 0) ?? pool[0];
   recent.push(def.id);
   if (recent.length > 2) recent.shift();
   if (!s.seen[def.id]) s.seen[def.id] = 'met';
@@ -612,14 +638,16 @@ function updateCustomer(s: GameState, c: Customer, dt: number) {
         const dish = DISH_BY_ID[c.dish!];
         const server = s.workers.find((w) => w.id === c.serverId);
         const amount = Math.max(1, Math.round(dish.price * def.spend));
-        const tipRaw = server ? amount * server.stats.tips * 0.04 : 0;
+        // purple bonus stars: the buzz makes diners tip more
+        const tipRaw = server ? amount * server.stats.tips * 0.04 * (1 + TUNING.purpleTipBoost * purpleStars(s)) : 0;
         const tip = Math.floor(tipRaw) + (rand(s) < tipRaw % 1 ? 1 : 0);
         s.cash += amount + tip;
         s.stats.earned += amount + tip;
         s.stats.served++;
         s.events.push({ t: 'coin', x: c.x, y: c.y, amount, tip });
         c.serverId = undefined;
-        leave(s, c, 'happy');
+        // a Fresh variant leaves diners extra happy: their verdict counts for more
+        leave(s, c, 'happy', false, true, dish.rateWeight ?? 1);
       }
       break;
     case 'leaving':
@@ -979,7 +1007,8 @@ function finishStove(s: GameState, st: Stove) {
   const f = stoveFurn(s, st);
   st.status = 'done';
   st.left = 0;
-  const wait = Math.max(TUNING.burnMinSec, dish.cookSec) * (f.keepWarm ? TUNING.keepWarmFactor : 1);
+  // Frozen variants take FROZEN_BURN_MULT times longer to burn
+  const wait = Math.max(TUNING.burnMinSec, dish.cookSec) * (f.keepWarm ? TUNING.keepWarmFactor : 1) * (dish.burnMult ?? 1);
   st.burnAt = s.now + wait;
   addXp(s, dish.xp);
   s.stats.cooked[dish.id] = (s.stats.cooked[dish.id] ?? 0) + 1;

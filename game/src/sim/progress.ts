@@ -4,6 +4,7 @@ import { DOOR_X, isInside, key } from './grid';
 import { grimeCount } from './build';
 import type { GameState, Pet } from './state';
 import { addToCounter, addXp, blockedTiles, chairTable, furnById, itemOf, move, rand, room, setPath, stars, zombies } from './sim';
+import { updateTodo } from './todo';
 
 // ---------- goals (the clipboard) ----------
 
@@ -100,11 +101,22 @@ export function serveFromFridge(s: GameState, index: number): string | null {
   return null;
 }
 
-/** Studying a stolen dish teaches you its recipe (and uses it up), like the original's fridge. */
+/** Can this fridge item be studied (a secret recipe or a rare variant you don't know yet)? */
+export function canStudy(s: GameState, dish: string): boolean {
+  const d = DISH_BY_ID[dish];
+  return !!d && d.source === 'raid' && !s.recipes.includes(d.id);
+}
+
+/**
+ * Studying a stolen dish teaches you its recipe (and uses it up), like the original's fridge. The
+ * same goes for rare variants (the original's UNLOCK button): once learned, the variant shows up in
+ * the dish picker and cookbook as its own entry.
+ */
 export function studyFromFridge(s: GameState, index: number): string | null {
   const it = s.fridge[index];
   if (!it) return 'Nothing there.';
   const d = DISH_BY_ID[it.dish];
+  if (!d) return 'Nothing there.';
   if (d.source !== 'raid') return 'You already know how to make this one. Serve it instead!';
   if (s.recipes.includes(d.id)) return 'Already in your cookbook. Serve it instead!';
   s.recipes.push(d.id);
@@ -195,6 +207,7 @@ export function refreshDaily(s: GameState, day = today()) {
 }
 
 export function updateProgress(s: GameState, dt: number) {
+  updateTodo(s);
   syncPets(s);
   for (const p of s.pets) updatePet(s, p, dt);
 }

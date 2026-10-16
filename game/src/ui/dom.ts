@@ -31,6 +31,13 @@ export function starsHtml(st: number) {
   return h;
 }
 
+/** Purple bonus stars, drawn after the normal five. */
+export function purpleStarsHtml(n: number) {
+  let h = '';
+  for (let i = 0; i < n; i++) h += '<b class="st purple">★</b>';
+  return h;
+}
+
 /** Wire every [data-a] inside root to handler(action, element). */
 export function bindActions(root: HTMLElement, handler: (a: string, el: HTMLElement) => void) {
   root.querySelectorAll<HTMLElement>('[data-a]').forEach((b) => {

@@ -30,6 +30,7 @@ function pay(s: GameState, def: { cash?: number; sauce?: number }) {
 
 function bought(s: GameState, def: ItemDef) {
   s.stats.purchases++;
+  if (def.kind === 'decor' || def.kind === 'wall') s.stats.decor = (s.stats.decor ?? 0) + 1;
   addXp(s, def.xp);
 }
 

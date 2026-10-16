@@ -472,3 +472,99 @@
 .hint * {
   pointer-events: none !important;
 }
+
+/* ---------- purple bonus stars (Gus's to-do list) ---------- */
+:root {
+  --purple: #a45be0;
+  --purple-deep: #6a2a9e;
+}
+.st.purple,
+.modal .st.purple {
+  color: var(--purple);
+  text-shadow: 0 1px 0 var(--ink), 0 0 4px rgba(164, 91, 224, 0.6);
+}
+.purple-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 8px;
+  color: var(--chalk);
+}
+.purple-head .st {
+  font-size: 24px;
+}
+.purple-head .sub {
+  color: var(--chalk);
+  opacity: 0.85;
+}
+.tab .tab-star {
+  font-size: 18px;
+  width: 26px;
+  text-align: center;
+}
+.goal.todo .btn {
+  white-space: nowrap;
+}
+.goal.todo-locked {
+  opacity: 0.85;
+}
+
+/* ---------- rare dish variants: the plain dish icon with a coloured stamp ---------- */
+.dish-ico {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 38px;
+}
+.fridge-row .dish-ico {
+  width: 40px;
+}
+.dish-ico img {
+  display: block;
+  width: 100%;
+}
+.var-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  font: 900 9px/12px var(--font);
+  font-style: normal;
+  text-align: center;
+  color: #fff;
+}
+.var-tag {
+  font-style: normal;
+  font-size: 9px;
+  color: #fff;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  padding: 0 4px;
+  vertical-align: 2px;
+  letter-spacing: 0.5px;
+}
+.v-bulk {
+  background: #7a5a2a;
+}
+.v-quick {
+  background: #3e6f86;
+}
+.v-spicy {
+  background: #b5341f;
+}
+.v-fancy {
+  background: #a8822a;
+}
+.v-frozen {
+  background: #4a8fb8;
+}
+.v-fresh {
+  background: #5e7a26;
+}
+.dish.variant,
+.fridge-row.variant {
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.35), inset 3px 0 0 var(--gold-deep);
+}

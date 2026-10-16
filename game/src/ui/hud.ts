@@ -3,6 +3,9 @@ import {
   DISHES,
   DISH_BY_ID,
   ITEM_BY_ID,
+  VARIANT_BY_ID,
+  purpleStars,
+  withLearnedVariants,
   MAP_LEVEL,
   TUTORIAL,
   TUNING,
@@ -36,7 +39,7 @@ import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
 import { headUrl, artUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
-import { bindActions, energyColor, esc, fmt, fmtTime, icon, priceHtml, starsHtml } from './dom';
+import { bindActions, energyColor, esc, fmt, fmtTime, icon, priceHtml, purpleStarsHtml, starsHtml } from './dom';
 import { openCookbook, openCrew, openFridge, openGoals, openLevelUp, openOffline, openRating, openSettings, openZombiepedia } from './panels';
 import { openStore } from './store';
 import { EditBar } from './editbar';
@@ -147,6 +150,7 @@ export class Hud {
         if (w) ctl.info(`${w.name} joined the crew!`);
       }
       if (e.t === 'burnt') ctl.info('Something’s BURNING! Tap it to scrape it off.');
+      if (e.t === 'purple') ctl.info(e.gained ? `The food critic came by! Purple star ${e.stars}/3: more customers, bigger tips.` : 'Your purple stars wore off. Finish Gus’s to-do list for more!');
     });
     setInterval(() => this.refresh(), 200);
     this.refresh();
@@ -209,7 +213,9 @@ export class Hud {
   private refresh() {
     const s = this.ctl.state;
     this.el.lvl.textContent = String(s.level);
-    this.el.stars.innerHTML = starsHtml(stars(s));
+    // normal stars, then any purple bonus stars (only rebuilt when they change)
+    const starHtml = starsHtml(stars(s)) + purpleStarsHtml(purpleStars(s));
+    if (this.el.stars.innerHTML !== starHtml) this.el.stars.innerHTML = starHtml;
     const need = xpToNext(s.level);
     const max = s.level >= LEVEL_CAP;
     this.el.xpfill.style.width = max ? '100%' : `${Math.min(100, (s.xp / need) * 100)}%`;
@@ -337,7 +343,8 @@ export class Hud {
     } else if (sel.kind === 'dishPicker') {
       const st = s.stoves.find((x) => x.id === sel.stoveId)!;
       const w = s.workers.find((x) => x.id === sel.workerId);
-      const rows = DISHES.filter((d) => stoveCooks(st, d.station) && (d.source === 'level' || dishAvailable(s, d.id)))
+      const rows = withLearnedVariants(s)
+        .filter((d) => stoveCooks(st, d.station) && (d.source === 'level' || dishAvailable(s, d.id)))
         .map((d) => dishRow(d.id, s, true))
         .join('');
       const raidLocked = DISHES.filter((d) => stoveCooks(st, d.station) && d.source === 'raid' && !dishAvailable(s, d.id)).length;
@@ -500,8 +507,12 @@ export function dishRow(id: string, s: Controller['state'], pickable: boolean): 
   const avail = dishAvailable(s, id);
   const cant = pickable && s.cash < d.cost;
   const lockTxt = d.source === 'raid' ? '🔒 Steal it in a raid' : `🔒 Level ${d.level}`;
-  return `<button class="dish ${!avail || cant ? 'locked' : ''}" ${pickable && avail ? `data-dish="${d.id}"` : ''}>
-    <img src="${artUrl(d.icon)}" alt=""/>
-    <span><b>${esc(d.name)}${d.source === 'raid' ? ' <i class="raid-tag">STOLEN</i>' : ''}</b><small>${!avail ? lockTxt : `⏱ ${fmtTime(d.cookSec)} · ${d.servings} servings · $${d.price}/serving · +${d.xp} XP`}</small></span>
+  const v = d.variant ? VARIANT_BY_ID[d.variant] : undefined;
+  const tag = v ? ` <i class="var-tag v-${v.id}">${v.name.toUpperCase()}</i>` : d.source === 'raid' ? ' <i class="raid-tag">STOLEN</i>' : '';
+  // Frozen and Fresh don't show in the numbers, so spell them out
+  const extra = v && (v.id === 'frozen' || v.id === 'fresh') ? ` · ${v.effect}` : '';
+  return `<button class="dish ${!avail || cant ? 'locked' : ''} ${v ? 'variant' : ''}" ${pickable && avail ? `data-dish="${d.id}"` : ''}>
+    <span class="dish-ico"><img src="${artUrl(d.icon)}" alt=""/>${v ? `<i class="var-dot v-${v.id}">${v.name[0]}</i>` : ''}</span>
+    <span><b>${esc(d.name)}${tag}</b><small>${!avail ? lockTxt : `⏱ ${fmtTime(d.cookSec)} · ${d.servings} servings · $${d.price}/serving · +${d.xp} XP${extra}`}</small></span>
     <span class="price">${priceHtml({ cash: d.cost })}</span></button>`;
 }

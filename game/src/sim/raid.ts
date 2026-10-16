@@ -14,7 +14,7 @@
  *
  * A zombie's Energy is its health. Pure and deterministic (own RNG): the scene renders it, tests drive it.
  */
-import { DISHES, DISH_BY_ID, TUNING, walkSpeed } from './data';
+import { DISHES, DISH_BY_ID, TUNING, VARIANTS, VARIANT_DROP_CHANCE, variantId, walkSpeed } from './data';
 import { ITEM_BY_ID, type Dir } from './catalog';
 import { DOOR_X, STREET_RUN, findPath, isInside, key, type Pt, type Room } from './grid';
 import { maxEnergy, type GameState, type Worker } from './state';
@@ -886,6 +886,8 @@ export function finishRaid(s: GameState, r: RaidState): RaidResult {
     out.xp = Math.round(def.reward.xp * 0.15);
   }
   s.rivals[r.rival] = prog;
+  // a swiped dish sometimes turns out to be a rare variant (Bulk, Quick, Spicy…): UNLOCK it in the Fridge
+  out.dishes = out.dishes.map((d) => (d !== out.recipeDrop && !DISH_BY_ID[d]?.variant && rnd(r) < VARIANT_DROP_CHANCE ? variantId(d, VARIANTS[Math.floor(rnd(r) * VARIANTS.length)].id) : d));
   s.cash += out.cash;
   s.stats.earned += out.cash;
   s.sauce += out.sauce;

@@ -5,7 +5,18 @@ import {
   EXPANSIONS,
   ITEMS,
   activeGoals,
+  bribeTodo,
+  canStudy,
   claimGoal,
+  purpleLeft,
+  purpleStars,
+  todoDone,
+  todoProgress,
+  todoText,
+  withLearnedVariants,
+  PURPLE,
+  TUNING,
+  VARIANT_BY_ID,
   grimeCount,
   maxEnergy,
   ratingBonus,
@@ -23,7 +34,7 @@ import { audio, sfx } from '../game/sfx';
 import { headUrl, artUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import type { Hud } from './hud';
-import { bindActions, energyColor, esc, fmtTime, icon, priceHtml, starsHtml } from './dom';
+import { bindActions, energyColor, esc, fmtTime, icon, priceHtml, purpleStarsHtml, starsHtml } from './dom';
 import { dishRow } from './hud';
 import { itemThumb } from './store';
 
@@ -68,10 +79,11 @@ export function openSettings(hud: Hud) {
 export function openCookbook(hud: Hud) {
   const s = hud.ctl.state;
   const section = (title: string, ids: string[]) => `<h4>${title}</h4>${ids.map((id) => dishRow(id, s, false)).join('')}`;
-  const by = (st: string) => DISHES.filter((d) => d.station === st).map((d) => d.id);
+  // learned rare variants sit right under the dish they're made from
+  const by = (st: string) => withLearnedVariants(s, DISHES.filter((d) => d.station === st)).map((d) => d.id);
   hud.openModal(
     `<h2>${icon('ui_menu', 'h-ico')} Cookbook</h2><div class="list">${section('Stove (the house menu)', by('stove'))}${section('BBQ Grill', by('grill'))}${section('Smoker', by('smoker'))}${section('Deep Fryer', by('fryer'))}</div>
-    <p class="small">Tap a cook, then a stove, to cook. Stolen recipes come from raids: study them in the Fridge.</p>`,
+    <p class="small">Tap a cook, then a stove, to cook. Stolen recipes come from raids: study them in the Fridge. Swiped food sometimes comes home as a rare Bulk, Quick, Spicy, Fancy, Frozen or Fresh variant: UNLOCK it in the Fridge.</p>`,
   );
 }
 
@@ -111,9 +123,31 @@ export function openCrew(hud: Hud) {
   });
 }
 
+let goalsTab: 'goals' | 'todo' = 'goals';
+
+/** Gus's to-do list (from level 6): four jobs, a purple bonus star when they're all done. */
+function todoHtml(s: Parameters<typeof purpleStars>[0]): string {
+  const p = purpleStars(s);
+  const timer = p ? `<span class="sub">${p} purple star${p > 1 ? 's' : ''} · ${fmtTime(purpleLeft(s))} left</span>` : '<span class="sub">No purple stars yet</span>';
+  const head = `<div class="purple-head"><span class="purple-row">${purpleStarsHtml(p)}${'<b class="st">★</b>'.repeat(PURPLE.max - p)}</span>${timer}</div>`;
+  if (s.level < PURPLE.level || !s.todo)
+    return `${head}<div class="goal todo-locked"><span class="check">${icon('fx_lock', 'ico')}</span><b>Gus’s to-do list opens at level ${PURPLE.level}.<br/><span class="sub">Four quick jobs. Finish them all and the food critic drops by with a purple bonus star.</span></b></div>`;
+  const rows = s.todo.tasks
+    .map((t, i) => {
+      const done = todoDone(s, t);
+      const prog = todoProgress(s, t);
+      return `<div class="goal todo ${done ? 'done' : ''}"><span class="check">${done ? icon('ui_check', 'ico') : ''}</span><b>${esc(todoText(t))}<br/><span class="sub">${t.bribed ? 'Reviewer bribed' : `${prog.toLocaleString('en-US')}/${t.target.toLocaleString('en-US')}`}</span></b>
+        ${done ? '' : `<button class="btn sauce" data-a="bribe" data-i="${i}">Bribe ${priceHtml({ sauce: PURPLE.bribeSauce })}</button>`}</div>`;
+    })
+    .join('');
+  const boost = Math.round(TUNING.purpleArrivalBoost * 100);
+  return `${head}${rows}<p class="small">Finish all ${PURPLE.tasks} for a purple star (max ${PURPLE.max}). Each one: +${boost}% customers, +${Math.round(TUNING.purpleTipBoost * 100)}% tips, rarer visitors. The first lasts ${PURPLE.hours[0]} h, the next add ${PURPLE.hours[1]} h and ${PURPLE.hours[2]} h. Short on time? Bribe the reviewer.</p>`;
+}
+
 export function openGoals(hud: Hud) {
   const render = () => {
     const s = hud.ctl.state;
+    const tabs = `<div class="tabs"><button class="tab ${goalsTab === 'goals' ? 'on' : ''}" data-a="tab" data-id="goals">${icon('ui_goals', 'tab-ico')}<span>Clipboard</span></button><button class="tab ${goalsTab === 'todo' ? 'on' : ''}" data-a="tab" data-id="todo"><b class="st purple tab-star">★</b><span>To-do${s.level < PURPLE.level ? ` ${icon('fx_lock', 'ico-s')}` : ''}</span></button></div>`;
     const goals = activeGoals(s);
     const reward = (r: { cash?: number; sauce?: number; xp?: number }) =>
       [r.cash ? priceHtml({ cash: r.cash }) : '', r.sauce ? priceHtml({ sauce: r.sauce }) : '', r.xp ? `+${r.xp} XP` : ''].filter(Boolean).join(' ');
@@ -125,8 +159,25 @@ export function openGoals(hud: Hud) {
           )
           .join('')
       : '<p>You’ve done it all, Boss. The undead salute you.</p>';
-    const m = hud.openModal(`<h2>${icon('ui_goals', 'h-ico')} Gus’s Clipboard</h2><div class="list">${rows}</div><p class="small">${s.goalsDone.length} goals done. Finish one to see the next.</p>`);
+    const body =
+      goalsTab === 'todo' ? `<div class="list">${todoHtml(s)}</div>` : `<div class="list">${rows}</div><p class="small">${s.goalsDone.length} goals done. Finish one to see the next.</p>`;
+    const m = hud.openModal(`<h2>${icon('ui_goals', 'h-ico')} Gus’s Clipboard</h2>${tabs}${body}`);
     bindActions(m, (a, el) => {
+      if (a === 'tab') {
+        goalsTab = el.dataset.id === 'todo' ? 'todo' : 'goals';
+        render();
+        return;
+      }
+      if (a === 'bribe') {
+        const before = purpleStars(s);
+        const err = bribeTodo(s, Number(el.dataset.i));
+        if (err) hud.ctl.toast(err);
+        else {
+          sfx(purpleStars(s) !== before ? 'levelUp' : 'cashRegister');
+          render();
+        }
+        return;
+      }
       if (a !== 'claim') return;
       const err = claimGoal(s, el.dataset.id!);
       if (err) hud.ctl.toast(err);
@@ -146,20 +197,25 @@ export function openFridge(hud: Hud) {
       ? s.fridge
           .map((it, i) => {
             const d = DISH_BY_ID[it.dish];
-            const canStudy = d.source === 'raid' && !s.recipes.includes(d.id);
-            return `<div class="fridge-row"><img src="${artUrl(d.icon)}" alt=""/><b>${esc(d.name)}<br/><span class="sub">${it.servings} servings${d.source === 'raid' ? ' · STOLEN' : ''}</span></b>
-              <button class="btn" data-a="serve" data-i="${i}">Serve</button>${canStudy ? `<button class="btn green" data-a="study" data-i="${i}">Study</button>` : ''}</div>`;
+            const v = d.variant ? VARIANT_BY_ID[d.variant] : undefined;
+            const study = canStudy(s, d.id);
+            const sub = v ? `RARE · ${v.effect}` : d.source === 'raid' ? 'STOLEN' : '';
+            return `<div class="fridge-row ${v ? 'variant' : ''}"><span class="dish-ico"><img src="${artUrl(d.icon)}" alt=""/>${v ? `<i class="var-dot v-${v.id}">${v.name[0]}</i>` : ''}</span><b>${esc(d.name)}<br/><span class="sub">${it.servings} servings${sub ? ` · ${sub}` : ''}</span></b>
+              <button class="btn" data-a="serve" data-i="${i}">Serve</button>${study ? `<button class="btn green" data-a="study" data-i="${i}">${v ? 'UNLOCK' : 'Study'}</button>` : ''}</div>`;
           })
           .join('')
       : `<p>Empty. Raid rival joints and swipe their food: it lands in here.</p>`;
-    const m = hud.openModal(`<h2>${icon('ui_fridge', 'h-ico')} The Fridge</h2><div class="list">${rows}</div><p class="small">Serve puts the food on your counter. Study a stolen dish to learn its secret recipe for good.</p>`);
+    const m = hud.openModal(
+      `<h2>${icon('ui_fridge', 'h-ico')} The Fridge</h2><div class="list">${rows}</div><p class="small">Serve puts the food on your counter. Study a stolen dish to learn its secret recipe for good. UNLOCK a rare variant to cook it yourself.</p>`,
+    );
     bindActions(m, (a, el) => {
       const i = Number(el.dataset.i);
+      const name = DISH_BY_ID[s.fridge[i]?.dish]?.name ?? 'it';
       const err = a === 'serve' ? serveFromFridge(s, i) : studyFromFridge(s, i);
       if (err) hud.ctl.toast(err);
       else {
         sfx(a === 'study' ? 'levelUp' : 'plate');
-        if (a === 'study') hud.ctl.info('New recipe learned! Check the Cookbook.');
+        if (a === 'study') hud.ctl.info(`Learned ${name}! Check the Cookbook.`);
         render();
       }
     });
@@ -215,9 +271,14 @@ export function openRating(hud: Hud) {
   const grime = grimeCount(s);
   const pct = Math.round(s.rating * 100);
   hud.openModal(
-    `<h2>Star Rating</h2><div class="rate-row"><span class="big-stars">${starsHtml(stars(s))}</span><span class="sub">Popularity ${pct}%</span></div>
+    `<h2>Star Rating</h2><div class="rate-row"><span class="big-stars">${starsHtml(stars(s))}${purpleStarsHtml(purpleStars(s))}</span><span class="sub">Popularity ${pct}%</span></div>
     <div class="rate-row"><b>Customers</b><span class="sub">Every happy customer pushes it up. Customers who wait too long, find no clean table, or get eaten drag it down.</span></div>
     <div class="rate-row"><b>Star items ${bonus >= 0 ? '+' : ''}${Math.round(bonus * 100)}★</b><span class="sub">Fancy items make the rating climb faster and fall slower.${grime ? ` ${grime} grimy thing${grime > 1 ? 's' : ''} (stains, loose tiles, old kit) hold you back.` : ''}</span></div>
+    <div class="rate-row"><b>Purple stars ${purpleStars(s)}/${PURPLE.max}</b><span class="sub">${
+      s.level < PURPLE.level
+        ? `Gus’s to-do list opens at level ${PURPLE.level}.`
+        : `Finish Gus’s to-do list (GOALS → To-do) for bonus stars: more customers, bigger tips.${purpleStars(s) ? ` They drop in ${fmtTime(purpleLeft(s))}.` : ''}`
+    }</span></div>
     ${s.closed ? '<p class="small">You’re CLOSED: the rating slowly sags until you open again.</p>' : ''}
     <p class="small">More stars bring more customers, and rarer ones.</p>`,
     { cls: 'narrow' },

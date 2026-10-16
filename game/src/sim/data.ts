@@ -22,6 +22,13 @@ export interface DishDef {
   xp: number; // awarded when the dish finishes cooking
   icon: string; // art key
   blurb: string;
+  /** rare variants only: which variant, of which base dish (see VARIANTS below) */
+  variant?: VariantId;
+  base?: string;
+  /** rare variants only: Frozen waits this many times longer before it burns */
+  burnMult?: number;
+  /** rare variants only: Fresh makes each happy diner count this many times toward the rating */
+  rateWeight?: number;
 }
 
 const M = 60;
@@ -70,7 +77,70 @@ export const DISHES: DishDef[] = [
   D('chicken', 'Crunchy Coop Bucket', 'fryer', 'raid', 1, 4 * H, 450, 240, 12, 40, "The Colonel's 11 secret spleens."),
 ];
 
-export const DISH_BY_ID: Record<string, DishDef> = Object.fromEntries(DISHES.map((d) => [d.id, d]));
+/**
+ * Rare dish variants (the original's Bulk / Quick / Spicy / Fancy / Frozen / Fresh). A variant is a
+ * known dish with one stat pushed about 1.5x. They only come from raids: a dish swiped off a rival's
+ * counter sometimes comes home as a variant (VARIANT_DROP_CHANCE), lands in the Fridge, and UNLOCK
+ * there learns it for good, after which it cooks from the stove's dish picker like any other recipe.
+ *   Bulk    servings x1.5          Quick  cook time /1.5 (x0.67)
+ *   Spicy   price/serving x1.5     Fancy  XP x1.5
+ *   Frozen  burn window x3 (it waits three times as long before it burns)
+ *   Fresh   each happy diner counts as 1.5 verdicts toward the star rating
+ * Ingredient cost is the same as the plain dish. Ids are `${variant}_${dish}`, e.g. 'spicy_sliders'.
+ */
+export type VariantId = 'bulk' | 'quick' | 'spicy' | 'fancy' | 'frozen' | 'fresh';
+
+export interface VariantDef {
+  id: VariantId;
+  name: string;
+  /** what it does, for the dish picker and the fridge */
+  effect: string;
+}
+
+export const VARIANT_MULT = 1.5;
+export const FROZEN_BURN_MULT = 3;
+/** chance that each dish stolen in a raid comes home as a rare variant */
+export const VARIANT_DROP_CHANCE = 0.3;
+
+export const VARIANTS: VariantDef[] = [
+  { id: 'bulk', name: 'Bulk', effect: '+50% servings' },
+  { id: 'quick', name: 'Quick', effect: 'cooks 1.5x faster' },
+  { id: 'spicy', name: 'Spicy', effect: '+50% cash per serving' },
+  { id: 'fancy', name: 'Fancy', effect: '+50% XP' },
+  { id: 'frozen', name: 'Frozen', effect: 'takes 3x longer to burn' },
+  { id: 'fresh', name: 'Fresh', effect: 'happy diners boost the rating 1.5x' },
+];
+
+export const VARIANT_BY_ID: Record<VariantId, VariantDef> = Object.fromEntries(VARIANTS.map((v) => [v.id, v])) as Record<VariantId, VariantDef>;
+
+export const variantId = (dish: string, v: VariantId) => `${v}_${dish}`;
+
+function makeVariant(d: DishDef, v: VariantDef): DishDef {
+  const m = VARIANT_MULT;
+  return {
+    ...d,
+    id: variantId(d.id, v.id),
+    name: `${v.name} ${d.name}`,
+    source: 'raid',
+    variant: v.id,
+    base: d.id,
+    servings: v.id === 'bulk' ? Math.round(d.servings * m) : d.servings,
+    cookSec: v.id === 'quick' ? Math.round(d.cookSec / m) : d.cookSec,
+    price: v.id === 'spicy' ? Math.max(d.price + 1, Math.round(d.price * m)) : d.price,
+    xp: v.id === 'fancy' ? Math.max(d.xp + 1, Math.round(d.xp * m)) : d.xp,
+    burnMult: v.id === 'frozen' ? FROZEN_BURN_MULT : undefined,
+    rateWeight: v.id === 'fresh' ? m : undefined,
+  };
+}
+
+/** Every variant of every dish (not in DISHES, so menus and unlock lists stay as they were). */
+export const VARIANT_DISHES: DishDef[] = DISHES.flatMap((d) => VARIANTS.map((v) => makeVariant(d, v)));
+
+/** Plain dishes and their variants: icons, names and stats for any dish id the sim can hold. */
+export const DISH_BY_ID: Record<string, DishDef> = Object.fromEntries([...DISHES, ...VARIANT_DISHES].map((d) => [d.id, d]));
+
+/** The plain dish a (possibly variant) dish id is made from. */
+export const baseDishId = (id: string) => DISH_BY_ID[id]?.base ?? id;
 
 /** The original's stats: Energy (~100), and Speed / Power / Tips / Recharge / Focus / Patience on 1..10. */
 export interface ZombieStats {
@@ -200,6 +270,28 @@ export const TUNING = {
   /** zombie levels: XP needed for each level; every level adds 5% max energy */
   zombieLevelXp: [0, 20, 50, 100, 170, 260, 380, 530, 720, 950],
   zombieLevelEnergy: 0.05,
+  /**
+   * purple bonus stars (Gus's to-do list, see PURPLE): each active one makes customers arrive 15%
+   * more often and lets one more diner in at a time, adds 15% to tips, and counts as half a star when
+   * deciding which (rarer) customers show up. Three purple stars ≈ +45% foot traffic and tips.
+   */
+  purpleArrivalBoost: 0.15,
+  purpleTipBoost: 0.15,
+  purpleStarValue: 0.5,
+};
+
+/** Gus's to-do list and the purple bonus stars it pays (original: from level 6, 4 tasks, max 3 stars). */
+export const PURPLE = {
+  level: 6,
+  tasks: 4,
+  max: 3,
+  /** the first star lasts 48 h; the second adds 36 h to the timer, the third 24 h (original) */
+  hours: [48, 36, 24],
+  /** with all three up, another finished list tops the timer up by 24 h, never past 108 h away */
+  refillHours: 24,
+  capHours: 108,
+  /** bribe the reviewer: tick off one unfinished task for this much Brain Sauce (original: 2 toxin) */
+  bribeSauce: 2,
 };
 
 /** Patience 1 attacks at ~20% energy, patience 10 holds out until ~2% (original game). */

@@ -42,6 +42,8 @@ export class RaidScene extends Phaser.Scene {
   private counterDishes: Phaser.GameObjects.Image[] = [];
   private ready = false;
   private t = 0;
+  /** diners just eaten: when, so the body stays down under the feasting zombie for a moment */
+  private eatenAt = new Map<string, number>();
   private seenEvents = 0;
   private drag: {
     x: number;
@@ -349,8 +351,11 @@ export class RaidScene extends Phaser.Scene {
     const buff = r.buff && r.t < r.buff.until ? r.buff.kind : null;
     for (const u of r.units) {
       const v = this.view(u);
-      const gone = u.state === 'gone';
-      v.holder.setVisible(!gone);
+      // an eaten diner drops and lies there while the zombie feasts, then fades away
+      const eatenFor = this.t - (this.eatenAt.get(u.id) ?? -99);
+      const corpse = u.state === 'gone' && eatenFor < 2.4;
+      const gone = u.state === 'gone' && !corpse;
+      v.holder.setVisible(!gone).setAlpha(corpse ? Math.min(1, (2.4 - eatenFor) / 0.6) : 1);
       if (gone) continue;
       const seat = (u.state === 'idle' || u.state === 'scream') && u.kind === 'customer' ? this.seatPose(r, u) : null;
       const p = seat ?? iso(u.x, u.y);
@@ -362,7 +367,7 @@ export class RaidScene extends Phaser.Scene {
           v.holder.addAt(v.puppet.root, 2);
         }
       }
-      const down = u.hp <= 0 || u.state === 'down';
+      const down = u.hp <= 0 || u.state === 'down' || corpse;
       const top = -(v.puppet?.height ?? 90) - 8;
       this.drawBar(v, u, down ? -30 : top);
       v.shadow.setVisible(!seat && !down);
@@ -379,7 +384,8 @@ export class RaidScene extends Phaser.Scene {
       else if (seat) pose = 'sit';
       else if (u.state === 'flee') pose = 'run';
       else if (u.state === 'grabbed') pose = 'shiver';
-      else if (u.state === 'eat' || u.state === 'steal') pose = 'eat';
+      else if (u.state === 'eat') pose = 'feast'; // original: bent over the body, chewing
+      else if (u.state === 'steal') pose = 'eat';
       else if (attackT < 0.5) pose = zombie ? 'attack' : 'punch';
       else if (r.t - u.hitAt < 0.3) pose = 'hit';
       else if (u.state === 'walk' && u.path.length) pose = 'walk';
@@ -495,6 +501,7 @@ export class RaidScene extends Phaser.Scene {
         break;
       }
       case 'eat': {
+        this.eatenAt.set(e.customer, this.t);
         const p = iso(e.x, e.y);
         // the text rides above the head and the cash pops beside the body, so they don't print over each other
         this.floatText(p.x, p.y - 125, `CHOMP! +$${e.cash}`, '#D9C25A', 14);
