@@ -14,6 +14,8 @@ Concept art lives in [`../art/concepts/`](../art/concepts/):
 | `mockup-raid.svg` | Raid screen |
 | `palette.svg` | Color palette & style rules |
 
+> The mockups are early concepts. The final HUD button set (Goals, Pets, Zombiepedia, Deliveries…) is in [06 — Menus](06-menus-unlocks-customers.md#1-main-joint-screen-landscape), and the raid screen's END RAID button becomes the original-style **white truce flag** in the top-left.
+
 ---
 
 ## 1. Visual rules
