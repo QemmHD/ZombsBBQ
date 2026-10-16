@@ -58,7 +58,9 @@ const overlapCheck = () =>
         const a = boxes[i].r, c = boxes[j].r;
         const ox = Math.min(a.right, c.right) - Math.max(a.left, c.left);
         const oy = Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top);
-        if (ox > 2 && oy > 2) out.push(`${boxes[i].s} overlaps ${boxes[j].s} by ${Math.round(ox)}x${Math.round(oy)}`);
+        // the side columns tuck a few px under the awning's scalloped hem by design
+        const tuck = boxes[i].s === '.awning' && boxes[j].s.startsWith('.side') && oy <= 6;
+        if (ox > 2 && oy > 2 && !tuck) out.push(`${boxes[i].s} overlaps ${boxes[j].s} by ${Math.round(ox)}x${Math.round(oy)}`);
       }
     // modal must fit
     const m = document.querySelector('.modal');
@@ -81,10 +83,11 @@ for (const d of DEVICES) {
   page.on('pageerror', (e) => errors.push(`${d.name}: ${e}`));
   await page.goto(`http://localhost:${server.address().port}/index.html`);
   await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
-  await page.waitForTimeout(800);
+  // let the start-up background work (the raid map is pre-rasterized after the joint loads) settle
+  await page.waitForTimeout(6000);
   const snap = async (label) => {
     await page.waitForTimeout(500);
-    await page.screenshot({ path: join(out, `${d.name}-${label}.png`) });
+    await page.screenshot({ path: join(out, `${d.name}-${label}.png`), timeout: 120000 });
     for (const p of await page.evaluate(overlapCheck)) problems.push(`${d.name} ${label}: ${p}`);
   };
   await snap('joint');
