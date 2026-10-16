@@ -6,6 +6,7 @@
  * GRID: one floor tile is a TILE_W x TILE_H diamond with a 1.6 : 1 ratio (steeper than 2:1, like the
  * original's camera). Iso projection: screenX = (gx - gy) * HW, screenY = (gx + gy) * HH.
  */
+import type { ArtAsset as _ArtAsset } from '../art/types';
 import { Doc, P, S, f, poly } from '../art/svg';
 import type { Pt } from '../art/svg';
 
@@ -170,4 +171,51 @@ export function asset(key: string, w: number, h: number, ox: number, oy: number,
   const d = new Doc(key);
   const inner = body(d);
   return { key, svg: d.build(w, h, inner), w, h, ox, oy };
+}
+
+// ---------------------------------------------------------------- shared frames
+
+/**
+ * WALL FRAME — wall segments and everything hung on them use one box per tile edge:
+ * WALL_IMG_W x WALL_IMG_H, anchor (0.5, 1). Side 'l' = the north-west back wall (bottom edge rises
+ * left→right), side 'r' = the north-east back wall (bottom edge falls left→right).
+ * wallPt(side, u, v): u 0..1 along the wall (screen left→right), v 0..1 from floor to the wall top.
+ */
+export type WallSide = 'l' | 'r';
+export const WALL_IMG_W = HW + 2;
+export const WALL_IMG_H = WALL_H + HH + 6;
+export function wallPt(side: WallSide, u: number, v: number): Pt {
+  const x = 1 + u * HW;
+  const yBottom = side === 'l' ? WALL_IMG_H - u * HH : WALL_IMG_H - HH + u * HH;
+  return [x, yBottom - v * WALL_H];
+}
+export function wallQuad(side: WallSide, u0: number, u1: number, v0: number, v1: number): string {
+  return poly([wallPt(side, u0, v0), wallPt(side, u1, v0), wallPt(side, u1, v1), wallPt(side, u0, v1)]);
+}
+export function wallAsset(key: string, body: (d: Doc) => string): _ArtAsset {
+  return asset(key, WALL_IMG_W, WALL_IMG_H, 0.5, 1, body);
+}
+
+/**
+ * FLOOR-OBJECT FRAME — every 1x1 item (furniture, stoves, decor, money-makers…) is OBJ_W wide and
+ * `h` tall; the tile centre sits at (OBJ_W / 2, h - HH - OBJ_M) and is the anchor. Draw with the Iso
+ * helper passed to `body` (i, j in -0.5..0.5 cover the tile, z goes up).
+ * Items are drawn FACING 'sw' (front toward screen lower-left); the scene mirrors them for 'se'.
+ */
+export const OBJ_M = 4;
+export const OBJ_W = TILE_W + OBJ_M * 2;
+export function objAsset(key: string, h: number, body: (d: Doc, t: Iso) => string): _ArtAsset {
+  const cy = h - HH - OBJ_M;
+  const a = asset(key, OBJ_W, h, 0.5, cy / h, (d) => body(d, new Iso(OBJ_W / 2, cy)));
+  return a;
+}
+
+/** Horizontally mirrored copy of an asset (sw-facing art → se-facing, wall 'l' art → 'r'). */
+export function mirrored(a: _ArtAsset, key: string): _ArtAsset {
+  const inner = a.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+  // ids inside must stay unique per document: prefix them for the copy
+  const pre = key.replace(/[^a-zA-Z0-9]/g, '') + 'm';
+  const body = inner.replace(/id="([^"]+)"/g, `id="${pre}$1"`).replace(/url\(#([^)]+)\)/g, `url(#${pre}$1)`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${f(a.w)}" height="${f(a.h)}" viewBox="0 0 ${f(a.w)} ${f(a.h)}"><g transform="translate(${f(a.w)} 0) scale(-1 1)">${body}</g></svg>`;
+  return { key, svg, w: a.w, h: a.h, ox: 1 - a.ox, oy: a.oy };
 }

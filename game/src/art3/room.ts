@@ -344,7 +344,7 @@ function checker(d: Doc, phase: number): string {
   return s;
 }
 
-function planks(d: Doc, seed: number): string {
+function planks(_d: Doc, seed: number): string {
   const r = rnd(seed);
   let s = F(FDIA, '#5E3E22');
   const rows = 4;
