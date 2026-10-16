@@ -73,13 +73,14 @@ export function streetEnds(r: Room): Pt[] {
   ];
 }
 
-/** Sidewalk spots where tired zombies lie down, nearest the door first. */
+/** Sidewalk spots where tired zombies lie down. First the stretch just past the end of the door's
+ * wall (outside, but in plain view so you can tap them), then past the other wall, then the rest. */
 export function restSpots(r: Room): Pt[] {
   const out: Pt[] = [];
-  for (let d = 1; d <= r.w + 2; d++) {
-    for (const x of [DOOR_X - d, DOOR_X + d]) if (x >= -1 && x <= r.w + 1) out.push({ x, y: -1 });
-  }
-  for (let y = 0; y < r.h + 2; y++) out.push({ x: -1, y });
+  for (let x = r.w; x < r.w + STREET_RUN; x++) out.push({ x, y: -1 });
+  for (let y = r.h; y < r.h + STREET_RUN; y++) out.push({ x: -1, y });
+  for (let d = 1; d <= r.w; d++) for (const x of [DOOR_X - d, DOOR_X + d]) if (x >= -1 && x < r.w) out.push({ x, y: -1 });
+  for (let y = 0; y < r.h; y++) out.push({ x: -1, y });
   return out;
 }
 

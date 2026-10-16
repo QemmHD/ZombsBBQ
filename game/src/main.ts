@@ -1,24 +1,37 @@
 import Phaser from 'phaser';
 import './ui/style.css';
+import './ui/theme3.css';
 import { Controller } from './game/controller';
 import { music, unlockAudio } from './game/sfx';
 import { Hud } from './ui/hud';
 import { JointScene } from './scenes/JointScene';
 import { RaidScene } from './scenes/RaidScene';
-import { initArt, measureCrops } from './scenes/assets';
+import { artUrlStretch, initArt, measureCrops } from './scenes/assets';
 import * as sim from './sim';
 import { openFridge } from './ui/panels';
 
 const dpr = () => Math.min(3, window.devicePixelRatio || 1);
 initArt();
+// the HUD skin's textures come from the v3 UI art
+for (const [v, k] of [
+  ['--tex-awning', 'tex_awning'],
+  ['--tex-chalk', 'tex_chalk'],
+  ['--tex-paper', 'tex_paper'],
+  ['--tex-parchment', 'tex_parchment'],
+  ['--tex-brick', 'tex_brick'],
+  ['--btn-olive', 'btn_olive'],
+  ['--btn-red', 'btn_red'],
+  ['--tex-star', 'ui_star'],
+])
+  document.documentElement.style.setProperty(v, `url("${artUrlStretch(k)}")`);
 // shop thumbnails of wall hangings are cropped to their painted area
-setTimeout(() => measureCrops(sim.ITEMS.filter((i) => i.kind === 'wall').map((i) => `${i.art}_r`)), 1500);
+setTimeout(() => measureCrops([...sim.ITEMS.filter((i) => i.kind === 'wall').map((i) => `${i.art}_r`), ...sim.WALL_FINISHES.map((f) => `wall_r_${f.art}`)]), 1500);
 const ctl = new Controller();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#7cb342',
+  backgroundColor: '#4f5a2c',
   antialias: true,
   audio: { noAudio: true }, // our own Web Audio engine handles sound
   scale: {

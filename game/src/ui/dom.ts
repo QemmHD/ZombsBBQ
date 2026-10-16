@@ -10,7 +10,7 @@ export const fmtTime = (sec: number) => {
   return `${Math.floor(sec / 3600)}h ${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}m`;
 };
 
-export const energyColor = (f: number) => (f > 0.5 ? '#6fcf3a' : f > 0.25 ? '#ffc83d' : '#e2403a');
+export const energyColor = (f: number) => (f > 0.5 ? '#7a9a32' : f > 0.25 ? '#c9a63a' : '#a3342a');
 
 export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 

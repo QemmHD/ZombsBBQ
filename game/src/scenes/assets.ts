@@ -1,24 +1,45 @@
 /**
  * Art registry + texture loading. SVG art is rasterized into Phaser textures on demand:
- * props up front, characters the first time they're needed (so ~1,000 sprites don't sit in
- * iPhone memory at once). Images are created directly (not via the Phaser loader) so it works
- * under strict content-security policies (embedded pages, app shells).
+ * the lot (ground, walls, floors) and in-world FX up front, furniture the first time it is placed,
+ * characters the first time they're needed. Only what is on screen sits in iPhone memory.
+ * Images are created directly (not via the Phaser loader) so it works under strict content-security
+ * policies (embedded pages, app shells).
+ *
+ * Art v3 (src/art3) is the café's look. The v2 sets (src/art) stay registered underneath as a fallback
+ * for anything v3 hasn't redrawn yet (the raid arenas, some characters).
  */
 import type Phaser from 'phaser';
 import { buildChar, buildProps, type ArtAsset, type CharArt, type CharPart } from '../art';
 import { buildRaidChar } from '../art/raidchars';
 import { buildRaidProps } from '../art/raidprops';
 import { buildUiIcons } from '../art/ui';
+import { buildGround } from '../art3/ground';
+import { buildRoom } from '../art3/room';
+import { buildKitchen } from '../art3/kitchen';
+import { buildFurniture } from '../art3/furniture';
+import { buildDecor } from '../art3/decor';
+import { buildWallItems } from '../art3/wallitems';
+import { buildSpecial } from '../art3/special';
+import { buildOutdoor } from '../art3/outdoor';
+import { buildDishes } from '../art3/dishes';
+import { buildFx } from '../art3/fx';
+import { buildUi3 } from '../art3/ui3';
+import { buildChar3 } from '../art3/chars';
 
 /** Rasterization scale: textures are drawn bigger than world units so zoomed-in Retina stays crisp. */
-export const TEX_S = Math.min(3.5, Math.max(2, (window.devicePixelRatio || 1) * 1.2));
+export const TEX_S = Math.min(3, Math.max(2, (window.devicePixelRatio || 1) * 1.1));
 
 export const svgData = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
+/** Joint art (v3). */
 const props = new Map<string, ArtAsset>();
-const raidProps = new Map<string, ArtAsset>();
+/** Older art kept for the raid arenas until they are redrawn. */
+const legacy = new Map<string, ArtAsset>();
 const ui = new Map<string, ArtAsset>();
 const chars = new Map<string, CharArt | null>();
+
+/** Always rasterized at boot: the lot itself and the small in-world FX. */
+const EAGER = /^(grass|sidewalk|road|kerb|lane|drain|manhole|oil|puddle|crack_road|wall_|door_|floor_|stain_|floorcrack_|rat$|roach$|fx_|face_|bubble_|plate_|grill_flames|fryer_bubbles|pot_burnt)/;
 
 function safe<T>(f: () => T, fallback: T): T {
   try {
@@ -31,23 +52,26 @@ function safe<T>(f: () => T, fallback: T): T {
 
 export function initArt() {
   if (props.size) return;
-  for (const a of safe(buildProps, [])) props.set(a.key, a);
-  for (const a of safe(buildRaidProps, [])) raidProps.set(a.key, a);
+  for (const build of [buildGround, buildRoom, buildKitchen, buildFurniture, buildDecor, buildWallItems, buildSpecial, buildOutdoor, buildDishes, buildFx])
+    for (const a of safe(build, [])) props.set(a.key, a);
+  for (const a of [...safe(buildProps, []), ...safe(buildRaidProps, [])]) if (!props.has(a.key)) legacy.set(a.key, a);
   for (const a of safe(buildUiIcons, [])) ui.set(a.key, a);
+  for (const a of safe(buildUi3, [])) ui.set(a.key, a); // v3 icons win
 }
 
 export function propMeta(key: string): ArtAsset | undefined {
-  return props.get(key) ?? raidProps.get(key);
+  return props.get(key) ?? legacy.get(key);
 }
 
 export function hasProp(key: string) {
-  return props.has(key) || raidProps.has(key);
+  return props.has(key) || legacy.has(key);
 }
 
-/** A character's art (joint characters and raid characters share one namespace). */
+/** A character's art: v3 joint rigs first, then the older sets (raid cast, not-yet-redrawn folks). */
 export function charArt(id: string): CharArt | null {
   if (!chars.has(id)) {
-    let a: CharArt | null = safe(() => buildChar(id as never), null);
+    let a: CharArt | null = safe(() => buildChar3(id), null);
+    if (!a || !a.parts?.length) a = safe(() => buildChar(id as never), null);
     if (!a || !a.parts?.length) a = safe(() => buildRaidChar(id), null);
     chars.set(id, a && a.parts?.length ? a : null);
   }
@@ -55,21 +79,38 @@ export function charArt(id: string): CharArt | null {
 }
 
 const urlCache = new Map<string, string>();
+const anyArt = (key: string) => ui.get(key) ?? props.get(key) ?? legacy.get(key);
+
 /** Data URL for DOM use (HUD icons, portraits, dish icons, map). */
 export function artUrl(key: string): string {
   let u = urlCache.get(key);
   if (u) return u;
-  const a = ui.get(key) ?? props.get(key) ?? raidProps.get(key);
+  const a = anyArt(key);
   u = a ? svgData(a.svg) : '';
   urlCache.set(key, u);
   return u;
+}
+
+/** Data URL for a texture that CSS stretches to any box (backgrounds, nine-slice borders). */
+export function artUrlStretch(key: string): string {
+  const k = `stretch:${key}`;
+  let u = urlCache.get(k);
+  if (u) return u;
+  const a = anyArt(key);
+  u = a ? svgData(a.svg.replace(/^<svg /, '<svg preserveAspectRatio="none" ')) : '';
+  urlCache.set(k, u);
+  return u;
+}
+
+export function hasArt(key: string): boolean {
+  return !!anyArt(key);
 }
 
 const autoCrops = new Map<string, [number, number, number, number]>();
 /** Measure the painted bounds of some art (async, once) so thumbnails can be cropped to it. */
 export function measureCrops(keys: string[], pad = 3) {
   for (const key of keys) {
-    const a = ui.get(key) ?? props.get(key) ?? raidProps.get(key);
+    const a = anyArt(key);
     if (!a || autoCrops.has(key)) continue;
     const img = new Image();
     img.onload = () => {
@@ -113,7 +154,7 @@ export function artUrlCrop(key: string, x: number, y: number, w: number, h: numb
   const k = `crop:${key}:${x},${y},${w},${h}`;
   let u = urlCache.get(k);
   if (u) return u;
-  const a = ui.get(key) ?? props.get(key) ?? raidProps.get(key);
+  const a = anyArt(key);
   u = a ? svgData(a.svg.replace(/width="[^"]*" height="[^"]*" viewBox="[^"]*"/, `width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}"`)) : '';
   urlCache.set(k, u);
   return u;
@@ -149,6 +190,7 @@ function addTexture(scene: Phaser.Scene, key: string, svg: string, w: number, h:
       resolve();
     };
     img.onerror = () => {
+      console.warn('texture failed', key);
       pending.delete(key);
       resolve();
     };
@@ -158,11 +200,11 @@ function addTexture(scene: Phaser.Scene, key: string, svg: string, w: number, h:
   return p;
 }
 
-/** Rasterize every joint prop (tiles, walls, furniture, dishes, fx). */
+/** Rasterize the lot and the in-world FX (furniture comes later, as it is placed). */
 export function loadProps(scene: Phaser.Scene, onProgress?: (f: number) => void): Promise<void> {
   initArt();
-  // the door's CLOSED sign reuses the HUD icon
-  const list = [...props.values(), ...['ui_closed'].map((k) => ui.get(k)!).filter(Boolean)];
+  // the door's OPEN/CLOSED board reuses the HUD art
+  const list = [...[...props.values()].filter((a) => EAGER.test(a.key)), ...['ui_closed', 'ui_open'].map((k) => ui.get(k)!).filter(Boolean)];
   let done = 0;
   return Promise.all(
     list.map((a) =>
@@ -174,9 +216,25 @@ export function loadProps(scene: Phaser.Scene, onProgress?: (f: number) => void)
   ).then(() => undefined);
 }
 
+/** Rasterize these prop keys if they aren't yet. Resolves once all are ready. */
+export function ensureProps(scene: Phaser.Scene, keys: Iterable<string>): Promise<void> {
+  const out: Promise<void>[] = [];
+  for (const k of keys) {
+    if (scene.textures.exists(k)) continue;
+    const a = props.get(k) ?? legacy.get(k) ?? ui.get(k);
+    if (a) out.push(addTexture(scene, a.key, a.svg, a.w, a.h));
+  }
+  return Promise.all(out).then(() => undefined);
+}
+
+export function propsReady(scene: Phaser.Scene, keys: Iterable<string>): boolean {
+  for (const k of keys) if (!scene.textures.exists(k) && hasProp(k)) return false;
+  return true;
+}
+
 export function loadRaidProps(scene: Phaser.Scene): Promise<void> {
   initArt();
-  return Promise.all([...raidProps.values()].filter((a) => !a.key.startsWith('map_')).map((a) => addTexture(scene, a.key, a.svg, a.w, a.h))).then(() => undefined);
+  return Promise.all([...legacy.values()].filter((a) => !a.key.startsWith('map_')).map((a) => addTexture(scene, a.key, a.svg, a.w, a.h))).then(() => undefined);
 }
 
 const charLoads = new Map<string, Promise<boolean>>();

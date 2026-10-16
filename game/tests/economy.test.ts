@@ -188,7 +188,8 @@ function raidIfReady(s: GameState): RaidState | null {
   for (const rv of RIVALS) {
     if (rivalReady(s, rv.id)) continue;
     if ((s.rivals[rv.id]?.wins ?? 0) > 0 && rv !== RIVALS.find((x) => !(s.rivals[x.id]?.wins))) continue;
-    const healthy = s.workers.filter((w) => w.kind === 'zombie' && w.energy > maxEnergy(w) * 0.6 && (w.state === 'idle' || w.state === 'resting' || w.state === 'daydream'));
+    // like the original, you can pull zombies off whatever they're doing to go raiding
+    const healthy = s.workers.filter((w) => w.kind === 'zombie' && w.energy > maxEnergy(w) * 0.6 && !['down', 'raiding', 'hunting', 'cooking'].includes(w.state));
     if (healthy.length < RAID_CREW[RIVALS.indexOf(rv)]) return null;
     // a sensible player sizes up the joint first: total punch vs. the Head Chef
     const punch = healthy.reduce((a, w) => a + (3 + w.stats.power * 1.6) * (w.energy / 100), 0);

@@ -1,0 +1,380 @@
+/*
+ * HUD skin v3: the original's grimy diner look. Layered over style.css (which keeps the layout rules).
+ * Texture URLs (--tex-*) are set at boot from the v3 UI art (src/art3/ui3.ts).
+ */
+:root {
+  --maroon: #6d1727;
+  --maroon-light: #7e454e;
+  --maroon-deep: #3f0c16;
+  --cream: #e8dfc4;
+  --cream-2: #d8cca6;
+  --ink: #16120c;
+  --gold: #d9b44a;
+  --gold-deep: #a8822a;
+  --zgreen: #8fa84a;
+  --zgreen-deep: #5e7a26;
+  --sauce: #9bd62e;
+  --fire: #c9762a;
+  --red: #a3342a;
+  --blue: #3e6f86;
+  --grass: #4f5a2c;
+  --olive: #658433;
+  --olive-d: #486d0d;
+  --chalk: #e6e4d6;
+  --paper: #e9dfa8;
+  --font: 'Arial Black', 'Arial Rounded MT Bold', ui-rounded, system-ui, sans-serif;
+  --font-body: 'Trebuchet MS', ui-rounded, system-ui, sans-serif;
+}
+
+/* ---------- the awning: full width, stained canvas stripes with a torn scalloped edge ---------- */
+.awning {
+  left: 0;
+  right: 0;
+  transform: none;
+  max-width: none;
+  justify-content: center;
+  height: calc(var(--safe-t) + 58px);
+  top: 0;
+  padding: var(--safe-t) calc(var(--safe-r) + 8px) 18px calc(var(--safe-l) + 8px);
+  gap: 12px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--tex-awning) 0 0 / auto 100% repeat-x;
+  filter: drop-shadow(0 3px 2px rgba(22, 18, 12, 0.45));
+}
+.awning::after {
+  display: none;
+}
+.awning .lvl {
+  background: var(--tex-star) center / contain no-repeat;
+  clip-path: none;
+  width: 38px;
+  height: 38px;
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.joint-name b {
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--cream);
+  text-shadow: 0 2px 0 var(--ink);
+  letter-spacing: 1px;
+}
+.st {
+  color: rgba(22, 18, 12, 0.55);
+  text-shadow: 0 0 1px rgba(232, 223, 196, 0.6);
+  font-size: 13px;
+}
+.st.on {
+  color: var(--gold);
+  text-shadow: 0 1px 0 var(--ink);
+}
+.xpbar {
+  background: rgba(22, 18, 12, 0.7);
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+}
+.xpbar i {
+  background: linear-gradient(#a9c6c9, #5f8a8f);
+  border-radius: 1px;
+}
+.xpbar span,
+.cur span {
+  font-family: var(--font);
+  color: var(--cream);
+  text-shadow: 0 1px 0 var(--ink);
+}
+.cur {
+  background: rgba(22, 18, 12, 0.62);
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+}
+.gear {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* ---------- icon buttons: the art sits proud, with a little olive sticker label underneath ---------- */
+.side {
+  top: calc(var(--safe-t) + 54px);
+}
+.side.left.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 58px);
+  gap: 4px 2px;
+}
+.btn-sq {
+  width: 58px;
+  height: 60px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.btn-sq:active {
+  transform: translateY(2px) scale(0.95);
+  box-shadow: none;
+}
+.btn-sq .bi {
+  width: 46px;
+  height: 46px;
+  margin-top: -14px;
+  filter: drop-shadow(0 2px 1px rgba(22, 18, 12, 0.55));
+}
+.btn-sq label {
+  bottom: 0;
+  left: 2px;
+  right: 2px;
+  height: 17px;
+  line-height: 13px;
+  font-family: var(--font);
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  color: var(--cream);
+  text-shadow: 0 1px 0 var(--ink);
+  border-style: solid;
+  border-width: 2px 6px;
+  border-image: var(--btn-olive) 16 24 fill / 2px 6px stretch;
+}
+.btn-sq.sign.closed,
+.btn-sq.sign {
+  background: transparent;
+}
+.btn-sq.sign.closed label {
+  color: var(--cream);
+  border-image: var(--btn-red) 16 24 fill / 2px 6px stretch;
+}
+.badge {
+  background: var(--olive);
+  color: var(--cream);
+  border: 1.5px solid var(--ink);
+  font-family: var(--font);
+  top: -6px;
+  right: -4px;
+}
+.badge.ready {
+  background: var(--red);
+}
+.badge.lock {
+  background: rgba(22, 18, 12, 0.7);
+}
+
+/* ---------- Gus's notes: a torn-off yellow legal pad ---------- */
+.hint .bubble {
+  background: var(--tex-paper) 0 0 / 100% 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: 2px 3px 0 rgba(22, 18, 12, 0.35);
+  padding: 20px 14px 10px 30px;
+  color: #2a2418;
+  font-family: var(--font-body);
+  font-weight: 700;
+  transform: rotate(-0.8deg);
+}
+.hint .bubble b {
+  color: var(--maroon);
+  font-family: var(--font);
+}
+
+/* ---------- context card + menus: a chalkboard in a beat-up wood frame ---------- */
+.card,
+.modal {
+  background: #2d3a2c;
+  border-style: solid;
+  border-width: 14px;
+  border-image: var(--tex-chalk) 24 fill / 14px stretch;
+  border-radius: 0;
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.45);
+  color: var(--chalk);
+  font-family: var(--font-body);
+}
+.card h3,
+.modal h2,
+.modal h3,
+.modal h4 {
+  color: #f0e6c8;
+  font-family: var(--font);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.sub,
+.small,
+.state {
+  color: #cfcbb8;
+}
+.modal-bg {
+  background: rgba(22, 18, 12, 0.62);
+}
+.chip {
+  background: rgba(232, 223, 196, 0.12);
+  border: 1px solid rgba(232, 223, 196, 0.35);
+  color: var(--chalk);
+}
+.bar {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+}
+.bar i {
+  border-radius: 1px;
+}
+.portrait {
+  background: rgba(232, 223, 196, 0.1);
+  border-color: rgba(232, 223, 196, 0.35);
+}
+
+/* ---------- buttons: slanted sticker buttons ---------- */
+.btn {
+  border-style: solid;
+  border-width: 7px 12px;
+  border-image: var(--btn-olive) 16 24 fill / 7px 12px stretch;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--cream);
+  font-family: var(--font);
+  font-weight: 900;
+  text-shadow: 0 1px 0 var(--ink);
+}
+.btn:active {
+  transform: translateY(2px) scale(0.98);
+}
+.btn.green,
+.btn.infect,
+.btn.blue,
+.btn.sauce {
+  background: transparent;
+}
+.btn.red {
+  border-image: var(--btn-red) 16 24 fill / 7px 12px stretch;
+  background: transparent;
+}
+.btn.sauce {
+  color: #e9f7c0;
+}
+.btn.infect {
+  color: #e9f7c0;
+  font-size: 15px;
+}
+
+/* ---------- list rows and shop cards: paper tags pinned to the board ---------- */
+.dish,
+.item,
+.goal,
+.fridge-row,
+.crew-row,
+.pedia-card,
+.rate-row,
+.unlocks > div {
+  background: #e3d9b8;
+  color: #2a2418;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.35);
+}
+.dish .sub,
+.item .sub,
+.goal .sub,
+.fridge-row .sub,
+.crew-row .sub,
+.pedia-card .sub,
+.rate-row .sub,
+.dish small,
+.item-meta {
+  color: #5a5040;
+}
+.item b,
+.dish b,
+.goal b {
+  color: #2a2418;
+}
+.item.locked {
+  filter: grayscale(0.8) brightness(0.8);
+}
+.item-art {
+  background: radial-gradient(ellipse at 50% 60%, #f1ead2, #cfc39a);
+  border-radius: 2px;
+}
+.item-art.floor-art img {
+  transform: scale(1.1);
+}
+.decor {
+  color: #7a5a10;
+  font-style: normal;
+  font-weight: 900;
+}
+.decor.bad {
+  color: var(--red);
+}
+.tab {
+  background: rgba(232, 223, 196, 0.1);
+  border: 1.5px solid rgba(232, 223, 196, 0.35);
+  color: var(--chalk);
+  border-radius: 2px;
+  font-family: var(--font);
+}
+.tab.on {
+  background: #e3d9b8;
+  color: #2a2418;
+}
+.grid-head {
+  color: #f0e6c8;
+  font-family: var(--font);
+}
+
+/* ---------- toasts: stencilled on a strip of tape ---------- */
+.toast {
+  background: rgba(22, 18, 12, 0.88);
+  color: var(--cream);
+  border: 1.5px solid #4a4335;
+  border-radius: 2px;
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+/* ---------- decorating toolbar ---------- */
+.editbar {
+  background: #2d3a2c;
+  border-style: solid;
+  border-width: 10px;
+  border-image: var(--tex-chalk) 24 fill / 10px stretch;
+  border-radius: 0;
+  color: var(--chalk);
+}
+.eb-info b {
+  color: #f0e6c8;
+  font-family: var(--font);
+}
+.eb-info span {
+  color: #cfcbb8;
+}
+.eb-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--cream);
+}
+.eb-btn label {
+  color: var(--cream);
+  font-family: var(--font);
+  text-shadow: 0 1px 0 var(--ink);
+}
+
+/* ---------- boot screen ---------- */
+#boot {
+  background: #1d1a14 var(--tex-brick) center / cover;
+}
+
+/* ---------- leftovers from the old bright skin ---------- */
+.x {
+  background: rgba(22, 18, 12, 0.55);
+  border: 1.5px solid rgba(232, 223, 196, 0.45);
+  border-radius: 2px;
+}
+.item.wide-item {
+  background: #d9c98c;
+}
+.item.on {
+  outline: 2px solid var(--gold);
+}

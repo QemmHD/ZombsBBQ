@@ -20,7 +20,13 @@ import {
   tick,
   wake,
   wallSlotFree,
-  DIR_ORDER,
+  dirsFor,
+  onLawn,
+  paintFloor,
+  paintWall,
+  setClosed,
+  FLOOR_BY_ID,
+  WALL_BY_ID,
   type Dir,
   type GameEvent,
   type GameState,
@@ -54,6 +60,12 @@ export interface Placement {
 
 export type EditSel = { kind: 'furn'; id: string } | { kind: 'wall'; id: string } | null;
 
+/** Decorate-mode paint brush: tap wall segments or floor tiles to buy that finish for them. */
+export interface Painting {
+  kind: 'wall' | 'floor';
+  finish: string;
+}
+
 type Listener = (ev: GameEvent) => void;
 
 function storageGet(): string | null {
@@ -78,6 +90,7 @@ export class Controller {
   selection: Selection = null;
   placing: Placement | null = null;
   editSel: EditSel = null;
+  painting: Painting | null = null;
   raid: RaidState | null = null;
   raidResult: RaidResult | null = null;
   offlineReport: { sec: number; cash: number } | null = null;
@@ -146,6 +159,7 @@ export class Controller {
     this.selection = null;
     this.placing = null;
     this.editSel = null;
+    this.painting = null;
     for (const l of this.modeListeners) l(m);
     this.emitSel();
   }
@@ -218,6 +232,22 @@ export class Controller {
       this.select(null);
       return;
     }
+    if (st.status === 'paused') {
+      const sel = this.selection;
+      if (sel?.kind === 'worker') {
+        const err = startCooking(this.state, sel.id, stoveId);
+        if (err) this.toast(err);
+        else {
+          sfx('purchase');
+          this.info('Back on the stove!');
+        }
+        this.select(null);
+      } else {
+        this.toast('Nobody’s at this stove, so it stopped cooking. Tap a cook, then the stove.', false);
+        this.select({ kind: 'stove', id: stoveId });
+      }
+      return;
+    }
     if (st.status === 'cooking' || st.status === 'reserved') {
       sfx('tap');
       this.select({ kind: 'stove', id: stoveId });
@@ -249,6 +279,14 @@ export class Controller {
     if (this.selection) this.select(null);
   }
 
+  /** The front door (or the sign button): open or close the café. */
+  toggleClosed() {
+    setClosed(this.state, !this.state.closed);
+    sfx(this.state.closed ? 'close' : 'open');
+    this.info(this.state.closed ? 'CLOSED. No new customers come in. The rating slowly sags while you’re shut.' : 'OPEN for business! Bring on the brains.');
+    this.emitSel();
+  }
+
   // ----- decorating -----
   enterEdit() {
     this.setMode('edit');
@@ -264,24 +302,58 @@ export class Controller {
     const def = ITEM_BY_ID[itemId];
     if (this.mode !== 'edit') this.setMode('edit');
     const s = this.state;
+    this.painting = null;
     if (def.kind === 'wall') {
       const slot = this.firstFreeWall();
       if (!slot) return this.toast('No free wall space left!');
       this.placing = { itemId, source, x: 0, y: 0, wall: slot };
     } else {
-      const dir = def.dirs?.[0];
-      const spot = this.firstFreeTile(itemId, dir) ?? { x: Math.floor(s.roomN / 2), y: Math.floor(s.roomN / 2) };
+      const dir = dirsFor(def)[0];
+      const spot = this.firstFreeTile(itemId, dir) ?? { x: Math.floor(s.roomW / 2), y: Math.floor(s.roomH / 2) };
       this.placing = { itemId, source, x: spot.x, y: spot.y, dir };
     }
     this.editSel = null;
     this.emitSel();
   }
 
+  /** Pick a finish to paint with (walls or floor), from the shop. */
+  beginPaint(kind: 'wall' | 'floor', finish: string) {
+    if (this.mode !== 'edit') this.setMode('edit');
+    this.placing = null;
+    this.editSel = null;
+    this.painting = { kind, finish };
+    this.emitSel();
+  }
+
+  endPaint() {
+    this.painting = null;
+    this.emitSel();
+  }
+
+  /** Paint one wall segment ('l'/'r', index) or floor tile (x, y) with the current finish. */
+  paintAt(a: 'l' | 'r' | number, b: number) {
+    const p = this.painting;
+    if (!p) return;
+    const err = typeof a === 'number' ? paintFloor(this.state, a, b, p.finish) : paintWall(this.state, a, b, p.finish);
+    if (err) {
+      if (!/already/i.test(err)) this.toast(err);
+      return;
+    }
+    sfx('place');
+    this.emitSel();
+  }
+
+  paintName(): string {
+    const p = this.painting;
+    if (!p) return '';
+    return (p.kind === 'wall' ? WALL_BY_ID : FLOOR_BY_ID)[p.finish]?.name ?? p.finish;
+  }
+
   beginMove() {
     const sel = this.editSel;
     if (!sel) return;
     if (sel.kind === 'wall') {
-      const w = this.state.walls.find((x) => x.id === sel.id);
+      const w = this.state.wallItems.find((x) => x.id === sel.id);
       if (w) this.placing = { itemId: w.item, source: 'move', id: w.id, x: 0, y: 0, wall: { wall: w.wall, index: w.index } };
     } else {
       const f = this.state.furniture.find((x) => x.id === sel.id);
@@ -291,17 +363,26 @@ export class Controller {
   }
 
   private firstFreeTile(itemId: string, dir?: Dir) {
-    const n = this.state.roomN;
-    const c = Math.floor(n / 2);
-    for (let r = 0; r < n; r++)
-      for (let y = c - r; y <= c + r; y++)
-        for (let x = c - r; x <= c + r; x++) if (!canPlace(this.state, itemId, x, y, dir)) return { x, y };
+    const s = this.state;
+    const r = { w: s.roomW, h: s.roomH };
+    const outdoor = ITEM_BY_ID[itemId].outdoor;
+    // spiral out from the middle of the room (or of the front lawn, for outdoor things)
+    const cx = outdoor ? s.roomW + 1 : Math.floor(s.roomW / 2);
+    const cy = outdoor ? Math.floor(s.roomH / 2) : Math.floor(s.roomH / 2);
+    const maxR = Math.max(s.roomW, s.roomH) + 4;
+    for (let rad = 0; rad < maxR; rad++)
+      for (let y = cy - rad; y <= cy + rad; y++)
+        for (let x = cx - rad; x <= cx + rad; x++) {
+          if (outdoor && !onLawn(x, y, r)) continue;
+          if (!canPlace(s, itemId, x, y, dir)) return { x, y };
+        }
     return null;
   }
 
   private firstFreeWall(): { wall: 'l' | 'r'; index: number } | null {
-    for (let i = 0; i < this.state.roomN; i++)
-      for (const wall of ['r', 'l'] as const) if (!wallSlotFree(this.state, wall, i)) return { wall, index: i };
+    const s = this.state;
+    for (let i = 0; i < Math.max(s.roomW, s.roomH); i++)
+      for (const wall of ['r', 'l'] as const) if (!wallSlotFree(s, wall, i)) return { wall, index: i };
     return null;
   }
 
@@ -323,10 +404,9 @@ export class Controller {
   rotatePlacement() {
     const p = this.placing;
     if (!p || p.wall) return;
-    const dirs = ITEM_BY_ID[p.itemId].dirs;
-    if (!dirs || dirs.length < 2) return this.toast('This one only goes one way.', false);
-    const order = DIR_ORDER.filter((d) => dirs.includes(d));
-    p.dir = order[(order.indexOf(p.dir ?? order[0]) + 1) % order.length];
+    const dirs = dirsFor(ITEM_BY_ID[p.itemId]);
+    if (dirs.length < 2) return this.toast('This one only goes one way.', false);
+    p.dir = dirs[(dirs.indexOf(p.dir ?? dirs[0]) + 1) % dirs.length];
     sfx('rotate');
     this.emitSel();
   }

@@ -1,7 +1,7 @@
-import { ITEMS, ITEM_BY_ID, THEMES, buyCheck, buyTheme, expand, nextExpansion, ownedCount, sellFromStorage, type ItemDef, type StoreTab } from '../sim';
+import { FLOOR_FINISHES, ITEMS, ITEM_BY_ID, WALL_FINISHES, buyCheck, dirsFor, expand, nextExpansion, ownedCount, sellFromStorage, type FinishDef, type ItemDef, type StoreTab } from '../sim';
 import { sfx } from '../game/sfx';
 import { artUrl, artUrlFit } from '../scenes/assets';
-import { furnKey, themeKeys } from '../scenes/JointScene';
+import { furnArt } from '../scenes/JointScene';
 import type { Hud } from './hud';
 import { bindActions, esc, icon, priceHtml } from './dom';
 
@@ -11,7 +11,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'decor', label: 'Decor', icon: 'ui_tab_decor' },
   { id: 'kitchen', label: 'Kitchen', icon: 'ui_tab_kitchen' },
   { id: 'furniture', label: 'Furniture', icon: 'ui_tab_furniture' },
-  { id: 'walls', label: 'Walls', icon: 'ui_tab_walls' },
+  { id: 'walls', label: 'Walls & Floors', icon: 'ui_tab_walls' },
   { id: 'special', label: 'Special', icon: 'ui_tab_special' },
   { id: 'storage', label: 'Storage', icon: 'ui_tab_storage' },
 ];
@@ -20,12 +20,19 @@ let lastTab: Tab = 'featured';
 
 export function itemArt(def: ItemDef): string {
   if (def.kind === 'wall') return `${def.art}_r`;
-  return furnKey(def.id, def.dirs?.[0]);
+  return furnArt(def.id, dirsFor(def)[0]).key;
 }
 
 /** Thumbnail URL: wall hangings are cropped out of their wall-sized canvas. */
 export function itemThumb(def: ItemDef): string {
   return def.kind === 'wall' ? artUrlFit(itemArt(def)) : artUrl(itemArt(def));
+}
+
+/** Star items show their bonus like the original's "+★" tag. */
+function ratingTag(r: number): string {
+  if (r > 0) return ` <i class="decor">+${Math.round(r * 100)}★</i>`;
+  if (r < 0) return ` <i class="decor bad">${Math.round(r * 100)}★</i>`;
+  return '';
 }
 
 export function openStore(hud: Hud, tab: Tab = lastTab) {
@@ -38,19 +45,20 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
     return `<button class="item ${locked ? 'locked' : err ? 'dim' : ''}" data-a="buy" data-id="${def.id}">
       <div class="item-art"><img src="${itemThumb(def)}" alt=""/></div>
       <b>${esc(def.name)}</b>
-      <span class="item-meta">${locked ? `${icon('fx_lock', 'ico-s')} Lv ${def.level}` : priceHtml(def)}${def.decor ? ` <i class="decor">+${def.decor}★pts</i>` : ''}</span>
+      <span class="item-meta">${locked ? `${icon('fx_lock', 'ico-s')} Lv ${def.level}` : priceHtml(def)}${ratingTag(def.rating)}</span>
       ${owned ? `<span class="owned">×${owned}</span>` : ''}${extra}</button>`;
   };
+  const shopItems = ITEMS.filter((i) => !i.starter);
   let body = '';
   if (tab === 'featured') {
-    const fresh = ITEMS.filter((i) => i.level <= s.level && i.level >= s.level - 2).slice(0, 6);
-    const cheap = ITEMS.filter((i) => !buyCheck(s, i.id) && (i.kind === 'decor' || i.kind === 'wall'))
-      .sort((a, b) => b.decor / (b.cash ?? 99) - a.decor / (a.cash ?? 99))
+    const fresh = shopItems.filter((i) => i.level <= s.level && i.level >= s.level - 2).slice(0, 6);
+    const stars = shopItems.filter((i) => !buyCheck(s, i.id) && i.rating > 0)
+      .sort((a, b) => b.rating / (b.cash ?? 99) - a.rating / (a.cash ?? 99))
       .slice(0, 4);
-    const pick = [...new Map([...fresh, ...cheap].map((i) => [i.id, i])).values()];
+    const pick = [...new Map([...fresh, ...stars].map((i) => [i.id, i])).values()];
     body = expansionCard(hud) + pick.map((d) => card(d)).join('');
   } else if (tab === 'storage') {
-    const ids = Object.keys(s.storage);
+    const ids = Object.keys(s.storage).filter((id) => s.storage[id] > 0);
     body = ids.length
       ? ids
           .map((id) => {
@@ -61,9 +69,9 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
           .join('')
       : '<p class="empty">Nothing in storage. In Decorate mode, tap a piece and choose Store.</p>';
   } else {
-    const items = ITEMS.filter((i) => i.tab === tab).sort((a, b) => a.level - b.level);
-    body = items.map((d) => card(d)).join('');
-    if (tab === 'walls') body += themeCards(hud);
+    const items = shopItems.filter((i) => i.tab === tab).sort((a, b) => a.level - b.level);
+    if (tab === 'walls') body = finishCards(hud, 'wall') + finishCards(hud, 'floor') + `<h4 class="grid-head">On the walls</h4>`;
+    body += items.map((d) => card(d)).join('');
     if (tab === 'special') body = expansionCard(hud) + body;
   }
   const m = hud.openModal(
@@ -82,7 +90,7 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
       if (err) return hud.ctl.toast(err);
       hud.closeModal();
       hud.ctl.beginPlace(id, 'buy');
-      hud.ctl.info(ITEM_BY_ID[id].kind === 'wall' ? 'Tap a wall spot, then ✓' : 'Drag it where you want it, then ✓');
+      hud.ctl.info(ITEM_BY_ID[id].kind === 'wall' ? 'Tap a spot on a wall, then ✓' : 'Drag it where you want it, then ✓');
     } else if (a === 'place') {
       hud.closeModal();
       hud.ctl.beginPlace(id, 'storage');
@@ -100,15 +108,13 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
       const err = expand(s);
       if (err) return hud.ctl.toast(err);
       sfx('expand');
-      hud.ctl.info(`The joint is now ${s.roomN}×${s.roomN}! More room for tables.`);
+      hud.ctl.info(`The café is now ${s.roomW}×${s.roomH}! More room for tables.`);
       openStore(hud, tab);
-    } else if (a === 'theme') {
-      const owned = s.ownedThemes.includes(id as never);
-      const err = buyTheme(s, id as never);
-      if (err) return hud.ctl.toast(err);
-      sfx(owned ? 'place' : 'purchase');
-      hud.ctl.info(owned ? 'Redecorated!' : 'New theme! The crew loves it.');
-      openStore(hud, 'walls');
+    } else if (a === 'paint') {
+      const [kind, finish] = id.split(':') as ['wall' | 'floor', string];
+      hud.closeModal();
+      hud.ctl.beginPaint(kind, finish);
+      hud.ctl.info(kind === 'wall' ? 'Tap wall sections to paper them. Each one is bought separately.' : 'Tap floor tiles to lay them. Each tile is bought separately.');
     }
   });
 }
@@ -119,21 +125,23 @@ function expansionCard(hud: Hud): string {
   if (!e) return '';
   const locked = e.level > s.level;
   return `<button class="item wide-item ${locked ? 'locked' : ''}" data-a="expand"><div class="item-art">${icon('ui_expand', 'big-ico')}</div>
-    <b>Expand to ${e.size}×${e.size}</b><span class="item-meta">${locked ? `${icon('fx_lock', 'ico-s')} Lv ${e.level}` : priceHtml(e)}</span></button>`;
+    <b>Expand to ${e.w}×${e.h}</b><span class="item-meta">${locked ? `${icon('fx_lock', 'ico-s')} Lv ${e.level}` : priceHtml(e)}</span></button>`;
 }
 
-function themeCards(hud: Hud): string {
+/** Wallpaper and floor tiles: pick one, then tap segments/tiles in the café to buy them one by one. */
+function finishCards(hud: Hud, kind: 'wall' | 'floor'): string {
   const s = hud.ctl.state;
+  const list: FinishDef[] = (kind === 'wall' ? WALL_FINISHES : FLOOR_FINISHES).filter((f) => f.cash > 0);
   return (
-    `<h4 class="grid-head">Themes: new floors and walls</h4>` +
-    THEMES.map((t) => {
-      const owned = s.ownedThemes.includes(t.id);
-      const on = s.theme === t.id;
-      const locked = !owned && t.level > s.level;
-      const k = themeKeys(t.id);
-      return `<button class="item ${locked ? 'locked' : ''} ${on ? 'on' : ''}" data-a="theme" data-id="${t.id}">
-        <div class="item-art theme-art"><img src="${artUrl(k.l)}" alt=""/><img src="${artUrl(k.a)}" alt="" class="floor"/></div>
-        <b>${esc(t.name)}</b><span class="item-meta">${on ? 'In use' : owned ? 'Owned · tap to use' : locked ? `${icon('fx_lock', 'ico-s')} Lv ${t.level}` : priceHtml(t)}${t.decor ? ` <i class="decor">+${t.decor}★pts</i>` : ''}</span></button>`;
-    }).join('')
+    `<h4 class="grid-head">${kind === 'wall' ? 'Wallpaper (per wall section)' : 'Flooring (per tile)'}</h4>` +
+    list
+      .map((f) => {
+        const locked = f.level > s.level;
+        const art = kind === 'wall' ? artUrlFit(`wall_r_${f.art}`) : artUrl(`floor_${f.art}_a`);
+        return `<button class="item ${locked ? 'locked' : ''}" data-a="paint" data-id="${kind}:${f.id}">
+        <div class="item-art ${kind === 'floor' ? 'floor-art' : ''}"><img src="${art}" alt=""/></div>
+        <b>${esc(f.name)}</b><span class="item-meta">${locked ? `${icon('fx_lock', 'ico-s')} Lv ${f.level}` : `${priceHtml({ cash: f.cash })} each`}${ratingTag(f.rating)}</span></button>`;
+      })
+      .join('')
   );
 }

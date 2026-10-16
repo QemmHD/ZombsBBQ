@@ -5,14 +5,15 @@ import {
   ITEM_BY_ID,
   MAP_LEVEL,
   TUTORIAL,
+  TUNING,
   activeGoals,
+  chairTable,
   attackThreshold,
   buyKeepWarm,
   cancelCooking,
   discardCounter,
   finishCost,
   finishNow,
-  setClosed,
   collectPayout,
   dishAvailable,
   fireZombie,
@@ -22,10 +23,13 @@ import {
   refill,
   rest,
   stars,
+  stoveCooks,
   wake,
   xpToNext,
   zombies,
   LEVEL_CAP,
+  maxEnergy,
+  payoutState,
   type Worker,
 } from '../sim';
 import type { Controller } from '../game/controller';
@@ -42,11 +46,15 @@ const WORKER_STATE: Record<Worker['state'], string> = {
   idle: 'Ready to serve',
   toStove: 'Heading to the stove',
   cooking: 'Cooking',
+  toPickup: 'Fetching food from the stove',
+  carryDish: 'Carrying the pot to the counter',
   toCounter: 'Grabbing food',
   carrying: 'Serving a customer',
+  toPlate: 'Clearing a dirty plate',
+  carryPlate: 'Taking plates to the sink',
   hunting: 'HANGRY! Going for a customer!',
   toRest: 'Off for a nap',
-  resting: 'Napping on the lawn… Zzz',
+  resting: 'Napping on the sidewalk… Zzz',
   daydream: 'Daydreaming about brains… (tap to snap out of it)',
   raiding: 'Out on a raid',
   down: 'Knocked out cold. Reanimating…',
@@ -78,18 +86,18 @@ export class Hud {
         <div class="cur sauce" data-k="sauce">${icon('ui_sauce', 'cur-ico')}<span data-k="saucev"></span></div>
         <button class="gear" data-k="gear" aria-label="Settings">${icon('ui_settings', 'gear-ico')}</button>
       </div>
-      <div class="side left play-only">
+      <div class="side left grid3 play-only">
         <button class="btn-sq" data-k="shop" aria-label="Shop">${icon('ui_shop', 'bi')}<label>SHOP</label></button>
         <button class="btn-sq" data-k="book" aria-label="Cookbook">${icon('ui_menu', 'bi')}<label>MENU</label></button>
-        <button class="btn-sq" data-k="crew" aria-label="Crew">${icon('ui_crew', 'bi')}<label>CREW</label><span class="badge" data-k="crewc"></span></button>
         <button class="btn-sq" data-k="map" aria-label="Raid map">${icon('ui_raid', 'bi')}<label>RAID</label><span class="badge lock" data-k="maplock">${icon('fx_lock', 'ico-s')}</span></button>
-        <button class="btn-sq sign" data-k="sign" aria-label="Open or close the joint"><img class="bi" data-k="signimg" alt=""/><label data-k="signlbl">OPEN</label></button>
-      </div>
-      <div class="side right play-only">
+        <button class="btn-sq" data-k="crew" aria-label="Crew">${icon('ui_crew', 'bi')}<label>CREW</label><span class="badge" data-k="crewc"></span></button>
         <button class="btn-sq" data-k="goals" aria-label="Goals">${icon('ui_goals', 'bi')}<label>GOALS</label><span class="badge ready" data-k="goalc"></span></button>
         <button class="btn-sq" data-k="edit" aria-label="Decorate">${icon('ui_edit', 'bi')}<label>DECOR</label></button>
+      </div>
+      <div class="side right play-only">
+        <button class="btn-sq sign" data-k="sign" aria-label="Open or close the joint"><img class="bi" data-k="signimg" alt=""/><label data-k="signlbl">OPEN</label></button>
         <button class="btn-sq" data-k="fridge" aria-label="Fridge">${icon('ui_fridge', 'bi')}<label>FRIDGE</label><span class="badge" data-k="fridgec"></span></button>
-        <button class="btn-sq" data-k="pedia" aria-label="Zombiepedia">${icon('ui_zombiepedia', 'bi')}<label>ZOMBIES</label></button>
+        <button class="btn-sq" data-k="pedia" aria-label="Zombiepedia">${icon('ui_zombiepedia', 'bi')}<label>ZOMBS</label></button>
       </div>
       <div class="hint hidden play-only" data-k="hint"><img alt="" data-k="gusimg"/><div class="bubble"><b>GUS, ZOMBIE UNION REP</b><span data-k="hinttext"></span></div></div>
       <div class="card hidden play-only" data-k="card"></div>
@@ -116,10 +124,7 @@ export class Hud {
     btn('edit', () => ctl.enterEdit());
     btn('fridge', () => openFridge(this));
     btn('pedia', () => openZombiepedia(this));
-    btn('sign', () => {
-      setClosed(ctl.state, !ctl.state.closed);
-      ctl.info(ctl.state.closed ? 'CLOSED. No new customers; tired zombies nap. Handy before a raid!' : 'OPEN for business! Bring on the brains.');
-    });
+    btn('sign', () => ctl.toggleClosed());
     this.el.card.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.edit = new EditBar(this, this.el.editbar);
     this.raid = new RaidUi(this, this.el.raidhud);
@@ -267,11 +272,12 @@ export class Hud {
     if (sel.kind === 'worker') {
       const w = s.workers.find((x) => x.id === sel.id);
       if (!w) return this.ctl.select(null);
-      const f = w.energy / w.stats.energy;
+      const me = maxEnergy(w);
+      const f = w.energy / me;
       let state = WORKER_STATE[w.state];
       if (w.state === 'cooking') {
         const st = s.stoves.find((x) => x.id === w.stoveId);
-        if (st?.dish) state = `Cooking ${DISH_BY_ID[st.dish].name} · ${fmtTime((st.doneAt ?? 0) - s.now)}`;
+        if (st?.dish) state = `Cooking ${DISH_BY_ID[st.dish].name} · ${fmtTime(st.left ?? 0)}`;
       }
       if (w.state === 'down') state = `Knocked out cold · back in ${fmtTime((w.downUntil ?? 0) - s.now)}`;
       const resting = w.state === 'resting' || w.state === 'toRest';
@@ -282,7 +288,7 @@ export class Hud {
         <div class="row"><div class="portrait"><img src="${headUrl(charIdFor(w), w.state === 'down' ? 'dazed' : resting ? 'sleep' : undefined)}" alt=""/></div>
         <div class="grow"><h3>${esc(w.name)}</h3><div class="sub">${w.kind === 'you' ? 'Patient Zero · the Boss' : `${esc(def.name)}, ex-customer`}</div>
         <div class="bar"><i data-live="ebar" style="width:${f * 100}%;background:${energyColor(f)}"></i></div>
-        <div class="state" data-live="etext">Energy ${Math.floor(w.energy)}/${w.stats.energy}${warn}</div></div></div>
+        <div class="state" data-live="etext">Energy ${Math.floor(w.energy)}/${me}${warn}</div></div></div>
         <div class="state" data-live="state">${state}</div>
         <div class="chips"><span class="chip">SPD ${w.stats.speed}</span><span class="chip">PWR ${w.stats.power}</span><span class="chip">TIPS ${w.stats.tips}</span><span class="chip">FOCUS ${w.stats.focus}</span><span class="chip">PATIENCE ${w.stats.patience}</span></div>
         <div class="actions">
@@ -304,7 +310,7 @@ export class Hud {
       html = `
         <div class="row"><div class="portrait"><img src="${headUrl(c.type)}" alt=""/></div>
         <div class="grow"><h3>${esc(def.name)}</h3><div class="sub"><span class="tier ${def.tier}">${def.tier}</span> ${c.state === 'eating' ? 'Chowing down' : c.state === 'waiting' ? 'Waiting for food' : 'Walking in'}</div>
-        ${c.state === 'waiting' ? `<div class="bar"><i data-live="wait" style="width:${(c.waitLeft / 50) * 100}%;background:${energyColor(c.waitLeft / 50)}"></i></div>` : ''}</div>
+        ${c.state === 'waiting' ? `<div class="bar"><i data-live="wait" style="width:${(c.waitLeft / TUNING.customerWaitSec) * 100}%;background:${energyColor(c.waitLeft / TUNING.customerWaitSec)}"></i></div>` : ''}</div>
         <div class="portrait z"><img src="${headUrl(`${c.type}_z`)}" alt=""/></div></div>
         <div class="chips"><span class="chip">SPD ${def.stats.speed}</span><span class="chip">PWR ${def.stats.power}</span><span class="chip">TIPS ${def.stats.tips}</span><span class="chip">FOCUS ${def.stats.focus}</span><span class="chip">PATIENCE ${def.stats.patience}</span><span class="chip">NRG ${def.stats.energy}</span></div>
         <div class="actions"><button class="btn infect" data-a="infect" ${full ? 'disabled' : ''}>INFECT · ${costTxt}</button></div>
@@ -315,10 +321,12 @@ export class Hud {
       const f = s.furniture.find((x) => x.id === st.furnitureId)!;
       const name = ITEM_BY_ID[f.item].name;
       let body = '';
-      if (st.status === 'cooking' && st.dish) {
+      if ((st.status === 'cooking' || st.status === 'paused') && st.dish) {
         const d = DISH_BY_ID[st.dish];
-        const p = 1 - ((st.doneAt ?? 0) - s.now) / d.cookSec;
-        body = `<div class="state" data-live="cook">Cooking ${d.name} · ${fmtTime((st.doneAt ?? 0) - s.now)} left</div><div class="bar"><i data-live="cbar" style="width:${p * 100}%;background:#ff8a1f"></i></div>
+        const p = 1 - (st.left ?? 0) / (st.total ?? d.cookSec);
+        const paused = st.status === 'paused';
+        body = `<div class="state" data-live="cook">${paused ? 'PAUSED: nobody at the stove' : 'Cooking'} ${d.name} · ${fmtTime(st.left ?? 0)} left</div><div class="bar"><i data-live="cbar" style="width:${p * 100}%;background:${paused ? '#8a857a' : '#c9a63a'}"></i></div>
+          ${paused ? '<div class="small">A dish only cooks while its cook stands at the stove. Tap a cook, then this stove.</div>' : ''}
           <div class="actions"><button class="btn sauce" data-a="finish">Finish now · ${icon('ui_sauce', 'ico-s')} <span data-live="fcost">${finishCost(s, st.id)}</span></button><button class="btn red small-btn" data-a="cancel">${this.cancelArmed === st.id ? 'Tap again' : 'Cancel'}</button></div><div class="small">Cancel gives back half the ingredients money.</div>`;
       } else if (st.status === 'reserved') body = `<div class="state">The cook is on the way…</div>`;
       else body = `<div class="state">Empty. Tap a cook (YOU or a zombie), then this ${st.kind}.</div>`;
@@ -329,10 +337,10 @@ export class Hud {
     } else if (sel.kind === 'dishPicker') {
       const st = s.stoves.find((x) => x.id === sel.stoveId)!;
       const w = s.workers.find((x) => x.id === sel.workerId);
-      const rows = DISHES.filter((d) => d.station === st.kind && (d.source === 'level' || dishAvailable(s, d.id)))
+      const rows = DISHES.filter((d) => stoveCooks(st, d.station) && (d.source === 'level' || dishAvailable(s, d.id)))
         .map((d) => dishRow(d.id, s, true))
         .join('');
-      const raidLocked = DISHES.filter((d) => d.station === st.kind && d.source === 'raid' && !dishAvailable(s, d.id)).length;
+      const raidLocked = DISHES.filter((d) => stoveCooks(st, d.station) && d.source === 'raid' && !dishAvailable(s, d.id)).length;
       html = `<h3>What should ${w?.kind === 'you' ? 'you' : esc(w?.name ?? 'they')} cook?</h3><div class="sub">${esc(ITEM_BY_ID[s.furniture.find((f) => f.id === st.furnitureId)!.item].name)}</div>${rows}${raidLocked ? `<div class="small">${raidLocked} more secret recipe${raidLocked > 1 ? 's' : ''} for this station can be stolen in raids.</div>` : ''}`;
     } else if (sel.kind === 'counter') {
       const slots = s.counter.filter((c) => c.dish && c.servings > 0);
@@ -350,10 +358,13 @@ export class Hud {
       if (!f) return this.ctl.select(null);
       const def = ITEM_BY_ID[f.item];
       let body = `<div class="small">${esc(def.blurb)}</div>`;
-      if (def.payout && f.payoutAt !== undefined) {
-        const left = f.payoutAt - s.now;
-        body += left <= 0 ? `<div class="actions"><button class="btn green" data-a="collect">Collect ${priceHtml({ cash: def.payout.cash })}</button></div>` : `<div class="state" data-live="pay">Next payout in ${fmtTime(left)}</div>`;
+      if (def.payout) {
+        const bank = Math.floor(f.bank ?? 0);
+        const st = payoutState(s, f.id);
+        body += `<div class="state" data-live="pay">${priceHtml({ cash: bank })} of ${priceHtml({ cash: def.payout.max })} · earns ${priceHtml({ cash: def.payout.perHour })}/hour${st === 'full' ? ' · FULL, empty it!' : s.closed ? ' · paused while closed' : ''}</div>`;
+        if (st !== 'none') body += `<div class="actions"><button class="btn green" data-a="collect">Collect</button></div>`;
       }
+      if (def.kind === 'table') body += `<div class="state">${f.dirty ? 'Dirty plate waiting to be cleared.' : chairTableCount(s, f.id) ? 'Ready for a customer.' : 'Needs a chair facing it to seat anyone.'}</div>`;
       html = `<div class="row"><img class="card-art" src="${artUrl(def.art)}" alt=""/><div class="grow"><h3>${esc(def.name)}</h3><div class="sub">${def.tab}</div></div></div>${body}`;
     }
     const full = `<button class="x" data-a="close" aria-label="Close">${icon('ui_cancel', 'x-ico')}</button>${html}`;
@@ -478,6 +489,10 @@ export class Hud {
       this.renderCard();
     }
   }
+}
+
+function chairTableCount(s: Controller['state'], tableId: string): number {
+  return s.furniture.filter((c) => chairTable(s, c)?.id === tableId).length;
 }
 
 export function dishRow(id: string, s: Controller['state'], pickable: boolean): string {
