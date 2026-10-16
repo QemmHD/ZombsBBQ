@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build && node tools/inline.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "smoke": "node tests/smoke.mjs"
+    "smoke": "node tests/smoke.mjs",
+    "gallery": "node tests/gallery.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

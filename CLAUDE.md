@@ -13,7 +13,8 @@ iPhone restaurant sim, spiritual successor to Zombie Café. Design docs live in 
 - `npm test` — Vitest unit tests (sim + art)
 - `npm run typecheck` — TypeScript, the project's lint gate
 - `npm run build` — production build + `dist/zombs-bbq.html` single-file build
-- `npm run smoke` — after a build: opens the game as an iPhone (844×390 @3x) in the pre-installed Chromium, taps through the tutorial, writes screenshots to `test-results/`, fails on console errors
+- `npm run smoke` — after a build: opens the game as an iPhone (844×390 @3x) in the pre-installed Chromium and plays every feature with real taps (tutorial, menus, shop, decorating, raid, save/reload), writes screenshots to `test-results/`, fails on console errors or broken steps
+- `npm run gallery` — after a build: screenshots a decked-out joint in every theme and every rival arena to `test-results/gallery/` for art review
 
 ## Conventions
 - Stay faithful to the original's mechanics as documented in `docs/01-research.md`; deviations are deliberate fixes listed there.
