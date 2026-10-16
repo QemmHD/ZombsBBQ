@@ -496,8 +496,9 @@ export class RaidScene extends Phaser.Scene {
       }
       case 'eat': {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 80, `CHOMP! +$${e.cash}`, '#D9C25A', 14);
-        this.pop('fx_cash', p.x, p.y - 60);
+        // the text rides above the head and the cash pops beside the body, so they don't print over each other
+        this.floatText(p.x, p.y - 125, `CHOMP! +$${e.cash}`, '#D9C25A', 14);
+        this.pop('fx_cash', p.x + 26, p.y - 70);
         sfx('chomp');
         setTimeout(() => sfx('scream', { pitch: 1 + Math.random() * 0.3 }), 120);
         break;
