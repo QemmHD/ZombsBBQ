@@ -181,13 +181,19 @@ function updatePet(s: GameState, p: Pet, dt: number) {
   move(p, dt);
   if (s.now < p.nextAction || p.path.length) return;
   if (p.state === 'sniff') {
-    // the Zombie Pug sniffs out loose change, like a furry metal detector
-    const amount = 15 + Math.floor(rand(s) * 40);
+    // the Zombie Pug sniffs out loose change, like a furry metal detector: a few dollars every few
+    // minutes, nothing while the café is shut, and only so much in a day
+    p.state = 'roam';
+    p.nextAction = s.now + 2;
+    p.nextFind = s.now + TUNING.pugFindSec * (0.75 + rand(s) * 0.5);
+    const day = Math.floor(s.now / 86400);
+    if (!s.pugDay || s.pugDay.day !== day) s.pugDay = { day, cash: 0 };
+    const amount = Math.min(TUNING.pugDailyMax - s.pugDay.cash, TUNING.pugFindMin + Math.floor(rand(s) * (TUNING.pugFindMax - TUNING.pugFindMin + 1)));
+    if (s.closed || amount <= 0) return;
+    s.pugDay.cash += amount;
     s.cash += amount;
     s.stats.earned += amount;
     s.events.push({ t: 'petFind', petId: p.id, amount });
-    p.state = 'roam';
-    p.nextAction = s.now + 2;
     return;
   }
   const blocked = blockedTiles(s);
@@ -199,7 +205,8 @@ function updatePet(s: GameState, p: Pet, dt: number) {
     setPath(s, p, { x, y }, p.type === 'pug' ? 1.6 : 2.4);
     break;
   }
-  if (p.type === 'pug' && rand(s) < 0.12) {
+  p.nextFind ??= s.now + TUNING.pugFindSec * (0.5 + rand(s) * 0.5);
+  if (p.type === 'pug' && s.now >= p.nextFind && !s.closed) {
     p.state = 'sniff';
     p.nextAction = s.now + 3;
   } else p.nextAction = s.now + 4 + rand(s) * 6;

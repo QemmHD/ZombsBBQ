@@ -1024,8 +1024,9 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
       break;
     }
     case 'cooking': {
-      drain(w, TUNING.energyCookPerSec * dt);
       const st = s.stoves.find((x) => x.id === w.stoveId);
+      // the prep is the work (the first 10 min of a dish); after that they just stand and stir
+      if (st && (st.total ?? 0) - (st.left ?? 0) < TUNING.prepSec) drain(w, TUNING.energyCookPerSec * dt);
       if (!st || st.status !== 'cooking' || st.cookId !== w.id) {
         w.state = 'idle';
         w.stoveId = undefined;
@@ -1254,7 +1255,20 @@ function finishStove(s: GameState, st: Stove) {
   st.cookId = undefined;
 }
 
+/** True while the offline catch-up runs: stoves then cook on real time, cook or no cook. */
+let awayCooking = false;
+
 function updateStove(s: GameState, st: Stove, dt: number) {
+  if (awayCooking && (st.status === 'paused' || st.status === 'reserved') && st.dish && st.left !== undefined) {
+    // nobody needs to babysit the pots while you're away
+    if (st.status === 'reserved') {
+      const cook = s.workers.find((w) => w.id === st.cookId);
+      if (cook?.state === 'toStove') return; // they're on their way: let them get there
+    }
+    st.left = Math.max(0, st.left - dt);
+    if (st.left <= 0) finishStove(s, st);
+    return;
+  }
   if (st.status === 'cooking') {
     // a dish only cooks while its cook stands at the stove (original); otherwise it pauses
     const cook = s.workers.find((w) => w.id === st.cookId);
@@ -1349,8 +1363,26 @@ export function tick(s: GameState, dt: number) {
  * purple-star timer), while the café's own in-the-moment beats (a diner mid-meal, a feast, a daydream,
  * a hangry warning) are carried along with it so they don't all go off at once.
  */
-export function skipTime(s: GameState, sec: number) {
+export function skipTime(s: GameState, sec: number, stoveSec = 0) {
   if (!(sec > 0)) return;
+  // the pots keep cooking on real time (up to a day away in all)
+  const now0 = s.now;
+  for (const st of s.stoves) {
+    if (!st.dish || st.left === undefined || !(st.status === 'cooking' || st.status === 'paused' || st.status === 'reserved')) continue;
+    const go = Math.min(stoveSec, st.left);
+    if (go <= 0) continue;
+    if (go >= st.left) {
+      // done partway through: it starts waiting (and maybe burning) from then
+      s.now = now0 + st.left;
+      if (st.status === 'reserved') {
+        const cook = s.workers.find((w) => w.id === st.cookId);
+        if (cook) releaseJob(s, cook);
+      }
+      st.left = 0;
+      finishStove(s, st);
+      s.now = now0;
+    } else st.left -= go;
+  }
   s.now += sec;
   const shift = (t: number | undefined) => (t === undefined ? t : t + sec);
   for (const c of s.customers) {
@@ -1365,7 +1397,40 @@ export function skipTime(s: GameState, sec: number) {
     w.nextDaydream = shift(w.nextDaydream)!;
     w.hungryEnd = shift(w.hungryEnd);
   }
-  for (const p of s.pets) p.nextAction += sec;
+  for (const p of s.pets) {
+    p.nextAction += sec;
+    if (p.nextFind !== undefined) p.nextFind += sec;
+  }
+  // anything that finished long ago has burnt by now
+  for (const st of s.stoves) updateStove(s, st, 0);
+}
+
+/** Tired enough to nap during a union break (see unionBreak). */
+export function tired(w: Worker, margin = TUNING.unionBreakMargin): boolean {
+  return w.kind === 'zombie' && w.energy <= maxEnergy(w) * (attackThreshold(w.stats.patience) + margin);
+}
+
+/**
+ * The union break: while you're away (app in the background, offline catch-up), a zombie close to
+ * its bite line walks out for a nap instead of snacking on the customers. On unless turned off in Settings.
+ */
+export function unionBreak(s: GameState) {
+  if (s.unionBreak === false) return;
+  for (const w of s.workers) {
+    if (!atWork(w) || !tired(w) || !['idle', 'daydream', 'cooking', 'toStove', 'hungry'].includes(w.state)) continue;
+    rest(s, w.id);
+  }
+}
+
+/** The crew list's "Rest all tired" button: everyone under half their energy goes out for a nap. */
+export function restTired(s: GameState): number {
+  let n = 0;
+  for (const w of s.workers) {
+    if (w.kind !== 'zombie' || !atWork(w) || w.state === 'resting' || w.state === 'toRest' || w.state === 'feasting') continue;
+    if (w.energy >= maxEnergy(w) * 0.5) continue;
+    if (!rest(s, w.id)) n++;
+  }
+  return n;
 }
 
 /** What happened while you were away (the welcome-back card). */
@@ -1390,13 +1455,26 @@ export function catchUpReport(s: GameState, seconds: number): AwayReport {
   const r: AwayReport = { sec, cash: 0, served: 0, angry: 0, bitten: 0, burnt: 0, rating0: s.rating, rating1: s.rating };
   let left = total;
   const cash0 = s.cash;
-  while (left > 0) {
-    const d = Math.min(1, left);
-    tick(s, d);
-    left -= d;
+  // level-ups earned while away are still announced when you're back; the rest of the chatter isn't
+  const kept = s.events.filter((e) => e.t === 'levelup' || e.t === 'zombieLevel');
+  // long absences step a little coarser (it all runs before the game shows up)
+  const step = total > 3600 ? 5 : 1;
+  awayCooking = true;
+  try {
+    while (left > 0) {
+      const d = Math.min(step, left);
+      unionBreak(s);
+      tick(s, d);
+      for (const e of s.events) if (e.t === 'levelup' || e.t === 'zombieLevel') kept.push(e);
+      s.events.length = 0;
+      left -= d;
+    }
+    skipTime(s, sec - total, Math.max(0, Math.min(sec, TUNING.offlineStoveCapSec) - total));
+  } finally {
+    awayCooking = false;
   }
   s.events.length = 0;
-  skipTime(s, sec - total);
+  s.events.push(...kept);
   r.cash = s.cash - cash0;
   r.served = s.stats.served - st0.served;
   r.angry = s.stats.angry - st0.angry;

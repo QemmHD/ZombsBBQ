@@ -1,5 +1,5 @@
 import { catchUpReport, type AwayReport } from './sim';
-import { createInitialState, migrate, type GameState } from './state';
+import { createInitialState, migrate, repairRaiders, type GameState } from './state';
 
 export const SAVE_KEY = 'zombsbbq.save.v1';
 
@@ -22,10 +22,19 @@ export interface Loaded {
   report: AwayReport | null;
   /** there was a save, but it couldn't be read: nothing should overwrite it until the player decides */
   failed?: boolean;
+  /** the save loaded, but fast-forwarding the time away threw: it was loaded as it was, without it */
+  catchUpFailed?: boolean;
 }
 
 export function serialize(s: GameState, nowMs: number): string {
-  const file: SaveFile = { savedAt: nowMs, state: { ...s, events: [] } };
+  // never write anyone as "out on a raid": if the app dies mid-raid they'd be stuck out for good
+  const state: GameState = { ...s, events: [] };
+  if (s.workers.some((w) => w.state === 'raiding') || s.pets.some((p) => p.state === 'raiding')) {
+    state.workers = s.workers.map((w) => ({ ...w }));
+    state.pets = s.pets.map((p) => ({ ...p }));
+    repairRaiders(state);
+  }
+  const file: SaveFile = { savedAt: nowMs, state };
   return JSON.stringify(file);
 }
 
@@ -73,16 +82,30 @@ export function nextBackupSlot(raws: (string | null)[]): number {
 export function deserialize(raw: string | null, nowMs: number): Loaded {
   const fresh = (failed?: boolean): Loaded => ({ state: createInitialState(Math.floor(nowMs) % 2147483647), offlineSec: 0, offlineCash: 0, report: null, ...(failed ? { failed } : {}) });
   if (!raw) return fresh();
+  const load = (): { state: GameState; savedAt: number } | null => {
+    try {
+      const file = JSON.parse(raw) as SaveFile;
+      const state = migrate(file?.state);
+      if (!state) return null;
+      state.events = [];
+      return { state, savedAt: isFinite(file.savedAt) ? file.savedAt : nowMs };
+    } catch {
+      return null;
+    }
+  };
+  const got = load();
+  if (!got) return fresh(true);
+  const offlineSec = Math.max(0, (nowMs - got.savedAt) / 1000);
+  if (offlineSec <= 5) return { state: got.state, offlineSec, offlineCash: 0, report: null };
   try {
-    const file = JSON.parse(raw) as SaveFile;
-    const state = migrate(file?.state);
-    if (!state) throw new Error('version');
-    state.events = [];
-    const offlineSec = Math.max(0, (nowMs - file.savedAt) / 1000);
     // (time beyond the offline cap still counts for real-time timers: see skipTime)
-    const report = offlineSec > 5 ? catchUpReport(state, offlineSec) : null;
-    return { state, offlineSec, offlineCash: report?.cash ?? 0, report };
-  } catch {
-    return fresh(true);
+    const report = catchUpReport(got.state, offlineSec);
+    return { state: got.state, offlineSec, offlineCash: report.cash, report };
+  } catch (e) {
+    // a bug in the fast-forward must never cost the player their joint: load it as it was saved
+    console.warn('offline catch-up failed', e);
+    const again = load();
+    if (!again) return fresh(true);
+    return { state: again.state, offlineSec, offlineCash: 0, report: null, catchUpFailed: true };
   }
 }

@@ -29,11 +29,13 @@ import {
   perk,
   refill,
   rest,
+  restTired,
   rivalClosed,
   saveSummary,
   serialize,
   setClosed,
   startCooking,
+  startRaid,
   tick,
   wake,
   zombies,
@@ -434,5 +436,159 @@ describe('the fridge', () => {
     expect(binFridge(s, 0)).toBeNull();
     expect(fridgeFull(s)).toBe(false);
     expect(binFridge(s, 99)).not.toBeNull();
+  });
+});
+
+describe('saves never lose the joint (tech audit)', () => {
+  const H = 3600;
+  it('a save written mid-raid loads with everyone home, not stuck "raiding" forever', () => {
+    const s = createInitialState(6);
+    s.level = 3;
+    const z = makeWorker(s, 'zombie', 'joe', { x: 3, y: 2 });
+    s.workers.push(z);
+    const r = startRaid(s, 'chuck', [s.workers[0].id, z.id], []);
+    expect(typeof r).not.toBe('string');
+    expect(s.workers.every((w) => w.state === 'raiding')).toBe(true);
+    const back = deserialize(serialize(s, 0), 1000).state;
+    run(back, 100);
+    expect(back.workers.some((w) => w.state === 'raiding')).toBe(false);
+    // and an old save that already has the problem is repaired on load
+    const raw = JSON.parse(serialize(createInitialState(6), 0));
+    raw.state.workers[0].state = 'raiding';
+    const fixed = deserialize(JSON.stringify(raw), 1000).state;
+    expect(fixed.workers[0].state).not.toBe('raiding');
+  });
+
+  it('a save with a broken shape is reported as broken, never loaded or replaced silently', () => {
+    const good = JSON.parse(serialize(createInitialState(6), 0));
+    for (const breakIt of [
+      (st: Record<string, unknown>) => (st.workers = null),
+      (st: Record<string, unknown>) => (st.cash = 'lots'),
+      (st: Record<string, unknown>) => (st.furniture = [{ id: 1 }]),
+      (st: Record<string, unknown>) => (st.workers = []),
+    ]) {
+      const bad = structuredClone(good);
+      breakIt(bad.state);
+      expect(deserialize(JSON.stringify(bad), 1000).failed).toBe(true);
+    }
+  });
+
+  it('a throw during the offline fast-forward still loads the joint (without the catch-up)', () => {
+    const s = createInitialState(6);
+    s.cash = 4321;
+    const raw = JSON.parse(serialize(s, 0));
+    // a customer the fast-forward will choke on (an unknown type), but the save itself is fine
+    raw.state.customers.push({ id: 'cX', type: 'nobody', state: 'eating', x: 3, y: 3, path: [], speed: 0, facing: 1, waitLeft: 1, eatEnd: 1, dish: 'nope', serverId: 'w1' });
+    const got = deserialize(JSON.stringify(raw), 2 * H * 1000);
+    expect(got.failed).toBeUndefined();
+    expect(got.catchUpFailed).toBe(true);
+    expect(got.state.cash).toBe(4321);
+  });
+
+  it('level-ups earned while away are still announced', () => {
+    const s = createInitialState(6);
+    s.tut = 99;
+    s.xp = 9;
+    // a dish that finishes while you're gone (its XP levels you up)
+    expect(startCooking(s, s.workers[0].id, stove(s).id, 'sliders')).toBeNull();
+    const back = deserialize(serialize(s, 0), 2 * H * 1000).state;
+    expect(back.level).toBeGreaterThan(1);
+    expect(back.events.some((e) => e.t === 'levelup')).toBe(true);
+  });
+});
+
+describe('balance fixes from the design audit', () => {
+  const H = 3600;
+  it('cooks only burn energy during the first 10 min of a dish (prep), then just stir', () => {
+    const { s, z } = withZombie('joe');
+    s.closed = true;
+    s.level = 6;
+    s.cash = 5000;
+    expect(startCooking(s, z.id, stove(s).id, 'lasagut')).toBeNull(); // an 8 h dish
+    for (let i = 0; i < 400 && z.state !== 'cooking'; i++) tick(s, 0.1);
+    z.energy = maxEnergy(z);
+    run(s, TUNING.prepSec, 1);
+    const afterPrep = z.energy;
+    expect(maxEnergy(z) - afterPrep).toBeCloseTo(TUNING.prepSec * TUNING.energyCookPerSec, 0);
+    run(s, 2 * H, 1);
+    expect(z.energy).toBeCloseTo(afterPrep, 5);
+    expect(z.state).toBe('cooking');
+  });
+
+  it('union break: away from the app, tired zombies nap instead of biting', () => {
+    const away = (on: boolean) => {
+      const { s, z } = withZombie('teen', 12);
+      stock(s, 'sliders', 2000);
+      s.unionBreak = on;
+      z.energy = 30;
+      z.nextDaydream = 0;
+      catchUpReport(s, 4 * H);
+      return s.stats.bites;
+    };
+    expect(away(true)).toBe(0);
+    expect(away(false)).toBeGreaterThan(0);
+  });
+
+  it('Rest all tired sends everyone under half energy out for a nap', () => {
+    const { s, z } = withZombie();
+    const fresh = makeWorker(s, 'zombie', 'jane', { x: 4, y: 2 });
+    s.workers.push(fresh);
+    z.energy = 30;
+    expect(restTired(s)).toBe(1);
+    expect(z.state).toBe('toRest');
+    expect(fresh.state).toBe('idle');
+  });
+
+  it('while you are away the stoves keep cooking on real time, up to a day', () => {
+    const { s, z } = withZombie('joe');
+    s.level = 6;
+    s.cash = 5000;
+    expect(startCooking(s, z.id, stove(s).id, 'goulash')).toBeNull(); // a 24 h dish
+    for (let i = 0; i < 400 && z.state !== 'cooking'; i++) tick(s, 0.1);
+    rest(s, z.id); // nobody at the stove: in the café it would sit paused
+    expect(stove(s).status).toBe('paused');
+    const r = catchUpReport(s, 25 * H);
+    expect(['done', 'burnt']).toContain(stove(s).status);
+    expect(r.sec).toBe(25 * H);
+  });
+
+  it('the Zombie Pug finds a few dollars every few minutes, nothing while closed, at most $600 a day', () => {
+    const s = createInitialState(4);
+    s.cash = 10000;
+    s.level = 5;
+    s.tut = 99;
+    addFurniture(s, 'pethouse_pug', 8, 2);
+    s.closed = true;
+    let found = 0;
+    for (let i = 0; i < 3600; i++) {
+      tick(s, 1);
+      for (const e of s.events.splice(0)) if (e.t === 'petFind') found += e.amount;
+    }
+    expect(found).toBe(0);
+    s.closed = false;
+    const finds: number[] = [];
+    for (let i = 0; i < 3 * 3600; i++) {
+      tick(s, 1);
+      for (const e of s.events.splice(0)) if (e.t === 'petFind') finds.push(e.amount);
+    }
+    // about one find every 6 minutes, $5–15 each
+    expect(finds.length).toBeGreaterThan(18);
+    expect(finds.length).toBeLessThan(45);
+    for (const a of finds) expect(a >= 5 && a <= 15).toBe(true);
+    s.pugDay = { day: Math.floor(s.now / 86400), cash: 595 };
+    let late = 0;
+    for (let i = 0; i < 3600; i++) {
+      tick(s, 1);
+      for (const e of s.events.splice(0)) if (e.t === 'petFind') late += e.amount;
+    }
+    expect(late).toBeLessThanOrEqual(5);
+  });
+
+  it('a closed café loses only a sliver of rating overnight', () => {
+    const s = createInitialState(4);
+    s.rating = 0.6;
+    setClosed(s, true);
+    catchUpReport(s, 8 * H);
+    expect(0.6 - s.rating).toBeLessThan(0.1);
   });
 });

@@ -310,6 +310,9 @@ export const TUNING = {
   energyPerServe: 1.5,
   energyPerClear: 0.6,
   energyCookPerSec: 1 / 20, // original: cooks burn 1 energy / 20 s
+  /** …but only while prepping, the first this-many seconds of a dish; after that they just stand and
+   * stir (a 5 h dish would otherwise cost 900 energy, and a hangry cook would pause it forever) */
+  prepSec: 10 * 60,
   restRegenPerSec: 1 / 16, // ~3.75/min at average recharge (original ~3/min)
   /** each Toxic Barrel adds this much to the rest recharge rate (they stack; original +10%) */
   kegBonus: 0.1,
@@ -337,6 +340,16 @@ export const TUNING = {
   holdFoodSec: 2,
   /** the fridge holds this many stolen dishes */
   fridgeMax: 12,
+  /** while you're away (app hidden / offline catch-up) a zombie this close above its bite line takes
+   * itself out for a nap instead of snacking on the customers (the "union break"; a Settings toggle) */
+  unionBreakMargin: 0.1,
+  /** while away, stoves keep cooking on real time for up to this long (customers stop at the 8 h cap) */
+  offlineStoveCapSec: 24 * 3600,
+  /** the Zombie Pug: one find of $5–15 every ~6 min, never while closed, at most $600 a day */
+  pugFindSec: 360,
+  pugFindMin: 5,
+  pugFindMax: 15,
+  pugDailyMax: 600,
   /** a zombie who catches a customer eats them on the spot for this long before getting back to work */
   feastSec: 3,
   daydreamBaseSec: 100, // original: focus 1 ~ every 100 s
@@ -353,7 +366,7 @@ export const TUNING = {
   /** a bite counts as this many angry customers */
   ratingAttackWeight: 3,
   /** a closed café's rating slowly sags (per second) */
-  closedDriftPerSec: 0.00002,
+  closedDriftPerSec: 0.000003,
   reanimateSec: 60 * 60, // raid KO (original went from 8 h to 1 h)
   reanimateEnergy: 20, // comes back with 20 energy (original)
   sellBack: 0.5,

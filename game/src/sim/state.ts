@@ -156,6 +156,8 @@ export interface Pet extends Mover {
   homeId: string;
   nextAction: number;
   state: 'roam' | 'sniff' | 'raiding';
+  /** the Zombie Pug's next find (sim time) */
+  nextFind?: number;
 }
 
 export interface FridgeItem {
@@ -258,6 +260,10 @@ export interface GameState {
   rivals: Record<string, RivalProgress>;
   inventory: { headstone: number; summon: number };
   spawnCooldown: number;
+  /** the Zombie Pug's takings today: { day: floor(now / 1 day), cash } */
+  pugDay?: { day: number; cash: number };
+  /** the "union break": while you're away, tired zombies nap instead of biting (Settings; default on) */
+  unionBreak?: boolean;
   /** fired zombies on their way out */
   departing?: Departing[];
   /** last few customer types, to keep the crowd varied */
@@ -402,11 +408,45 @@ export function createInitialState(seed = 1234): GameState {
   return s;
 }
 
+const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+
+/** The bones a v3 save must have to be playable (anything less is treated as corrupt, not loaded). */
+function validShape(st: GameState): boolean {
+  if (![st.now, st.cash, st.sauce, st.xp, st.level, st.rng, st.nextId, st.roomW, st.roomH, st.rating].every(isNum)) return false;
+  if (![st.workers, st.furniture, st.customers, st.stoves, st.counter].every(Array.isArray)) return false;
+  if (!st.walls || !Array.isArray(st.walls.l) || !Array.isArray(st.walls.r)) return false;
+  if (!st.workers.every((w) => w && typeof w.id === 'string' && isNum(w.x) && isNum(w.y) && isNum(w.energy) && typeof w.state === 'string' && w.stats)) return false;
+  if (!st.workers.some((w) => w.kind === 'you')) return false;
+  if (!st.furniture.every((f) => f && typeof f.id === 'string' && typeof f.item === 'string' && isNum(f.x) && isNum(f.y))) return false;
+  return st.customers.every((c) => c && typeof c.id === 'string' && isNum(c.x) && isNum(c.y));
+}
+
+/**
+ * Anyone still marked "out on a raid" (a save written mid-raid, or the app killed during one) comes
+ * home: back on the sidewalk by the door, ready to work. Nothing else ever clears that state.
+ */
+export function repairRaiders(st: GameState) {
+  for (const w of st.workers ?? []) {
+    if (w.state !== 'raiding') continue;
+    w.state = 'idle';
+    w.x = DOOR_X;
+    w.y = -1;
+    w.path = [];
+    w.job = undefined;
+    w.restSpot = undefined;
+  }
+  for (const p of st.pets ?? []) if (p.state === 'raiding') p.state = 'roam';
+}
+
 /** Upgrade older saves in place. Returns null if the save can't be migrated. */
 export function migrate(raw: unknown): GameState | null {
   const st = raw as (GameState & { version?: number }) | null;
   if (!st || typeof st !== 'object') return null;
   if (st.version === SAVE_VERSION) {
+    if (!validShape(st)) return null;
+    for (const k of ['pets', 'wallItems', 'fridge', 'recipes', 'goalsDone', 'recentTypes'] as const) if (!Array.isArray(st[k])) (st as unknown as Record<string, unknown>)[k] = [];
+    for (const k of ['seen', 'rivals', 'storage', 'floors'] as const) if (!st[k] || typeof st[k] !== 'object') (st as unknown as Record<string, unknown>)[k] = {};
+    repairRaiders(st);
     // newer stat counters (e.g. decor) start at zero on older v3 saves
     st.stats = { ...freshStats(), ...(st.stats ?? {}) };
     // the never-used daily grave counters of earlier builds
