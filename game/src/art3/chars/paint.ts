@@ -153,6 +153,18 @@ export function vgrad(d: Doc, t: Tone, k = 1): string {
       `<stop offset="1" stop-color="${mix(t.b, t.s, 0.45 * k)}"/></linearGradient>`,
   );
 }
+/**
+ * Limb volume gradient across the limb (user space, x0 → x1 in the part's own frame): lit on the
+ * left, shadowed on the right. Two segments that share a joint use the same span at the pivot, so
+ * their colours match exactly where they meet (no ring at the elbow or knee).
+ */
+export function xgrad(d: Doc, t: Tone, x0: number, x1: number): string {
+  return cached(d, `x${t.b}${t.s}${f(x0)}_${f(x1)}`, (id) =>
+    `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${f(x0)}" y1="0" x2="${f(x1)}" y2="0">` +
+      `<stop offset="0" stop-color="${lt(t.b, 0.2)}"/><stop offset="0.45" stop-color="${t.b}"/>` +
+      `<stop offset="1" stop-color="${mix(t.b, t.s, 0.5)}"/></linearGradient>`,
+  );
+}
 /** Vertical fade gradient (for grime at hems, shading under chins). */
 export function fadeV(d: Doc, col: string, o0: number, o1: number): string {
   return cached(d, `f${col}${o0}${o1}`, (id) =>
@@ -176,6 +188,10 @@ export interface ShadeOpts {
   k?: number;
   /** extra content painted inside the shape (texture, folds) before the outline. */
   inner?: string;
+  /** outline this path instead of the fill's own edge (open joint caps: see `seg`). */
+  stroke?: string;
+  /** limb gradient across x0 → x1 (see `xgrad`) instead of the bounding-box volume gradient. */
+  across?: [number, number];
 }
 
 /** Two-tone cel shading + a soft gradient + optional inner texture + ink outline. */
@@ -183,12 +199,12 @@ export function shade(d: Doc, path: string, t: Tone, o: ShadeOpts = {}): string 
   const lw = o.lw ?? LW;
   const off = o.off ?? [-1.5, -1.3];
   const cid = d.clipId(path);
-  const g = (o.k ?? 1) > 0 ? vgrad(d, t, o.k ?? 1) : t.b;
+  const g = o.across ? xgrad(d, t, o.across[0], o.across[1]) : (o.k ?? 1) > 0 ? vgrad(d, t, o.k ?? 1) : t.b;
   let s = `<path d="${path}" fill="${t.s}"/>`;
   s += `<g clip-path="url(#${cid})"><path d="${path}" fill="${g}" transform="translate(${f(off[0])} ${f(off[1])})"/>`;
   if (o.inner) s += o.inner;
   s += '</g>';
-  if (lw > 0) s += `<path d="${path}" fill="none" stroke="${INK}" stroke-width="${f(lw)}"/>`;
+  if (lw > 0) s += `<path d="${o.stroke ?? path}" fill="none" stroke="${INK}" stroke-width="${f(lw)}"${o.stroke ? ' stroke-linejoin="round"' : ''}/>`;
   return s;
 }
 
@@ -397,5 +413,50 @@ export function tube(p1: Pt, p2: Pt, w1: number, w2 = w1, torn = 0, seed = 1): s
     `M${f(x1 + nx * r1)},${f(y1 + ny * r1)}L${f(b[0])},${f(b[1])}` + hem + (torn > 0 ? `L${f(c[0])},${f(c[1])}` : '') +
     `L${f(x1 - nx * r1)},${f(y1 - ny * r1)}A${f(r1)},${f(r1)} 0 0 0 ${f(x1 + nx * r1)},${f(y1 + ny * r1)}Z`
   );
+}
+/**
+ * Lower limb segment hanging from a joint pivot p1 (elbow / knee) to p2. Returns the fill path and
+ * an open outline that skips the joint cap: the cap is filled (radius inset by half the outline so
+ * the upper segment's own cap outline shows through as the elbow / knee silhouette) but not inked,
+ * so the joint reads as one continuous limb at any bend instead of a ring. `end`: 'round' (wrist
+ * under a hand), 'flat' (hem) or a torn zigzag hem when `torn` > 0.
+ */
+export function seg(p1: Pt, p2: Pt, w1: number, w2: number, end: 'round' | 'flat' = 'flat', torn = 0, seed = 1, lw = LW): { fill: string; edge: string } {
+  const [x1, y1] = p1;
+  const [x2, y2] = p2;
+  const L = Math.hypot(x2 - x1, y2 - y1) || 1;
+  const ux = (x2 - x1) / L;
+  const uy = (y2 - y1) / L;
+  const nx = -uy;
+  const ny = ux;
+  const r1 = w1 / 2;
+  const r2 = w2 / 2;
+  const rc = Math.max(0.5, r1 - lw / 2);
+  const a: Pt = [x1 + nx * r1, y1 + ny * r1];
+  const b: Pt = [x2 + nx * r2, y2 + ny * r2];
+  const c: Pt = [x2 - nx * r2, y2 - ny * r2];
+  const e: Pt = [x1 - nx * r1, y1 - ny * r1];
+  let hem: string;
+  if (end === 'round') hem = `A${f(r2)},${f(r2)} 0 0 0 ${f(c[0])},${f(c[1])}`;
+  else if (torn > 0) {
+    const r = rnd(seed);
+    hem = '';
+    const steps = 6;
+    for (let k = 1; k < steps; k++) {
+      const t = k / steps;
+      const o = k % 2 ? torn * (0.5 + r() * 0.8) : -torn * 0.2 * r();
+      hem += `L${f(b[0] + (c[0] - b[0]) * t + ux * o)},${f(b[1] + (c[1] - b[1]) * t + uy * o)}`;
+    }
+    hem += `L${f(c[0])},${f(c[1])}`;
+  } else hem = `Q${f((b[0] + c[0]) / 2 + ux * 0.8)},${f((b[1] + c[1]) / 2 + uy * 0.8)} ${f(c[0])},${f(c[1])}`;
+  const side = `M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}${hem}L${f(e[0])},${f(e[1])}`;
+  const fillP = side + `L${f(x1 - nx * rc)},${f(y1 - ny * rc)}A${f(rc)},${f(rc)} 0 0 0 ${f(x1 + nx * rc)},${f(y1 + ny * rc)}Z`;
+  return { fill: fillP, edge: side };
+}
+/** A cylindrical band (cuff, sock top, wristband) from y0 to y1 around x: flat-topped, gently curved edges. */
+export function band(x: number, y0: number, y1: number, w0: number, w1 = w0): string {
+  const a = w0 / 2;
+  const b = w1 / 2;
+  return `M${f(x - a)},${f(y0)}Q${f(x)},${f(y0 + 0.9)} ${f(x + a)},${f(y0)}L${f(x + b)},${f(y1)}Q${f(x)},${f(y1 + 0.9)} ${f(x - b)},${f(y1)}Z`;
 }
 export { ell as ellD };

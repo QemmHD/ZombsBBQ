@@ -1057,7 +1057,7 @@ function furArm(T: Tone, o: { bulk?: number; sleeve?: Tone; claws?: string } = {
     let hs = hand(c, Wp);
     const [x, y] = Wp;
     const cl = o.claws ?? '#2A2418';
-    for (const [dx, dy] of [[-2.2, 7.4], [-0.5, 8.3], [1.1, 7.9]] as Pt[]) hs += `<path d="M${f(x + dx - 0.7)},${f(y + dy - 0.4)}Q${f(x + dx)},${f(y + dy + 2.2)} ${f(x + dx + 1.1)},${f(y + dy + 2.4)}Q${f(x + dx + 0.4)},${f(y + dy + 0.8)} ${f(x + dx + 0.7)},${f(y + dy - 0.4)}Z" fill="${cl}" stroke="${INK}" stroke-width="0.35"/>`;
+    for (const [dx, dy] of [[-2.4, 8.2], [-0.5, 9.1], [1.2, 8.7]] as Pt[]) hs += `<path d="M${f(x + dx - 0.7)},${f(y + dy - 0.4)}Q${f(x + dx)},${f(y + dy + 2.2)} ${f(x + dx + 1.1)},${f(y + dy + 2.4)}Q${f(x + dx + 0.4)},${f(y + dy + 0.8)} ${f(x + dx + 0.7)},${f(y + dy - 0.4)}Z" fill="${cl}" stroke="${INK}" stroke-width="0.35"/>`;
     s += `<g transform="translate(${f(x)} ${f(y)}) scale(${HAND_S}) translate(${f(-x)} ${f(-y)})">${hs}</g>`;
     // a fur cuff over the wrist
     s += shade(c.d, jag(x, y - 0.6, A * 0.5, 2.2, c.seed + 31 + c.side, 7, 0.3), T, { lw: 0.8, k: 0 });

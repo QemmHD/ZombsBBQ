@@ -557,6 +557,8 @@ export function wrinkles(c: Ctx, n: number, e: Expr): string {
   let s = '';
   const lift = e === 'scream' || e === 'shock' ? -1.2 : 0;
   if (n >= 1) s += line(`M-1,${f(-88 + lift)}Q7,${f(-90 + lift)} 16,${f(-88.4 + lift)}`, 0.5, sk.d, 'opacity="0.7"');
+  // the nose-to-mouth fold on the near cheek (tired, lived-in faces)
+  if (n >= 1 && e !== 'scream' && e !== 'shock' && e !== 'chomp' && e !== 'eat') s += line(`M8.4,-68.6Q5.2,-66.4 ${e === 'happy' ? '3.2,-62.4' : '3.8,-62.8'}`, 0.5, sk.d, 'opacity="0.55"');
   if (n >= 2) s += line(`M1,${f(-90.8 + lift)}Q8,${f(-92.6 + lift)} 14.6,${f(-91.2 + lift)}`, 0.5, sk.d, 'opacity="0.6"');
   if (n >= 2) s += line('M-2.6,-74.4l-1.6,0.6M-2.4,-72.8l-1.4,1.2M19.6,-74.4l1,0.6', 0.45, sk.d, 'opacity="0.7"');
   if (n >= 3) s += line('M4,-55.8Q9,-54.4 14,-56M-4,-71q1,-3 4,-3.4', 0.45, sk.d, 'opacity="0.6"');
