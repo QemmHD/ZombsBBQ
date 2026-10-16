@@ -24,6 +24,35 @@
 
 ---
 
+## 1b. The original's funny twists (all kept, then turned up)
+
+Everything that made Zombie Café funny is in, mapped to Zombs BBQ:
+
+| Original gag | In Zombs BBQ | Where it shows up |
+|---|---|---|
+| **Your waiters are zombies, and the customers don't seem to mind.** | Same. Customers happily eat ribs served by a drooling corpse. Some only complain about the slow service. | Core joint |
+| **Tired zombies attack the customers.** | **HANGRY** zombies lunge at a guest: a cartoon chase around the tables, the customer screams and flees, the stars wobble. Nurses and cops react (the cop "arrests" the zombie and it sulks for 10 s). | Hunger system §3.3 |
+| **Any customer can be infected, and keeps their outfit as a zombie.** | Same, with an **infection dance** cutscene. Every zombie keeps their human outfit, torn and green, plus one gag detail: the food critic's notepad reads "BRAINS 5/5", the lumberjack's axe is stuck in his own hat, the cheerleader's pom-pom is a brain. | §3.3, art bible |
+| **"YOU": the lone human chef in the room**, with your own health bar. | You're the only living employee, with a customizable avatar (hard hat, apron, hats). Zombies *never* bite you because they respect the boss, but a hungry one will sniff you and get shooed away. Tap yourself for Photo/Info/Chef. | Joint, avatar |
+| **Zombies crash face-down on tables, or sprawl on the lawn to rest.** | Exhausted zombies face-plant into tables or the lawn with "Zzz" bubbles. Unhired zombie applicants crawl on the grass outside groaning "joooob". | Hunger/rest, curb |
+| **"CLOSED" at night, zombies sleeping on the sidewalk.** | Flip the sign to **CLOSED**: zombies line up on the sidewalk and snooze (Zzz). Dishes don't spoil while closed (a vacation mode). | Joint |
+| **Gross recipe names.** | Brain Burger, Finger-Lickin' Wings (literally), Pulled Pork(ish), Eyeball Kebabs, Toe-fu Skewers, Spleen Beans, Liver-and-Let-Die, Mystery Meatloaf. | Menu §3.1 |
+| **Pun-named rival restaurants** ("Jane Wayne's Mess Hall"). | Every raid target is a pun: *Chuck Wagon's Chow Hall*, *Big Hank's Burger Barn*, *Vegan Vera's Salad Fortress*, *Colonel Crunch's Chicken Shack*, *Le Snob Bistro*, *Crust Me Pizzeria*. | Raid map §3.6 |
+| **Costume and B-movie parody zombies** (kings, conquistadors, caped heroes, robot suits, cat-girls, monster zombies). | Event and raid-reward zombies are parody costumes and B-movie monsters: Zombie King, Conquistadead, Captain Rotten (caped), Mecha-Muncher, Kitty Corpse, The Swamp Thing-ish, Mummy Dearest, the 50-Foot Grandma. | Collection, events |
+| **Zombie pets that fight in raids** (zombie dogs, werewolves). | Zombie Pug, Rot-weiler, Werewoof, and Two-Headed Cat. They roam the joint for perks *and* join raids as fast runners. | Pets §3.7, raids |
+| **Raid line: zombies shamble in single file with "!" and health bars.** | Same visual, plus lanes, abilities and goofy KO animations (dizzy stars, sinking into the ground, a "bonk" sound). | Raids §3.6 |
+| **Toxin as the magic green currency.** | **Brain Sauce**: a glowing green jar. Zombies chug it and their eyes spin. | Economy §4 |
+
+**New gags in the same spirit:**
+- **Butterfingers trait:** the zombie drops plates; the customer eats off the floor anyway and leaves a *bigger* tip.
+- **Spare parts:** a zombie's arm occasionally falls off mid-serve, and they pick it up and keep going. There's a 1% chance it ends up in the brisket ("Secret Ingredient!" popup, +10% servings).
+- **Food critic review cards** are hand-written and funny: "Service was dead. 4 stars."
+- **Health Inspector visit:** the inspector is visibly terrified, and you get a bonus if no zombie snacks on him.
+- **Influencer customer** films a story; if a zombie lunges on camera, the video "goes viral" and you get a crowd rush, so a disaster becomes a win.
+- **Zombie idle animations:** one plays air guitar on the smoker, one tries to eat a fly, one stares at the wall for 10 seconds, then walks into it.
+
+---
+
 ## 2. Core loops
 
 ### 2.1 Minute-to-minute (the "shift")
@@ -163,7 +192,7 @@ Higher stars bring more customers, better customer types and bigger tips. The aw
 Raids are **asynchronous PvP plus PvE**. They're short (≤ 2 min), skillful and funny.
 
 **Targets**
-- **Raid Map (PvE campaign):** a road-trip map of rival joints across a ruined America, with 10 chapters and a boss joint per chapter: *Big Hank's Burger Barn*, *Vegan Vera's Salad Fortress*, *Sushi Samurai*, *Colonel Crunch's Chicken Shack*, *Le Snob Bistro*, *Taco Titan*, *Pizza Palazzo*, *The Golden Spork* (final). Each awards stars (1–3) and a **signature recipe**.
+- **Raid Map (PvE campaign):** a road-trip map of rival joints across a ruined America, with 9 chapters at launch and a boss joint per chapter: *Chuck Wagon's Chow Hall*, *Big Hank's Burger Barn*, *Vegan Vera's Salad Fortress*, *Sushi Samurai*, *Colonel Crunch's Chicken Shack*, *Le Snob Bistro*, *Taco Titan*, *Crust Me Pizzeria*, *The Golden Spork* (final). Each awards stars (1–3) and a **signature recipe**.
 - **Neighbors (PvP):** other players' joints, defended by their saved layout and assigned Bouncers. You get matched by Raid Power. The defender gets a 6 h shield after being hit and a revenge button.
 - **Friends:** a "Friendly Food Fight" with no losses, for fun and quests.
 
@@ -184,7 +213,7 @@ Raids are **asynchronous PvP plus PvE**. They're short (≤ 2 min), skillful and
 
 ### 3.7 Pets
 
-Unlock at Lv 10. One active pet roams the joint: *Zombie Pug* (finds coins), *Two-Headed Cat* (catches spies), *Undead Chicken* (lays a free Brain Snack daily), *Mini T-Rex skeleton* (event). Pets are cosmetic plus small perks.
+Unlock at Lv 10. One active pet roams the joint: *Zombie Pug* (finds coins), *Two-Headed Cat* (catches spies), *Undead Chicken* (lays a free Brain Snack daily), *Rot-weiler* and *Werewoof* (fast raid runners), *Mini T-Rex skeleton* (event). Pets are cosmetic plus small perks.
 
 ### 3.8 Meta & retention
 
@@ -261,8 +290,8 @@ Level cap at launch: **50** (raised by updates). XP curve: `xp_to_next(L) = roun
 | Stations | 6 |
 | Decor items | ~220 across 6 themes |
 | Defenses | 7 |
-| Raid Map chapters | 8 (40 stages + 8 bosses) |
-| Pets | 4 |
+| Raid Map chapters | 9 (45 stages + 9 bosses) |
+| Pets | 6 |
 | Launch event | Halloween Graveyard Grill |
 | Languages | English at launch; Spanish, Portuguese, French, German post-launch |
 

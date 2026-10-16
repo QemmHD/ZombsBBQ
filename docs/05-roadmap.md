@@ -42,7 +42,7 @@ Each phase ends with a **gate**: don't move on until it's true.
 **Gate:** a 30-minute slice that looks and feels like the final game.
 
 ## Phase 3: Production (Week 19–36)
-24. Content: 16 customer types/zombies, 40 recipes, 6 stations, ~220 decor items, 6 themes, 7 defenses, 8 raid chapters, 4 pets.
+24. Content: 16 customer types/zombies, 40 recipes, 6 stations, ~220 decor items, 6 themes, 7 defenses, 9 raid chapters, 6 pets.
 25. Backend: Sign in with Apple, cloud save, server-side raid validation, PvP matchmaking, leaderboards, crews.
 26. Economy tuning in the spreadsheet → remote config. Simulate 30 days of play with a script and check against the pacing table.
 27. Monetization: Grill Pass, starter pack, remove ads, rewarded ads (opt-in only).
