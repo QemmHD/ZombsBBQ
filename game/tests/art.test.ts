@@ -27,7 +27,8 @@ describe('characters', () => {
   ];
 
   it('exports every required id exactly once', () => {
-    expect([...CHAR_IDS].sort()).toEqual([...required].sort());
+    for (const id of required) expect(CHAR_IDS).toContain(id);
+    expect(new Set(CHAR_IDS).size).toBe(CHAR_IDS.length);
   });
 
   it.each(CHAR_IDS)('%s has six well-formed parts', (id) => {

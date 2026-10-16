@@ -37,124 +37,79 @@
  * up-left of the table (i - 1), 'bench_r' on the tile down-right of it (i + 1). Each bench is shifted
  * a quarter tile toward the table; the seat center is at tile center + PROP_META.bench_l/r (dx, dy),
  * seat top at height PROP_META.seatZ above the floor.
+ *
+ * MODULES: shared helpers live in propkit.ts (Iso, WallF wall frame, floorProp, dish, frontI/onFace face
+ * painters). The rest of the catalog is split by theme/category and merged by buildProps():
+ *   propthemes.ts    floor_<t>_a/_b, wall_l_<t>, wall_r_<t>, wall_r_door_<t> for roadhouse / diner / graveyard
+ *                    (same geometry and anchors as the shack keys above).
+ *   propfurniture.ts table_diner / table_barrel / table_coffin (seat on all 4 sides), chair_<diner|wood|bone>_<dir>,
+ *                    fryer, fryer_bubbles, counter_chrome, keep_warm.
+ *   propdecor.ts     cactus, hay_bale, lamp_post, gnome_zombie, flamingo_zombie, skeleton_statue, pumpkin_pile,
+ *                    coffin_upright, slime_fountain, barrel_stack (1x1 floor objects).
+ *   propwall.ts      wall hangings <key>_l / <key>_r: 48x144, anchor (0.5, 1), placed exactly like a wall segment
+ *                    and drawn after it; transparent except the hanging itself.
+ *   propspecial.ts   atm, vending, jukebox, arcade, pethouse_pug, pethouse_kennel (fronts face +i, like the fridge).
+ *   propdishes.ts    dish_rings … dish_foie (32x24 plates), fx_cashbag, fx_goo_splat, fx_heart, fx_lock (anchor .5/1).
+ *
+ * CHAIRS + 4-SIDED TABLES: `chair_<f>_<dir>` faces `dir` (se = +i, sw = +j, ne = -j, nw = -i). For a table on
+ * tile (i, j): chair_se on (i-1, j), chair_nw on (i+1, j), chair_sw on (i, j-1), chair_ne on (i, j+1). Each chair
+ * is shifted a quarter tile toward its table; seat center = chair tile center + PROP_META.seat[dir], seat top at
+ * PROP_META.chairSeatZ[family] (= seatZ). Dishes go at table tile center - PROP_META.tableTop[tableKey]. For
+ * _ne/_nw chairs the backrest is nearer the camera: draw the sitter under (before) the chair sprite.
+ *
+ * OVERLAYS: 'fryer_bubbles' (0.5, 1) at (tileCenterX, tileCenterY - fryerTopZ); 'keep_warm' (0.5, 1) on a grill at
+ * (tileCenterX, tileCenterY - keepWarmZ).
  */
 import type { ArtAsset } from './types';
 import { TILE_H, TILE_W, WALL_H } from './types';
 import { Doc, OUT, PW, S, P, G, capsule, ell, f, hl, hull, poly, rrect } from './svg';
 import type { Pt, Tone } from './svg';
+import {
+  COUNTER_Z, DIAMOND, FRYER_Z, GRILL_Z, HH, HW, Iso, SEAT_Z, TABLE_BARREL_Z, TABLE_COFFIN_Z, TABLE_DINER_Z, TABLE_Z,
+  WOOD, WOOD_D, WOOD_DD, WOOD_M, asset, blobs, fly, floorProp, rivet, rnd, speckles, tile, T, dish,
+} from './propkit';
+import { themeProps } from './propthemes';
+import { furnitureProps } from './propfurniture';
+import { decorProps } from './propdecor';
+import { wallHangingProps } from './propwall';
+import { specialProps } from './propspecial';
+import { extraDishes, extraFx } from './propdishes';
+
+const Q = TILE_W / 8; // quarter-tile screen offset: 12
+const QY = TILE_H / 8; // 6
 
 /** Useful numbers for placing things on/at the props (world units). */
 export const PROP_META = {
-  /** Height of the bench seat top above the floor. */
-  seatZ: 15.5,
+  /** Height of the bench / chair seat top above the floor (every seat family uses the same height). */
+  seatZ: SEAT_Z,
   /** Seat center offset from the bench tile's center. */
-  bench_l: { dx: TILE_W / 8, dy: TILE_H / 8 },
-  bench_r: { dx: -TILE_W / 8, dy: -TILE_H / 8 },
-  /** Table top height above the floor (put dishes at tileCenterY - tableTopZ). */
-  tableTopZ: 26,
-  counterTopZ: 34,
-  grillTopZ: 26,
+  bench_l: { dx: Q, dy: QY },
+  bench_r: { dx: -Q, dy: -QY },
+  /**
+   * Chair seat center offset from the chair tile's center, by the direction the sitter FACES
+   * (`chair_<family>_<dir>`): a quarter tile toward the table it faces.
+   */
+  seat: {
+    se: { dx: Q, dy: QY },
+    sw: { dx: -Q, dy: QY },
+    ne: { dx: Q, dy: -QY },
+    nw: { dx: -Q, dy: -QY },
+  },
+  /** Seat top height per chair family (all equal to seatZ so the sitting pose code is shared). */
+  chairSeatZ: { chair_diner: SEAT_Z, chair_wood: SEAT_Z, chair_bone: SEAT_Z },
+  /** Table top height above the floor for the original picnic table (put dishes at tileCenterY - tableTopZ). */
+  tableTopZ: TABLE_Z,
+  /** Table top height per table key. */
+  tableTop: { table: TABLE_Z, table_diner: TABLE_DINER_Z, table_barrel: TABLE_BARREL_Z, table_coffin: TABLE_COFFIN_Z },
+  counterTopZ: COUNTER_Z,
+  /** Counter top height per counter key. */
+  counterTop: { counter: COUNTER_Z, counter_chrome: COUNTER_Z },
+  grillTopZ: GRILL_Z,
+  /** Oil surface height of the fryer: put 'fryer_bubbles' (anchor .5/1) at (tileCenterX, tileCenterY - fryerTopZ). */
+  fryerTopZ: FRYER_Z,
+  /** 'keep_warm' (anchor .5/1) goes on a stove/grill at (tileCenterX, tileCenterY - keepWarmZ). */
+  keepWarmZ: GRILL_Z,
 } as const;
-
-const HW = TILE_W / 2; // 48
-const HH = TILE_H / 2; // 24
-const M = 4; // outline margin
-
-// wood palette
-const WOOD = '#C98B55';
-const WOOD_M = '#A8693A';
-const WOOD_D = '#7A4524';
-const WOOD_DD = '#5C3A22';
-
-// ------------------------------------------------------------------ iso helpers
-class Iso {
-  constructor(
-    readonly cx: number,
-    readonly cy: number,
-  ) {}
-  /** i, j in tile units relative to the tile center; z in world units (up). */
-  p(i: number, j: number, z = 0): Pt {
-    return [this.cx + (i - j) * HW, this.cy + (i + j) * HH - z];
-  }
-  quad(i0: number, i1: number, j0: number, j1: number, z = 0): Pt[] {
-    return [this.p(i0, j0, z), this.p(i1, j0, z), this.p(i1, j1, z), this.p(i0, j1, z)];
-  }
-  /** Box with visible top, +j face (screen lower-left) and +i face (screen lower-right). */
-  box(i0: number, i1: number, j0: number, j1: number, z0: number, z1: number, top: string, left: string, right: string, sw = PW): string {
-    const p = this.p.bind(this);
-    return (
-      P(poly([p(i0, j1, z0), p(i1, j1, z0), p(i1, j1, z1), p(i0, j1, z1)]), left, sw) +
-      P(poly([p(i1, j0, z0), p(i1, j1, z0), p(i1, j1, z1), p(i1, j0, z1)]), right, sw) +
-      P(poly(this.quad(i0, i1, j0, j1, z1)), top, sw)
-    );
-  }
-  /** Diamond floor shadow. */
-  shadow(i0: number, i1: number, j0: number, j1: number, op = 0.18): string {
-    return P(poly(this.quad(i0, i1, j0, j1, 0)), OUT, 0, OUT, `opacity="${op}"`);
-  }
-  line(a: [number, number, number], b: [number, number, number], sw: number, col = OUT): string {
-    const pa = this.p(...a);
-    const pb = this.p(...b);
-    return S(`M${f(pa[0])},${f(pa[1])}L${f(pb[0])},${f(pb[1])}`, sw, col);
-  }
-  /** A post drawn as an outlined thick line. */
-  post(a: [number, number, number], b: [number, number, number], w: number, col: string): string {
-    return this.line(a, b, w + PW * 1.6) + this.line(a, b, w, col);
-  }
-}
-
-/** 1x1 floor object: `above` = how far the art reaches above the tile center. */
-function floorProp(key: string, above: number, body: (d: Doc, iso: Iso) => string, w = TILE_W + 2 * M): ArtAsset {
-  const h = Math.ceil(above + HH + M);
-  const d = new Doc(key);
-  const iso = new Iso(w / 2, above);
-  const svg = d.build(w, h, body(d, iso));
-  return { key, svg, w, h, ox: 0.5, oy: above / h };
-}
-
-function asset(key: string, w: number, h: number, ox: number, oy: number, body: (d: Doc) => string): ArtAsset {
-  const d = new Doc(key);
-  return { key, svg: d.build(w, h, body(d)), w, h, ox, oy };
-}
-
-/** Union of circles with one outline and cel shading (canopies, clouds, smoke). */
-function blobs(d: Doc, circles: [number, number, number][], base: string, shadow: string, sw = PW, off: Pt = [-2, -2]): string {
-  const all = circles.map(([x, y, r]) => ell(x, y, r)).join('');
-  const cid = d.id('u');
-  d.def(`<clipPath id="${cid}">${circles.map(([x, y, r]) => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}"/>`).join('')}</clipPath>`);
-  return (
-    (sw > 0 ? P(all, OUT, sw * 2, OUT) : '') +
-    P(all, shadow) +
-    `<g clip-path="url(#${cid})"><path d="${all}" fill="${base}" transform="translate(${f(off[0])} ${f(off[1])})"/></g>`
-  );
-}
-
-// ------------------------------------------------------------------ floor tiles
-const DIAMOND = `M${HW},0L${TILE_W},${HH}L${HW},${TILE_H}L0,${HH}Z`;
-
-function tile(key: string, body: (d: Doc, t: Iso) => string): ArtAsset {
-  const d = new Doc(key);
-  const t = new Iso(HW, HH);
-  return { key, svg: d.build(TILE_W, TILE_H, d.clip(DIAMOND, body(d, t))), w: TILE_W, h: TILE_H, ox: 0.5, oy: 0.5 };
-}
-
-function rnd(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-function speckles(t: Iso, seed: number, n: number, cols: string[], r = 0.8): string {
-  const R = rnd(seed);
-  let s = '';
-  for (let k = 0; k < n; k++) {
-    const [x, y] = t.p(R() - 0.5, R() - 0.5);
-    s += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r * (0.6 + R() * 0.8))}" fill="${cols[k % cols.length]}"/>`;
-  }
-  return s;
-}
 
 function tiles(): ArtAsset[] {
   const out: ArtAsset[] = [];
@@ -238,6 +193,11 @@ function wall(key: string, side: 'l' | 'r', deco: (d: Doc) => string): ArtAsset 
     const sx = k % 2 ? 14 : 36;
     s += S(`M${sx},${v0 + 1}V${v0 + pr - 1}`, 1, WOOD_D);
     s += S(`M${(sx + 20) % 48},${v0 + 3.5}h6`, 0.6, '#C2834E');
+    // nail heads either side of the butt joint + a bit of grain
+    s += rivet(sx - 2, v0 + pr / 2, 0.6, '#5A3418', '#D9A066') + rivet(sx + 2, v0 + pr / 2, 0.6, '#5A3418', '#D9A066');
+    const gx = (sx + 8 + k * 7) % 38;
+    s += S(`M${gx},${v0 + 6.6}q4,-1.4 8,0`, 0.5, WOOD_D, 'opacity="0.55"');
+    if (k === 4) s += P(ell(((sx + 30) % 40) + 4, v0 + 5, 1.6, 1.1), WOOD_D) + S(ell(((sx + 30) % 40) + 4, v0 + 5, 2.8, 2), 0.5, WOOD_D, 'opacity="0.6"');
   }
   // top cap and baseboard
   s += P(`M0,0H${w}V9H0Z`, WOOD_DD) + P(`M0,0H${w}V2.4H0Z`, '#7A5034') + S(`M0,9H${w}`, 1.4);
@@ -334,6 +294,13 @@ function furniture(): ArtAsset[] {
       s += t.box(-0.32, 0.32, -0.46, 0.46, TOP - 4, TOP, WOOD, WOOD_M, WOOD_D);
       for (const i of [-0.16, 0, 0.16]) s += t.line([i, -0.46, TOP], [i, 0.46, TOP], 0.9, WOOD_M);
       s += t.line([-0.28, -0.4, TOP], [-0.28, 0.2, TOP], 0.8, '#E2AE78');
+      // grain streaks, nail heads at the cleats, and someone's carved initials
+      for (const [i, j0, j1] of [[-0.24, -0.1, 0.3], [-0.08, -0.42, -0.1], [0.07, 0.05, 0.4], [0.23, -0.3, 0.02]] as [number, number, number][]) {
+        s += t.line([i, j0, TOP], [i, j1, TOP], 0.5, '#9A5A2E', 'opacity="0.7"');
+      }
+      for (const j of [-0.4, 0.4]) for (const i of [-0.24, -0.08, 0.08, 0.24]) s += rivet(...t.p(i, j, TOP), 0.55, '#5A3418', '#E2AE78');
+      const [cx, cy] = t.p(0.16, 0.22, TOP);
+      s += `<g transform="matrix(1 0.5 -1 0.5 ${f(cx)} ${f(cy)})">${S('M-2.4,-1.2c-1,-1.4 -3,0 -1.6,1.6l1.6,1.6l1.6,-1.6c1.4,-1.6 -0.6,-3 -1.6,-1.6z', 0.5, '#7A4524')}</g>`;
       return s;
     }),
   );
@@ -347,6 +314,8 @@ function furniture(): ArtAsset[] {
       }
       s += t.box(c - 0.13, c + 0.13, -0.44, 0.44, Z - 3.5, Z, WOOD, WOOD_M, WOOD_D);
       s += t.line([c, -0.44, Z], [c, 0.44, Z], 0.9, WOOD_M);
+      s += t.line([c - 0.07, -0.3, Z], [c - 0.07, 0.1, Z], 0.5, '#9A5A2E', 'opacity="0.7"') + t.line([c + 0.06, 0.05, Z], [c + 0.06, 0.38, Z], 0.5, '#9A5A2E', 'opacity="0.7"');
+      for (const j of [-0.38, 0.38]) s += rivet(...t.p(c - 0.06, j, Z), 0.5, '#5A3418', '#E2AE78') + rivet(...t.p(c + 0.06, j, Z), 0.5, '#5A3418', '#E2AE78');
       return s;
     });
   out.push(bench('bench_l', 0.25));
@@ -389,6 +358,14 @@ function furniture(): ArtAsset[] {
         s += P(ell(kx, ky, 1.8, 1.6), '#C9CED6', 1);
       }
       s += t.line([0.4, -0.3, Z - 3], [0.4, 0.3, Z - 3], 0.8, '#5A5050');
+      // grease drip, a hanging spatula, rivets, and a fly that thinks it's fine
+      const [ddx, ddy] = t.p(-0.1, 0.4, Z - 12);
+      s += P(`M${f(ddx)},${f(ddy)}q-1.2,3.4 0,4.4q1.2,-1 0,-4.4z`, '#3A2010', 0.6);
+      for (const i of [-0.36, 0.36]) s += rivet(...t.p(i, 0.4, Z - 2), 0.6, '#7A1A1A', '#FF8A8A');
+      const [hx, hy] = t.p(0.4, 0.14, Z - 4);
+      s += S(`M${f(hx)},${f(hy)}l2.4,10`, 2.6) + S(`M${f(hx)},${f(hy)}l2.4,10`, 1.2, WOOD_M);
+      s += P(`M${f(hx + 1)},${f(hy + 9)}l4,0.6l1.4,7l-5,0.8z`, '#C9CED6', 0.9) + S(`M${f(hx + 2.4)},${f(hy + 11)}l0.8,4.4M${f(hx + 4)},${f(hy + 11)}l0.8,4.4`, 0.5, '#8E959E');
+      s += fly(...t.p(0.1, 0.4, Z - 7), 0.9);
       return s;
     }),
   );
@@ -428,6 +405,11 @@ function furniture(): ArtAsset[] {
       const [cx, cy] = t.p(i1, 0, zc);
       s += P(ell(cx - 2, cy - 3, 3.4, 3.4), '#F4F1E6', 1.2) + S(`M${f(cx - 2)},${f(cy - 3)}l1.6,-1.6`, 0.9, '#D7262E');
       s += P(ell(cx + 1.2, cy + 6, 4, 1.8), '#FF5A1F', 1.1) + S(`M${f(cx - 1.6)},${f(cy + 6)}h5.6`, 0.6, '#FFC23D');
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + 0.2;
+        s += rivet(...t.p(i1, rj * 0.82 * Math.cos(a), zc + rz * 0.82 * Math.sin(a)), 0.6, '#120F0F', '#8E8888');
+      }
+      for (const i of [-0.2, 0, 0.2]) s += rivet(...t.p(i, rj * 0.97, zc - 2), 0.6, '#120F0F', '#8E8888');
       // handle on the lid
       s += t.post([-0.12, 0.2, zc + rz - 3], [0.18, 0.2, zc + rz - 3], 2, WOOD_M);
       // chimney
@@ -457,7 +439,10 @@ function furniture(): ArtAsset[] {
         S(`M${f(gx - 2.4)},${f(gy - 2.6)}v-3.4M${f(gx - 0.6)},${f(gy - 3.4)}v-3.6M${f(gx + 1.2)},${f(gy - 3)}v-3.2M${f(gx + 2.8)},${f(gy - 1.8)}l1.6,-2.4`, 1.4, '#8DC63F', 'opacity="0.75"');
       const [mx, my] = t.p(0.36, 0.05, 66);
       s += P(ell(mx, my, 1.8), '#D7262E', 0.9) + P(ell(mx + 6, my + 1.4, 1.6), '#FFC83D', 0.9);
-      s += P(rrect(mx - 1, my + 4, 6, 7, 0.6), '#FFFFFF', 0.8, OUT, 'transform="rotate(-8 ' + f(mx) + ' ' + f(my) + ')"');
+      const [nx, ny] = t.p(0.36, 0.31, 77);
+      s += `<g transform="matrix(1 -0.5 0 1 ${f(nx)} ${f(ny)}) rotate(-6 7 5)">` +
+        P('M0,0H14V9.4L12,11.4H0Z', '#FFE66A', 0.8) + P('M12,11.4L12.4,9.8L14,9.4Z', '#E0C040', 0.5) +
+        T(7, 4.2, 2.6, '#B3263A', "DON'T EAT") + T(7, 7.8, 3.2, '#2B1B17', 'STAFF') + S('M3,8.8h8', 0.5, '#B3263A') + '</g>';
       const [sx, sy] = t.p(0.36, -0.1, 56);
       s += P(`M${f(sx - 1.4)},${f(sy)}q0,4 1.4,5q1.6,-1 1.2,-5z`, '#B8F07A', 0.8);
       s += t.line([-0.3, 0.36, Z - 6], [-0.3, 0.36, 10], 1.6, '#FFFFFF');
@@ -611,20 +596,6 @@ function pline3(t: Iso, i0: number, i1: number, j: number, z: number): string {
 }
 
 // ------------------------------------------------------------------ dishes
-const DW = 32;
-const DH = 24;
-const PX = 16;
-const PY = 15;
-
-function dish(key: string, food: (d: Doc) => string): ArtAsset {
-  return asset(key, DW, DH, PX / DW, PY / DH, (d) => {
-    let s = P(ell(PX + 0.6, PY + 1.6, 13, 5.6), OUT, 0, OUT, 'opacity="0.18"');
-    s += P(ell(PX, PY, 13.4, 6), '#FFFFFF', 1.3);
-    s += P(ell(PX, PY + 0.4, 9.6, 4), '#F1ECE2') + S(ell(PX, PY + 0.4, 9.6, 4), 0.6, '#D9D2C4');
-    return s + food(d);
-  });
-}
-
 function dishes(): ArtAsset[] {
   const out: ArtAsset[] = [];
   out.push(
@@ -808,5 +779,18 @@ function fx(): ArtAsset[] {
 }
 
 export function buildProps(): ArtAsset[] {
-  return [...tiles(), ...walls(), ...furniture(), ...dishes(), ...fx()];
+  return [
+    ...tiles(),
+    ...walls(),
+    ...themeProps(),
+    ...furniture(),
+    ...furnitureProps(),
+    ...decorProps(),
+    ...wallHangingProps(),
+    ...specialProps(),
+    ...dishes(),
+    ...extraDishes(),
+    ...fx(),
+    ...extraFx(),
+  ];
 }

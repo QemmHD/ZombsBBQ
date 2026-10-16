@@ -46,8 +46,8 @@ export const RIVAL_BY_ID: Record<string, RivalDef> = Object.fromEntries(RIVALS.m
 export const RAID_TIME = 120;
 export const RIVAL_COOLDOWN = 5 * 60;
 export const ARENA_N = 6;
-export const GATE_X = 2; // gate on the front-left edge, between (2,5) and (2,6)
-export const LINE_Y = 8; // sidewalk where the horde lines up
+export const GATE_Y = 2; // gate on the front-right fence, between (5,2) and (6,2)
+export const LINE_X = 8; // sidewalk where the horde lines up
 export const HEADSTONE_COST = 300;
 export const SUMMON_COST = 5; // Brain Sauce
 
@@ -217,8 +217,8 @@ export function startRaid(s: GameState, rivalId: RivalId, workerIds: string[], p
       ref: w.id,
       art: isYou ? 'you' : `${w.type}_z`,
       name: w.name,
-      x: -1 + i * 0.9,
-      y: LINE_Y,
+      x: LINE_X,
+      y: -1 + i * 0.9,
       hp: Math.max(1, w.energy),
       maxHp: w.stats.energy,
       dmg: 3 + w.stats.power * 1.6,
@@ -232,10 +232,10 @@ export function startRaid(s: GameState, rivalId: RivalId, workerIds: string[], p
     if (!p || p.state === 'raiding') return;
     p.state = 'raiding';
     const rot = p.type === 'rotweiler';
-    unit(r, { side: 'z', kind: 'pet', ref: p.id, art: rot ? 'pet_rotweiler' : 'pet_pug', name: rot ? 'Rot-weiler' : 'Zombie Pug', x: -2 - i, y: LINE_Y + 0.6, hp: rot ? 90 : 45, dmg: rot ? 9 : 4, speed: rot ? 2.6 : 2.2, cdMax: 0.7, state: 'queued' });
+    unit(r, { side: 'z', kind: 'pet', ref: p.id, art: rot ? 'pet_rotweiler' : 'pet_pug', name: rot ? 'Rot-weiler' : 'Zombie Pug', x: LINE_X + 0.6, y: -2 - i, hp: rot ? 90 : 45, dmg: rot ? 9 : 4, speed: rot ? 2.6 : 2.2, cdMax: 0.7, state: 'queued' });
   });
   // the rival joint
-  unit(r, { side: 'r', kind: 'gate', art: 'gate_r', name: 'Gate', x: GATE_X, y: ARENA_N - 0.5, hp: def.gateHp, dmg: 0, speed: 0 });
+  unit(r, { side: 'r', kind: 'gate', art: 'gate_r', name: 'Gate', x: ARENA_N - 0.5, y: GATE_Y, hp: def.gateHp, dmg: 0, speed: 0 });
   const tables: Pt[] = [
     { x: 2, y: 2 },
     { x: 4, y: 2 },
@@ -249,10 +249,10 @@ export function startRaid(s: GameState, rivalId: RivalId, workerIds: string[], p
   }
   for (let i = 0; i < def.staff.count; i++)
     unit(r, { side: 'r', kind: 'staff', art: `staff_${rivalId}`, name: 'Waiter', x: 1 + (i % 4), y: 1 + Math.floor(i / 4) * 2 + 0.5, hp: def.staff.hp, dmg: def.staff.dmg, speed: 1.6, cdMax: 1.1 });
-  for (let i = 0; i < def.dogs; i++) unit(r, { side: 'r', kind: 'dog', art: 'guard_dog', name: 'Guard Dog', x: 1 + i * 3, y: ARENA_N - 1, hp: 40 + def.level * 5, dmg: 3 + def.level * 0.4, speed: 2.5, cdMax: 0.8 });
+  for (let i = 0; i < def.dogs; i++) unit(r, { side: 'r', kind: 'dog', art: 'guard_dog', name: 'Guard Dog', x: ARENA_N - 1, y: 1 + i * 3, hp: 40 + def.level * 5, dmg: 3 + def.level * 0.4, speed: 2.5, cdMax: 0.8 });
   const zapSpots = [
     { x: ARENA_N - 1, y: ARENA_N - 1 },
-    { x: 0, y: ARENA_N - 1 },
+    { x: ARENA_N - 1, y: 0 },
   ];
   for (let i = 0; i < def.zappers; i++)
     unit(r, { side: 'r', kind: 'zapper', art: 'bug_zapper', name: 'Bug Zapper', ...zapSpots[i], hp: 100 + def.level * 12, dmg: 4 + def.level * 0.45, speed: 0, range: 2.8, cdMax: 1.6 });
@@ -338,7 +338,7 @@ export function useSummon(s: GameState, r: RaidState): string | null {
   if (s.inventory.summon <= 0) return 'No Summon Stones. Buy one before the raid.';
   if (r.units.filter((u) => u.kind === 'summon' && u.hp > 0).length >= 3) return 'Three Big Foot-Longs is the legal limit.';
   s.inventory.summon--;
-  const u = unit(r, { side: 'z', kind: 'summon', art: 'bigfoot', name: 'Big Foot-Long', x: GATE_X, y: LINE_Y - 0.5, hp: 420, dmg: 22, speed: 1.2, cdMax: 1.3, range: 1.1, state: 'walk' });
+  const u = unit(r, { side: 'z', kind: 'summon', art: 'bigfoot', name: 'Big Foot-Long', x: LINE_X - 0.5, y: GATE_Y, hp: 420, dmg: 22, speed: 1.2, cdMax: 1.3, range: 1.1, state: 'walk' });
   r.events.push({ t: 'summon', unit: u.id });
   return null;
 }
@@ -360,12 +360,11 @@ function stepToward(r: RaidState, u: RaidUnit, goal: Pt, dt: number) {
   let target = goal;
   const uIn = inside(u);
   const gIn = inside(goal);
+  const outsideGate = { x: ARENA_N + 0.2, y: GATE_Y };
+  const insideGate = { x: ARENA_N - 1, y: GATE_Y };
+  // once lined up with the gateway, walk straight through (a wide corridor so jostling can't stall it)
+  const inCorridor = Math.abs(u.y - GATE_Y) < 0.7 && u.x > ARENA_N - 1.2 && u.x < ARENA_N + 0.9;
   if (uIn !== gIn) {
-    // route via the gate: outside point → gate → inside point
-    const outsideGate = { x: GATE_X, y: ARENA_N + 0.2 };
-    const insideGate = { x: GATE_X, y: ARENA_N - 1 };
-    // once lined up with the gateway, walk straight through (a wide corridor so jostling can't stall it)
-    const inCorridor = Math.abs(u.x - GATE_X) < 0.7 && u.y > ARENA_N - 1.2 && u.y < ARENA_N + 0.9;
     if (uIn) target = inCorridor ? outsideGate : insideGate;
     else target = inCorridor && r.gateBroken ? insideGate : outsideGate;
   }
@@ -374,12 +373,18 @@ function stepToward(r: RaidState, u: RaidUnit, goal: Pt, dt: number) {
   const step = Math.min(d, u.speed * dt);
   const dx = (target.x - u.x) / d;
   const dy = (target.y - u.y) / d;
+  const px = u.x;
+  const py = u.y;
   u.x += dx * step;
   u.y += dy * step;
+  // the fence: nobody crosses it except through a broken gate
+  if (inside(u) !== uIn && !(r.gateBroken && Math.abs(u.y - GATE_Y) < 0.7)) {
+    u.x = px;
+    u.y = py;
+  }
   const sdx = dx - dy;
   if (Math.abs(sdx) > 0.05) u.facing = sdx > 0 ? 1 : -1;
   u.back = dx + dy < -0.05;
-  if (!r.gateBroken && !uIn && u.y > ARENA_N - 0.5 && u.y < ARENA_N + 0.15) u.y = ARENA_N + 0.15; // the fence
 }
 
 function nearest(u: RaidUnit, list: RaidUnit[]) {
@@ -507,7 +512,7 @@ function updateRival(r: RaidState, u: RaidUnit, dt: number) {
   }
   if (u.kind === 'dog') {
     // guard dogs patrol the yard and charge anything near the fence
-    const t = nearest(u, horde.filter((h) => dist(u, h) < 3.5 && (r.gateBroken || inside(h) || h.y < ARENA_N + 1.5)));
+    const t = nearest(u, horde.filter((h) => dist(u, h) < 3.5 && (r.gateBroken || inside(h))));
     if (t && (inside(t) || r.gateBroken)) return fight(r, u, t, dt);
     return;
   }
@@ -525,6 +530,16 @@ function updateCustomer(r: RaidState, c: RaidUnit, dt: number) {
   if (dist(c, exit) < 0.3) c.state = 'gone';
 }
 
+function nudge(r: RaidState, u: RaidUnit, dx: number, dy: number) {
+  const was = inside(u);
+  u.x += dx;
+  u.y += dy;
+  if (inside(u) !== was && !(r.gateBroken && Math.abs(u.y - GATE_Y) < 0.7)) {
+    u.x -= dx;
+    u.y -= dy;
+  }
+}
+
 /** Units on the same side gently push apart so the horde doesn't stack on one tile. */
 function separate(r: RaidState) {
   const list = r.units.filter((u) => alive(u) && u.speed > 0 && u.state !== 'queued');
@@ -537,10 +552,8 @@ function separate(r: RaidState) {
         const push = (0.45 - d) * 0.5;
         const dx = ((a.x - b.x) / d) * push;
         const dy = ((a.y - b.y) / d) * push;
-        a.x += dx;
-        a.y += dy;
-        b.x -= dx;
-        b.y -= dy;
+        nudge(r, a, dx, dy);
+        nudge(r, b, -dx, -dy);
       }
     }
 }
