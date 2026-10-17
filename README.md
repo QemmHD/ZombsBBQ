@@ -10,16 +10,16 @@ Zombs BBQ is an iPhone restaurant sim and spiritual successor to *Zombie Café* 
 
 ---
 
-## ⏸️ Where we are (paused)
+## 📍 Where we are
 
-> **Status: paused mid-way through the second wave of improvements.** Everything below is saved on GitHub, and nothing is lost.
+> **Status (2026-10-17): the core loop, interface and raids have been rebuilt to play like the original** (docs [21a](docs/21a-rebuild-core.md), [21b](docs/21b-rebuild-ui.md), [21c](docs/21c-rebuild-raids.md)), merged into `feat/fix-and-features`. 898 unit tests pass, typecheck is clean, and the full iPhone smoke test, the art gallery and the four-device fit check all pass with zero errors.
 
 ### Play it
 
 | Where | Link | Notes |
 |---|---|---|
-| GitHub Pages | **https://qemmhd.github.io/ZombsBBQ/** | Serves the `gh-pages` branch. Switch it on once: repo **Settings → Pages → Deploy from a branch → `gh-pages` / root**. A private repo needs a paid GitHub plan for Pages. |
-| Claude link | https://claude.ai/artifact/AceM4efaihGpTXtDs1MsDE | The same game, private to the owner. |
+| GitHub Pages | **https://qemmhd.github.io/ZombsBBQ/** | Serves the `gh-pages` branch (the split build: game, audio, icons). Switch it on once: repo **Settings → Pages → Deploy from a branch → `gh-pages` / root**. A private repo needs a paid GitHub plan for Pages. |
+| Claude link | https://claude.ai/artifact/AceM4efaihGpTXtDs1MsDE | An older single-file build, private to the owner. |
 
 Hold the phone sideways. Progress saves on the device.
 
@@ -27,21 +27,22 @@ Hold the phone sideways. Progress saves on the device.
 
 | Branch | What it is |
 |---|---|
-| `claude/zombs-bbq-game-plan` | **The main working branch.** Everything finished and merged. |
-| `gh-pages` | The built single-file game that GitHub Pages serves. |
-| `wip/tech-ios` | **Unfinished, not merged:** the tech and iPhone pass (details below). Four commits, tests were green at each. |
-| `wip/visual-fixes` | **Unfinished, not merged:** the visual pass (details below). One reviewed commit plus a WIP commit. |
+| `feat/fix-and-features` | **The main working branch.** Everything finished and merged, including the audio, animation and three rebuild branches. |
+| `rebuild/core`, `rebuild/ui`, `rebuild/raids` | The three rebuilds, already merged into `feat/fix-and-features`. |
+| `gh-pages` | The built game that GitHub Pages serves. |
+| `claude/zombs-bbq-game-plan` | The older main branch, from before the restart notes. |
+| `wip/tech-ios`, `wip/visual-fixes` | Older unfinished passes, not merged. |
 
-### How to resume
-1. Review and merge `wip/tech-ios`, then `wip/visual-fixes`, into `claude/zombs-bbq-game-plan`. Resolve any conflicts, then run `npm test`, `npm run typecheck`, `npm run build` and `npm run smoke`.
-2. Re-run the full smoke test. The last full run on the main branch was cut short by an outside process kill partway through the shop, but every step before that passed.
-3. Carry on down the audit lists in [docs 11–15](#docs), starting with whatever the WIP branches didn't finish.
+### Known gaps
+- **Sound:** 4 of 67 sounds are recorded; the rest use the built-in synth fallback. Higgsfield's sound-effect and music models are restricted to its own game pipeline, so the remaining sounds need generating elsewhere (prompts in `game/tools/audio/targets.json`, mastering spec in [doc 20](docs/20-audio.md)).
+- **Raids:** zombies jam at the 1-tile door; floating damage numbers still pile up in big brawls; the sushi rival's sign reads "BIG HANK'S"; one win can bring home a very large loot stack (correct by the original's quarter-stack rule).
+- **Not built yet:** the robot pets' combined form and pet-house café bonuses; chef avatar perks beyond the four stats.
 
 ---
 
 ## What's done
 
-The game lives in [`game/`](game/). It's TypeScript, Phaser 4 and Vite, built web-first and to be wrapped for iOS with Capacitor later. The rules are a pure, deterministic sim with **1,319 unit tests**. There's also an end-to-end iPhone smoke test that plays every feature with real taps, an art gallery script and a device-fit check.
+The game lives in [`game/`](game/). It's TypeScript, Phaser 4 and Vite, built web-first and to be wrapped for iOS with Capacitor later. The rules are a pure, deterministic sim with **898 unit tests**. There's also an end-to-end iPhone smoke test that plays every feature with real taps, an art gallery script and a device-fit check.
 
 ### Core café loop
 - **Starting room:** you begin in a grimy corner lot at a crossroads. There are sidewalks and roads on both street sides, and you look at the room through a real front door that swings open as people walk through, with a tappable OPEN/CLOSED sign.
