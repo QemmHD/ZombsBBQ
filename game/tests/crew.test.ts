@@ -321,6 +321,7 @@ describe('customer pacing', () => {
 
   it('a served diner holds the plate for 2 s before eating', () => {
     const s = createInitialState(8);
+    s.tut = 99; // past the tutorial (its first diner eats quicker)
     stock(s);
     for (let i = 0; i < 4000 && !s.customers.some((c) => c.state === 'eating'); i++) tick(s, 0.1);
     const c = s.customers.find((x) => x.state === 'eating')!;
@@ -457,9 +458,9 @@ describe('saves never lose the joint (tech audit)', () => {
     s.level = 3;
     const z = makeWorker(s, 'zombie', 'joe', { x: 3, y: 2 });
     s.workers.push(z);
-    const r = startRaid(s, 'chuck', [s.workers[0].id, z.id], []);
+    const r = startRaid(s, 'chuck', [z.id], []);
     expect(typeof r).not.toBe('string');
-    expect(s.workers.every((w) => w.state === 'raiding')).toBe(true);
+    expect(z.state).toBe('raiding');
     const back = deserialize(serialize(s, 0), 1000).state;
     run(back, 100);
     expect(back.workers.some((w) => w.state === 'raiding')).toBe(false);

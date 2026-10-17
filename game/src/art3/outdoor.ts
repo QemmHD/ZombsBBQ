@@ -6,7 +6,7 @@
  *   street_lamp (~190 tall) and sign_pole (~210 tall) are anchored at the base of the pole (tile centre).
  * Items with lettering also ship `<key>_se` (text still reads after mirroring): pethouse_pug, pethouse_kennel,
  * bus_bench, newsbox, street_lamp (missing-person flyer), sign_pole.
- * Tombstones glow: tombstone_str red (fist), tombstone_hp green (heart).
+ * Tombstones glow: tombstone_str red (fist), tombstone_hp green (heart), tombstone_revive violet (a hand clawing up).
  */
 import type { ArtAsset } from '../art/types';
 import type { Doc } from '../art/svg';
@@ -139,6 +139,38 @@ function tombHp(): ArtAsset {
       const [x, y] = t.p(i, j);
       s += L(`M${f(x)},${f(y)}q-0.6,-3 0.6,-5`, 0.8, '#4F7A22') + glow(d, F(ell(x + 0.6, y - 5.6, 1.6, 1), grn), 0.8, 0.8) + F(ell(x + 0.6, y - 5.6, 1.4, 0.9), '#9BE04A', 0.4);
     }
+    return s;
+  });
+}
+
+function tombRevive(): ArtAsset {
+  return objAsset('tombstone_revive', 122, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    const vio = '#B57AE8';
+    let s = mound(d, t, 32, 14, 41, vio);
+    // a weathered stone cross
+    const shape = 'M10,0L10,-34L0,-34L0,-44L10,-44L10,-58L20,-58L20,-44L30,-44L30,-34L20,-34L20,0Z';
+    const stone = '#7A7088';
+    const stoneD = '#4E465C';
+    s += glow(d, grp(F(shape, vio), swFace(t, -0.31, 0.06, 0)), 5, 0.26);
+    s += extrude(t, shape, -0.31, 0.06, 0, 0.12, stone, stoneD, 7);
+    let o = speckle(d, shape, [0, -58, 30, 58], 60, ['#4A4256', '#A89CB8', '#3A3446'], 9, 0.3, 0.8);
+    o += d.clip(shape, F(shape, d.linear(0, -58, 30, 0, [[0, '#F4E8FF', 0.14], [0.5, '#000', 0], [1, '#000', 0.3]])) + F(blob(14, -2, 7, 4, 6), '#4F6A22', 0, 'opacity="0.6"'));
+    // a glowing rune ring where the arms cross
+    const ring = 'M15,-45.6A6.6,6.6 0 1 1 14.99,-45.6Z';
+    o += glow(d, L(ring, 1.4, vio), 1.8, 0.9) + L(ring, 0.9, '#E6CCFF');
+    o += crack(16, -56, 1.6, 20, 7, 0.8, vio, 1);
+    o += L(shape, LW);
+    s += grp(o, swFace(t, -0.31, 0.06, 0));
+    // a zombie hand clawing up out of the dirt in front
+    const [hx, hy] = t.p(0.22, 0.26);
+    const hand = `M${f(hx - 4)},${f(hy)}L${f(hx - 4)},${f(hy - 9)}L${f(hx - 6)},${f(hy - 15)}L${f(hx - 4.4)},${f(hy - 15.6)}L${f(hx - 2.6)},${f(hy - 11)}L${f(hx - 2.2)},${f(hy - 17)}L${f(hx - 0.6)},${f(hy - 17)}L${f(hx)},${f(hy - 11.4)}L${f(hx + 1.2)},${f(hy - 16)}L${f(hx + 2.8)},${f(hy - 15.4)}L${f(hx + 2)},${f(hy - 10)}L${f(hx + 4.6)},${f(hy - 12.6)}L${f(hx + 5.6)},${f(hy - 11.4)}L${f(hx + 2.4)},${f(hy - 6)}L${f(hx + 2.4)},${f(hy)}Z`;
+    s += F(hand, SKIN_Z, LW) + F(`M${f(hx + 0.4)},${f(hy - 8)}L${f(hx + 2.4)},${f(hy - 6)}L${f(hx + 2.4)},${f(hy)}L${f(hx + 0.4)},${f(hy)}Z`, SKIN_ZS, 0);
+    s += F(blob(hx, hy, 7, 2.6, 5), '#43321E', 0.8);
+    // wisps rising
+    s += glow(d, dot(X - 12, Y - 70, 1.2, vio) + dot(X + 8, Y - 78, 1, vio) + dot(X + 14, Y - 62, 0.9, '#E6CCFF'), 0.8, 0.9);
+    void EYE_Z;
     return s;
   });
 }
@@ -801,6 +833,7 @@ export function buildOutdoor(): ArtAsset[] {
   return [
     tombStr(),
     tombHp(),
+    tombRevive(),
     ...pethousePug(),
     ...pethouseKennel(),
     ...streetLamp(),

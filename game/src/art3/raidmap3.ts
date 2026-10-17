@@ -6,11 +6,11 @@
  *   map_bg            1600 x 900, anchor (0, 0). Our café's lot is on the LEFT; the rival lots are strung
  *                     along a winding road to the RIGHT, the boss lot last. Nothing busy is drawn in the pin
  *                     boxes (x ± 80, y - 172 .. y + 16 around each MAP3_LAYOUT point) so pins and labels sit clean.
- *   map_home, map_joint_<chuck|hank|vera|crunch|snob|boss>
+ *   map_home, map_joint_<chuck|hank|vera|crunch|snob|sushi|taco|lab|clown|boss>
  *                     150 x 130, anchor (0.5, 1): the bottom-centre point stands on the MAP3_LAYOUT spot.
  *   map_closed        150 x 130, anchor (0.5, 1): boards + "CLOSED · NEW MANAGEMENT SOON", placed over a pin.
  *   map_steal         48 x 48, anchor (0.5, 1): "this rival is stealing your customers" badge.
- *   rsign_<chuck|hank|vera|crunch|snob|boss>
+ *   rsign_<chuck|hank|vera|crunch|snob|sushi|taco|lab|clown|boss>
  *                     100 x 124 shopfront sign for the north-east ('r') wall, see RSIGN_META below.
  */
 import type { ArtAsset } from '../art/types';
@@ -21,19 +21,26 @@ import { K, bite, box, boxShade, cyl, dk, extrudeStack, fly, grain, grp, letteri
 
 export const MAP3_W = 1600;
 export const MAP3_H = 900;
-export type Map3Spot = 'home' | 'chuck' | 'hank' | 'vera' | 'crunch' | 'snob' | 'boss';
+export type Map3Spot = 'home' | 'chuck' | 'hank' | 'vera' | 'crunch' | 'snob' | 'sushi' | 'taco' | 'lab' | 'clown' | 'boss';
 
-/** Bottom-centre point of each pin, in map_bg pixels. Labels go above the pin (pin is 130 tall). */
+/**
+ * Bottom-centre point of each pin, in map_bg pixels. Labels go above the pin (pin is 130 tall). The road
+ * zig-zags between two rows so all nine joints, home and the boss lot fit with room for labels.
+ */
 export const MAP3_LAYOUT: Readonly<Record<Map3Spot, { x: number; y: number }>> = {
-  home: { x: 170, y: 660 },
-  chuck: { x: 387, y: 450 },
-  hank: { x: 603, y: 690 },
-  vera: { x: 820, y: 440 },
-  crunch: { x: 1037, y: 690 },
-  snob: { x: 1253, y: 440 },
+  home: { x: 120, y: 690 },
+  chuck: { x: 255, y: 450 },
+  hank: { x: 390, y: 700 },
+  vera: { x: 525, y: 450 },
+  crunch: { x: 660, y: 700 },
+  snob: { x: 795, y: 450 },
+  sushi: { x: 930, y: 700 },
+  taco: { x: 1065, y: 450 },
+  lab: { x: 1200, y: 700 },
+  clown: { x: 1335, y: 450 },
   boss: { x: 1470, y: 700 },
 };
-const ORDER: Map3Spot[] = ['home', 'chuck', 'hank', 'vera', 'crunch', 'snob', 'boss'];
+const ORDER: Map3Spot[] = ['home', 'chuck', 'hank', 'vera', 'crunch', 'snob', 'sushi', 'taco', 'lab', 'clown', 'boss'];
 
 /**
  * Rival shopfront signs (rsign_<id>) lie in the plane of the north-east ('r') wall and span TWO wall
@@ -666,7 +673,7 @@ function buildMapBg(): ArtAsset {
       [880, 860, { seed: 32, w: 0.3, wall: '#B2A684', roof: '#585248' }],
     ];
     // church with a steeple (pocket between chuck and vera)
-    for (const [x, y, ho] of town) o += H(x, y, ho);
+    for (const [x, y, ho] of town) if (!inPin(x, y, 6)) o += H(x, y, ho);
     {
       const t = new Iso(632, 382);
       const st = box(t, -0.07, 0.07, -0.07, 0.07, 0, 34, '#B0A688', '#B0A688', '#857C62', 1.1);
@@ -1896,5 +1903,14 @@ export function buildRaidMap3(): ArtAsset[] {
     rsignCrunch(),
     rsignSnob(),
     rsignBoss(),
+    // the later joints on the road reuse a neighbour's pin and sign until their own are drawn
+    ...(['sushi', 'taco', 'lab', 'clown'] as const).flatMap((id, i) => {
+      const pin = [pinHank, pinCrunch, pinSnob, pinChuck][i]();
+      const sign = [rsignHank, rsignCrunch, rsignSnob, rsignChuck][i]();
+      return [
+        { ...pin, key: `map_joint_${id}`, svg: pin.svg.split(pin.key).join(`map_joint_${id}`) },
+        { ...sign, key: `rsign_${id}`, svg: sign.svg.split(sign.key).join(`rsign_${id}`) },
+      ];
+    }),
   ];
 }

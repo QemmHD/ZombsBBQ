@@ -299,6 +299,8 @@ export const TUNING = {
   /** how long a seated customer waits for food before leaving unhappy */
   customerWaitSec: 60, // original: a minute, then they storm off
   eatSec: 30, // original: half a minute at the table
+  /** the tutorial's very first diner eats in 10 s (original: TUTORIAL_CUSTOMER_EAT_TIME) */
+  tutorialEatSec: 10,
   fleeSpeed: 3.0,
   baseWalkSpeed: 1.4, // tiles/sec at speed 0 (original: an average person walks ~1.9 tiles/s)
   walkSpeedPerStat: 0.125,
@@ -391,9 +393,9 @@ export const PURPLE = {
   max: 3,
   /** the first star lasts 48 h; the second adds 36 h to the timer, the third 24 h (original) */
   hours: [48, 36, 24],
-  /** with all three up, another finished list tops the timer up by 24 h, never past 108 h away */
+  /** with all three up, another finished list tops the timer up by 24 h, never past a week away (original) */
   refillHours: 24,
-  capHours: 108,
+  capHours: 168,
   /** bribe the reviewer: tick off one unfinished task for this much Brain Sauce (original: 2 toxin) */
   bribeSauce: 2,
 };

@@ -25,6 +25,7 @@ function afford(s: GameState, def: { cash?: number; sauce?: number }): string | 
 
 function pay(s: GameState, def: { cash?: number; sauce?: number }) {
   s.cash -= def.cash ?? 0;
+  s.stats.spent = (s.stats.spent ?? 0) + (def.cash ?? 0);
   s.sauce -= def.sauce ?? 0;
 }
 
@@ -322,6 +323,7 @@ export function paintWall(s: GameState, wall: 'l' | 'r', index: number, finishId
   if (s.walls[wall][index] === finishId) return 'It already looks like that.';
   if (s.cash < fin.cash) return 'Not enough cash!';
   s.cash -= fin.cash;
+  s.stats.spent = (s.stats.spent ?? 0) + fin.cash;
   s.walls[wall][index] = finishId;
   s.stats.purchases++;
   return null;
@@ -336,6 +338,7 @@ export function paintFloor(s: GameState, x: number, y: number, finishId: string)
   if (cur === finishId) return 'It already looks like that.';
   if (s.cash < fin.cash) return 'Not enough cash!';
   s.cash -= fin.cash;
+  s.stats.spent = (s.stats.spent ?? 0) + fin.cash;
   if (cur === 'stain' || cur === 'loose') s.stats.floorsFixed++;
   s.floors[key(x, y)] = finishId;
   s.stats.purchases++;
@@ -420,6 +423,7 @@ export function buyKeepWarm(s: GameState, stoveId: string): string | null {
   if (s.level < 3) return 'Unlocks at level 3.';
   if (s.cash < KEEP_WARM_COST) return 'Not enough cash!';
   s.cash -= KEEP_WARM_COST;
+  s.stats.spent = (s.stats.spent ?? 0) + KEEP_WARM_COST;
   f.keepWarm = true;
   return null;
 }

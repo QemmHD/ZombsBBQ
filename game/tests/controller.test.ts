@@ -33,14 +33,16 @@ describe('Controller saves', () => {
     const ctl = new Controller();
     ctl.state.level = 3;
     ctl.state.crewCap = S.crewCapForLevel(3);
-    const you = ctl.state.workers[0].id;
-    expect(ctl.beginRaid('chuck', [you], [])).toBeNull();
+    // YOU stays home (like the original's chef); send a zombie
+    const z = S.makeWorker(ctl.state, 'zombie', 'joe', { x: 3, y: 2 });
+    ctl.state.workers.push(z);
+    expect(ctl.beginRaid('chuck', [z.id], [])).toBeNull();
     for (let i = 0; i < 100; i++) ctl.update(0.1);
     // killed (no pagehide on iOS), relaunched
     const ctl2 = new Controller();
     for (let i = 0; i < 600; i++) ctl2.update(0.1);
-    expect(ctl2.state.workers[0].state).not.toBe('raiding');
-    expect(S.startCooking(ctl2.state, you, ctl2.state.stoves[0].id, 'sliders')).toBeNull();
+    const z2 = ctl2.state.workers.find((w) => w.id === z.id)!;
+    expect(z2.state).not.toBe('raiding');
   });
 
   it('back from 20 h in the background: real-time timers count it all, same as a cold start', async () => {

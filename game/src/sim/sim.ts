@@ -769,6 +769,7 @@ function spawnCustomers(s: GameState, dt: number) {
     eatEnd: 0,
   };
   s.customers.push(c);
+  if (def.tier !== 'common' && def.tier !== 'uncommon') s.events.push({ t: 'rareArrival', customerId: c.id, tier: def.tier });
   if (!seats.length) {
     // no clean table: walk in, look around, leave unhappy (like the original)
     c.state = 'turnedAway';
@@ -944,6 +945,7 @@ function findJob(s: GameState, w: Worker): boolean {
       food.slot.servings -= 1;
       w.job = { kind: 'serve', slotId: food.slot.id, dish: food.slot.dish!, customerId: c.id };
       if (food.slot.servings <= 0) food.slot.dish = undefined;
+      if (!s.counter.some((k) => k.dish && k.servings > 0)) s.events.push({ t: 'outOfFood' });
       c.serverId = w.id;
       w.state = 'toCounter';
       if (!goTo(s, w, food.at, speed, 'the counter')) releaseJob(s, w);
@@ -1110,9 +1112,11 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         if (table) faceTowards(w, table.x, table.y);
         c.state = 'eating';
         c.dish = job.dish;
-        // a moment holding the plate, then they tuck in (original)
+        // a moment holding the plate, then they tuck in (original). The tutorial's first diner eats
+        // quickly so the lesson keeps moving (original: 10 s)
+        const first = s.stats.served === 0 && s.tut < TUTORIAL.length && !s.customers.some((o) => o !== c && o.state === 'eating');
         c.holdUntil = s.now + TUNING.holdFoodSec;
-        c.eatEnd = c.holdUntil + TUNING.eatSec;
+        c.eatEnd = c.holdUntil + (first ? TUNING.tutorialEatSec : TUNING.eatSec);
         w.job = undefined;
         drain(w, TUNING.energyPerServe);
         addZombieXp(s, w, 1);
@@ -1247,6 +1251,7 @@ function finishStove(s: GameState, st: Stove) {
   // Frozen variants take FROZEN_BURN_MULT times longer to burn
   const wait = Math.max(TUNING.burnMinSec, dish.cookSec) * (f.keepWarm ? TUNING.keepWarmFactor : 1) * (dish.burnMult ?? 1);
   st.burnAt = s.now + wait;
+  st.burnWarn = s.now + wait * 0.75;
   // a cook with the XP perk (the Critic, Grandma…) makes every dish count for more
   const cook = s.workers.find((w) => w.id === st.cookId);
   const xp = Math.round(dish.xp * (cook ? perk(cook.type, 'xp') : 1));
@@ -1289,8 +1294,13 @@ function updateStove(s: GameState, st: Stove, dt: number) {
   } else if (st.status === 'done' && s.now >= (st.burnAt ?? Infinity) && !st.carrierId) {
     st.status = 'burnt';
     s.stats.burnt = (s.stats.burnt ?? 0) + 1;
+    st.burnWarn = undefined;
     s.events.push({ t: 'burnt', stoveId: st.id });
+  } else if (st.status === 'done' && s.now >= (st.burnWarn ?? Infinity) && !st.carrierId) {
+    st.burnWarn = undefined;
+    s.events.push({ t: 'burnSoon', stoveId: st.id });
   }
+  if (st.status !== 'done') st.burnWarn = undefined;
 }
 
 export const TUTORIAL = [

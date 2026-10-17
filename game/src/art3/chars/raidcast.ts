@@ -8,7 +8,7 @@
  *   boss_<r>                 the Head Chef (≈1.25× scale)            faces angry, shock, scream, dazed
  *   bigfoot                  Big Foot-Long, hot-dog sasquatch zombie (≈1.5×)   faces chomp, sleep, dazed
  *   werewoof                 werewolf zombie pet                     faces chomp, sleep, dazed
- *   <r> = chuck | hank | vera | crunch | snob | boss (Chef Inferno's food truck)
+ *   <r> = chuck | hank | vera | crunch | snob | sushi | taco | lab | clown | boss (Chef Inferno's food truck)
  * Every waiter and chef holds a weapon in the near forearm (armL2), pointing forward-down at rest, so
  * the human punch (cock back, then jab 98° forward) brings it round in a chop.
  * Chefs scowl even at rest (a heavy-lidded glare instead of the joint cast's bored stare), and every
@@ -36,7 +36,7 @@ import type { Tone, Pt } from './paint';
 
 type Box = [number, number, number, number];
 
-export const RAID3_RIVALS = ['chuck', 'hank', 'vera', 'crunch', 'snob', 'boss'] as const;
+export const RAID3_RIVALS = ['chuck', 'hank', 'vera', 'crunch', 'snob', 'sushi', 'taco', 'lab', 'clown', 'boss'] as const;
 export type Raid3Rival = (typeof RAID3_RIVALS)[number];
 export const RAID3_STAFF_IDS: string[] = RAID3_RIVALS.flatMap((r) => [`staff_${r}`, `staff_${r}_b`]);
 export const RAID3_CHEF_IDS: string[] = RAID3_RIVALS.map((r) => `boss_${r}`);
@@ -1660,6 +1660,277 @@ const boss_boss = mk({
   leg: legPaint({ kind: 'pants', col: tone('#2A2622', '#1A1816'), shoe: 'boot', shoeCol: C.black, stripe: '#5A1E16' }),
 });
 
+// ---------------------------------------------------------------- props and bits for the later road
+/** A frozen fish swung by the tail like a club (Sensei Sashimi). */
+function frozenFish(ang: number, sc: number): HandItem {
+  const FISH = tone('#6E8A9A', '#4E6878');
+  return weapon(ang, [-4, -8, 35, 8], (c) => {
+    const d = c.d;
+    let s = shade(d, 'M-3,-6.4L4.4,-1.2L4.4,1.2L-3,6.4Q-0.6,0 -3,-6.4Z', FISH, { lw: 0.9, inner: line('M-1,-3.6L3,-0.6M-1,3.6L3,0.6', 0.4, FISH.d) });
+    const body = 'M3.6,-2C10,-7.4 24,-8 31,-2.8Q34.6,0 31,2.8C24,8 10,7.4 3.6,2Z';
+    let inner = fill('M3,-0.6H34V4H3Z', FISH.d, 'opacity="0.35"') + fill(ellD(16, -3.4, 9, 1.8), lt(FISH.b, 0.4), 'opacity="0.55"');
+    inner += line('M9,-2.6Q18,-0.6 27,-2.6', 0.5, FISH.d, 'opacity="0.7"') + speck([4, -7, 30, 7], 18, ['#DDEBF0', FISH.d], c.seed + 3, 0.3, 0.6, 0.6);
+    s += shade(d, body, FISH, { lw: 1, inner });
+    s += circ(27.8, -1.8, 1.4, '#E8EEE8') + circ(28, -1.8, 0.65, INK) + line('M30.4,1.4q1,0.8 2.6,0', 0.6);
+    s += line('M14,-1.4q-1.6,2.6 0.4,4.4', 0.6, FISH.d);
+    // frost
+    s += line('M10,-5.6l1,-1.8M16,-6.6l0.4,-2M22,-6l1,-1.6M12,5.4l0.8,1.6', 0.6, '#E8F4F8');
+    return s;
+  }, { sc });
+}
+
+/** A round-bottomed flask of something glowing, held by the neck (Dr. Gristle's lab). */
+function beaker(ang: number, sc: number): HandItem {
+  const GL = tone('#B8CCC4', '#8AA49A');
+  return weapon(ang, [-5, -8, 28, 8], (c) => {
+    const d = c.d;
+    let s = shade(d, limb([-4, 0], [14, 0], 2.2, 2.4), GL, { lw: 0.9, inner: fill('M-4,-1.4H14V-0.4H-4Z', '#FFFFFF', 'opacity="0.4"') });
+    const glow = fill(ellD(20.6, 1.8, 6.2, 4), '#7FD43A', 'opacity="0.85"') + circ(18.6, 1, 0.8, '#D8F8A8') + circ(22, 2.6, 0.6, '#D8F8A8') + circ(20, 3.4, 0.5, '#D8F8A8');
+    s += shade(d, ellD(20, 0, 7.4, 6.6), GL, { lw: 1, inner: glow + fill(ellD(17.6, -3, 2.4, 1.3), '#FFFFFF', 'opacity="0.55"') });
+    s += line('M3,-2.6q-2,-3 0.6,-5.6q2.4,-2 1,-4.6', 1, '#7FD43A', 'opacity="0.5"');
+    return s;
+  }, { sc });
+}
+
+/** A long wooden pizza peel with a pizza still on it (Giggles). */
+function pizzaPeel(ang: number, sc: number): HandItem {
+  return weapon(ang, [-5, -10, 37, 10], (c) => {
+    const d = c.d;
+    let s = shade(d, limb([-4, 0], [17, 0], 2.2, 2.2), WOOD, { lw: 0.9 });
+    const blade = 'M16,-3L19,-9.4H33.4Q36.4,-9.4 36.4,-6.4V6.4Q36.4,9.4 33.4,9.4H19L16,3Z';
+    let inner = grime([16, -9, 36, 9], 4, '#5A3A1E', c.seed + 2, 1.6, 0.4) + fill(ellD(27.6, 0, 7.2, 7), '#C8962E') + fill(ellD(27.6, 0, 6, 5.8), '#A8402E');
+    inner += fill(ellD(27.6, 0, 5.6, 5.4), '#E0C470', 'opacity="0.55"') + circ(25.4, -2, 1.3, '#7A1E14') + circ(30, 2, 1.3, '#7A1E14') + circ(29.4, -2.8, 1.1, '#7A1E14') + circ(25.8, 2.6, 1, '#4E6A22');
+    inner += line('M27.6,-6.6V6.6M21,0H34.2', 0.4, '#7A3A1E', 'opacity="0.6"');
+    s += shade(d, blade, WOOD, { lw: 1, inner });
+    return s;
+  }, { sc });
+}
+
+/** A red-handled pizza cutter, wheel first. */
+function pizzaCutter(ang: number, sc: number): HandItem {
+  const RED = tone('#B8402E', '#8E2A1E');
+  return weapon(ang, [-5, -8, 25, 8], (c) => {
+    const d = c.d;
+    let s = shade(d, limb([-4, 0], [10, 0], 2.8, 2.4), RED, { lw: 0.9, inner: fill('M-4,-2H10V-1H-4Z', '#FFFFFF', 'opacity="0.3"') });
+    s += line('M10,0H16', 2.2) + line('M10,0H16', 1.2, STEEL.b);
+    s += shade(d, ellD(18, 0, 6.6, 6.6), STEEL, { lw: 1, inner: line(ellD(18, 0, 4.6, 4.6), 0.4, STEEL.d) + line('M14,-3.6l8,7', 0.5, lt(STEEL.b, 0.5), 'opacity="0.7"') });
+    s += circ(18, 0, 1.3, '#5A5A56') + stain(21, 4, 1.1, '#B8402E', c.seed + 4, 0.8, 1);
+    return s;
+  }, { sc });
+}
+
+/** A cone party hat with spots and a pompom (the Funhouse crew). */
+function partyHat(col: Tone, spot: string): HatPaint {
+  const paint = (c: Ctx, x0: number): string => {
+    const cone = `M${f(-9 + x0)},-94L${f(5 + x0)},-126L${f(18 + x0)},-94Q${f(5 + x0)},-89.6 ${f(-9 + x0)},-94Z`;
+    const inner = circ(1 + x0, -100, 1.7, spot) + circ(9 + x0, -108, 1.5, spot) + circ(6 + x0, -116, 1.2, spot) + circ(12 + x0, -98, 1.4, spot) + fill(`M${f(-9 + x0)},-94L${f(5 + x0)},-126L${f(1 + x0)},-94Z`, '#FFFFFF', 'opacity="0.18"');
+    let s = shade(c.d, cone, col, { lw: 1.1, inner });
+    s += shade(c.d, ellD(5 + x0, -127, 3.6, 3.4), tone('#E8E0C0', '#BCB494'), { lw: 0.9 });
+    return s;
+  };
+  return { front: (c) => paint(c, 0), back: (c) => paint(c, -2) };
+}
+
+/** Clown face: white muzzle and star eye paint under, a big red nose on top. */
+const clownPaint = (accent: string) => (c: Ctx) => {
+  let s = fill(ellD(11.6, -61.6, 9.4, 5.6), '#E8E4D8', 'opacity="0.8"');
+  s += fill(`M${f(EYE_N[0])},${f(EYE_N[1] - 9)}l1.6,3.4l-1.6,3l-1.6,-3Z`, accent, 'opacity="0.8"') + fill(`M${f(EYE_F[0])},${f(EYE_F[1] - 8.6)}l1.3,3l-1.3,2.6l-1.3,-2.6Z`, accent, 'opacity="0.8"');
+  return s + (c.z ? '' : '');
+};
+const clownNose = (c: Ctx) => shade(c.d, ellD(19.6, -69.4, 4, 3.8), tone('#C8302A', '#8E1E1A'), { lw: 0.9, inner: fill(ellD(18.4, -70.8, 1.4, 1), '#FFD0C0', 'opacity="0.8"') });
+
+/** A white lab coat over whatever they had on, long, stained with something green. */
+const labCoat = (o: { long?: number; stains?: number } = {}): Paint =>
+  seq(jacketTorso({ top: C.ltgrey, collar: 'shirt', tie: tone('#2C6985') }, { col: tone('#D8D8CC', '#AEAEA2'), lapels: true, pockets: true, long: o.long ?? 6, pin: '#7FD43A' }), splats(o.stains ?? 3, ['#6A9A2A', '#4E7A1E', '#8A7A3A']));
+
+const RAINBOW = tone('#C8502E', '#8E3A1E');
+const LIME = tone('#7EA83A', '#5A7E26');
+
+// ---------------------------------------------------------------- Sensei Sashimi's Sushi Slab
+const staff_sushi = mk({
+  body: 'slim',
+  bodyMod: { hipX: 4.8 },
+  height: 108,
+  skin: SKIN_TAN,
+  face: { shape: 'long', lid: 0.55, bags: 1, brow: 'thin', browCol: '#1E1A16', nose: 'small', mouth: 'flat', wrinkles: 0, look: [1.2, 0.2] },
+  hair: HAIR.black,
+  set: H.withHat(H.buzz(HAIR.black), H.headband(tone('#D8D4C6', '#B0AC9E'), true)),
+  drop: 9,
+  torso: seq(shirtTorso({ top: C.navy, collar: 'v', pants: C.black }), waistApron(tone('#D8D4C6', '#B0AC9E'), 9)),
+  arm: armPaint({ sleeve: 'rolled', col: C.navy, itemL: cleaver(45, 0.9) }),
+  leg: legPaint({ kind: 'pants', col: C.black, shoe: 'flat', shoeCol: C.black }),
+});
+
+const staff_sushi_b = mk({
+  body: 'slim',
+  height: 104,
+  skin: SKIN_PALE,
+  face: { shape: 'heart', lid: 0.55, bags: 0, brow: 'arched', browCol: '#1E1A16', nose: 'small', mouth: 'lips', lips: '#8A2A30', lash: true, wrinkles: 0 },
+  hair: HAIR.black,
+  set: H.bun(HAIR.black),
+  faceUnder: W.makeup({ blush: '#B05A5A' }),
+  drop: 12,
+  torso: seq(W.skirt(tone('#8A2A30', '#661C22'), { hem: 12, flare: 1.6, pattern: (c) => W.florals(c, [-18, c.b.tBot - 8, 20, c.b.tBot + 12], '#D8B060', '#E0D8C0', 10) }), shirtTorso({ top: tone('#8A2A30', '#661C22'), collar: 'v' }), W.neckerchief(tone('#D8B060', '#A88A40'))),
+  arm: armPaint({ sleeve: 'long', col: tone('#8A2A30', '#661C22'), itemL: tray(35, 0.87, tone('#2A2622', '#1A1816'), '#8A2A22') }),
+  leg: legPaint({ kind: 'skirtleg', col: C.white, shoe: 'flat', shoeCol: C.black, sock: tone('#E0DCD0') }),
+});
+
+const boss_sushi = mk({
+  body: 'muscle',
+  bodyMod: { s: 1.1, belly: 2 },
+  height: 112,
+  skin: SKIN_TAN,
+  face: { shape: 'square', lid: 0.5, bags: 2, brow: 'bushy', browCol: '#2A2420', nose: 'broken', mouth: 'grim', wrinkles: 2 },
+  hair: HAIR.grey,
+  set: H.withHat(H.topknot(HAIR.grey), H.headband(tone('#D8D4C6', '#B0AC9E'), true)),
+  facialHair: seqE(W.walrus(HAIR.grey), W.goatee(HAIR.grey)),
+  drop: 6,
+  torso: seq(neck, chefCoat(tone('#D8D2C0', '#AEA894'), { stains: 3, piping: '#2F3A4C' }), W.neckerchief(tone('#2F3A4C', '#1E2634'))),
+  arm: armPaint({ sleeve: 'rolled', col: tone('#D8D2C0', '#AEA894'), bulk: 1.05, itemL: frozenFish(50, 0.82) }),
+  leg: legPaint({ kind: 'pants', col: C.navy, shoe: 'clog', shoeCol: C.black }),
+});
+
+// ---------------------------------------------------------------- Salsa Sal's Taco Truck Stop
+const staff_taco = mk({
+  body: 'stocky',
+  height: 108,
+  skin: SKIN_TAN,
+  face: { shape: 'round', lid: 0.5, bags: 1, brow: 'thick', browCol: '#1E1A16', nose: 'big', mouth: 'grin', stubble: true, wrinkles: 1 },
+  hair: HAIR.black,
+  set: H.withHat(H.underHat(HAIR.black), H.backCap(tone('#3E6E66', '#2A4E48'), '#D8B060')),
+  facialHair: W.horseshoe(HAIR.black),
+  drop: 8,
+  torso: seq(shirtTorso({ top: tone('#B8682C', '#8E4E1E'), collar: 'tee', untucked: true, pants: C.denim }), W.apron(C.white, { len: 6, stains: 5 }), splats(4, ['#A0441E', '#6E8A2A', KETCHUP])),
+  arm: armPaint({ sleeve: 'short', col: tone('#B8682C', '#8E4E1E'), itemL: rollingPin(40, 0.95) }),
+  leg: legPaint({ kind: 'pants', col: C.denim, shoe: 'sneaker', shoeCol: tone('#D0CCC0'), sole: '#8A8478' }),
+});
+
+const staff_taco_b = mk({
+  body: 'slim',
+  height: 105,
+  skin: SKIN_TAN,
+  face: { shape: 'heart', lid: 0.5, bags: 0, brow: 'arched', browCol: '#1E1A16', nose: 'small', mouth: 'smirk', lips: '#8A3A34', lash: true, wrinkles: 0, look: [1, 0.2] },
+  hair: HAIR.dark,
+  set: H.withHat(H.pony(HAIR.dark, tone('#C8402E')), H.headband(tone('#C8402E', '#8E2A1E'))),
+  faceUnder: W.makeup({ mole: [17.4, -63.6] }),
+  drop: 9,
+  torso: seq(W.skirt(tone('#3E6E66', '#2A4E48'), { hem: 9, flare: 3, pleats: 4 }), W.tankTop(tone('#D8B060', '#A88A40'), { scoop: 5 }), waistApron(C.white, 6)),
+  arm: armPaint({ sleeve: 'none', col: tone('#D8B060'), itemL: hotSauce(45, 1), extra: beads(['#C8402E', '#3E6E66', '#D8B060']) }),
+  leg: legPaint({ kind: 'skirtleg', col: C.cream, shoe: 'boot', shoeCol: tone('#6A4A2E') }),
+});
+
+const boss_taco = mk({
+  body: 'fat',
+  bodyMod: { s: 1.12, belly: 5 },
+  height: 116,
+  skin: SKIN_TAN,
+  face: { shape: 'jowl', lid: 0.45, bags: 2, brow: 'bushy', browCol: '#1E1A16', nose: 'bulb', mouth: 'grin', wrinkles: 2 },
+  hair: HAIR.black,
+  set: H.withHat(H.underHat(HAIR.black, { shaggy: true }), H.backCap(tone('#C8402E', '#8E2A1E'), '#D8B060')),
+  facialHair: bigStache(HAIR.black),
+  drop: 8,
+  torso: seq(shirtTorso({ top: tone('#E0D4B4', '#B8AC8C'), collar: 'tee', pants: tone('#4A3A2E'), belt: '#2A1E14', buckle: '#D8B060' }), W.apron(tone('#C8402E', '#8E2A1E'), { len: 8, stains: 6 }), splats(5, ['#A0441E', '#6E8A2A', KETCHUP, MUSTARD])),
+  arm: armPaint({ sleeve: 'short', col: tone('#E0D4B4', '#B8AC8C'), bulk: 1.06, itemL: hotSauce(45, 1.3), extra: hairyArm('#2A2420') }),
+  leg: legPaint({ kind: 'pants', col: tone('#4A3A2E'), shoe: 'boot', shoeCol: tone('#6A4A2E'), cuffs: true }),
+});
+
+// ---------------------------------------------------------------- Dr. Gristle's Lab-oratory Diner
+const staff_lab = mk({
+  body: 'teen',
+  height: 106,
+  skin: SKIN_PALE,
+  face: { shape: 'egg', lid: 0.6, bags: 2, brow: 'sparse', nose: 'pointy', mouth: 'gap', wrinkles: 0, look: [1.2, -0.4] },
+  hair: HAIR.ginger,
+  set: H.messy(HAIR.ginger, { vol: 1.6 }),
+  faceOver: W.glasses('round', '#3A3A36', '#9BE36B'),
+  headBackOver: W.glassesBack('#3A3A36'),
+  drop: 8,
+  torso: labCoat({ long: 7, stains: 4 }),
+  arm: armPaint({ sleeve: 'long', col: tone('#D8D8CC', '#AEAEA2'), glove: tone('#9BBE6A', '#6E8E46'), itemL: beaker(35, 1) }),
+  leg: legPaint({ kind: 'pants', col: C.charcoal, shoe: 'dress', shoeCol: C.black }),
+});
+
+const staff_lab_b = mk({
+  body: 'slim',
+  height: 104,
+  face: { shape: 'heart', lid: 0.55, bags: 1, brow: 'arched', browCol: '#3A2A1E', nose: 'small', mouth: 'pout', lips: '#5A2A3A', lash: true, shadow: '#4A6A3A', wrinkles: 0 },
+  hair: tone('#4E3A5A', '#36283E'),
+  set: H.bob(tone('#4E3A5A', '#36283E')),
+  faceOver: W.glasses('cat', '#2A2622'),
+  headBackOver: W.glassesBack('#2A2622'),
+  drop: 9,
+  torso: seq(W.skirt(C.charcoal, { hem: 6, flare: 2 }), labCoat({ long: 9, stains: 2 })),
+  arm: armPaint({ sleeve: 'long', col: tone('#D8D8CC', '#AEAEA2'), itemL: coffeePot(0, 0.95) }),
+  leg: legPaint({ kind: 'tights', col: tone('#2A2622', '#1A1816'), shoe: 'flat', shoeCol: C.black }),
+});
+
+const boss_lab = mk({
+  body: 'old',
+  bodyMod: { s: 1.16, belly: 3, wBot: 13.4, hunch: 1.8 },
+  height: 110,
+  skin: SKIN_PALE,
+  face: { shape: 'long', lid: 0.4, bags: 2, brow: 'bushy', browCol: '#D0CCC0', nose: 'hook', mouth: 'grin', wrinkles: 3, look: [1.4, -0.4] },
+  hair: HAIR.white,
+  set: H.perm(HAIR.white),
+  facialHair: W.walrus(HAIR.white),
+  faceOver: W.glasses('round', '#3A3A36', '#9BE36B'),
+  headBackOver: W.glassesBack('#3A3A36'),
+  drop: 10,
+  torso: labCoat({ long: 10, stains: 6 }),
+  arm: armPaint({ sleeve: 'long', col: tone('#D8D8CC', '#AEAEA2'), glove: tone('#2A2622', '#1A1816'), bulk: 1.04, itemL: tenderiser(50, 0.86) }),
+  leg: legPaint({ kind: 'pants', col: C.charcoal, shoe: 'boot', shoeCol: C.black }),
+});
+
+// ---------------------------------------------------------------- Funhouse Pizza Pit
+const staff_clown = mk({
+  body: 'std',
+  bodyMod: { belly: 2 },
+  height: 110,
+  skin: SKIN_PALE,
+  face: { shape: 'round', lid: 0.45, bags: 1, brow: 'raised', browCol: '#2A2420', nose: 'pug', mouth: 'grin', wrinkles: 1 },
+  hair: LIME,
+  set: H.withHat(H.perm(LIME), partyHat(tone('#2C6985', '#1E4A5E'), '#D8B060')),
+  faceUnder: clownPaint('#2C6985'),
+  faceOver: clownNose,
+  headBox: TALL_BOX,
+  torso: seq(shirtTorso({ top: tone('#D8B060', '#A88A40'), collar: 'polo', pants: tone('#2C6985'), stripes: '#C8402E' }), W.suspenders('#C8402E'), splats(3, [KETCHUP, '#C8962E'])),
+  arm: armPaint({ sleeve: 'short', col: tone('#D8B060', '#A88A40'), stripes: '#C8402E', glove: tone('#E8E4D8', '#BCB8AC'), itemL: pizzaCutter(40, 1) }),
+  leg: legPaint({ kind: 'pants', col: tone('#2C6985'), shoe: 'clog', shoeCol: tone('#C8402E', '#8E2A1E'), stripe: '#D8B060' }),
+});
+
+const staff_clown_b = mk({
+  body: 'slim',
+  height: 106,
+  skin: SKIN_PALE,
+  face: { shape: 'heart', lid: 0.45, bags: 0, brow: 'arched', browCol: '#2A2420', nose: 'small', mouth: 'lips', lips: '#C8302A', lash: true, shadow: '#2C6985', wrinkles: 0 },
+  hair: RAINBOW,
+  set: H.withHat(H.pony(RAINBOW, tone('#7EA83A')), partyHat(tone('#C8402E', '#8E2A1E'), '#E8E4D8')),
+  faceUnder: clownPaint('#C8402E'),
+  faceOver: clownNose,
+  headBox: TALL_BOX,
+  drop: 9,
+  torso: seq(W.skirt(tone('#7EA83A', '#5A7E26'), { hem: 9, flare: 4, pleats: 6 }), shirtTorso({ top: tone('#E8E4D8', '#BCB8AC'), collar: 'scoop', stripes: '#2C6985' })),
+  arm: armPaint({ sleeve: 'short', col: tone('#E8E4D8', '#BCB8AC'), stripes: '#2C6985', itemL: rollingPin(40, 0.95) }),
+  leg: legPaint({ kind: 'tights', col: tone('#C8402E', '#8E2A1E'), shoe: 'clog', shoeCol: tone('#2C6985', '#1E4A5E') }),
+});
+
+const boss_clown = mk({
+  body: 'fat',
+  bodyMod: { s: 1.14, belly: 5.4 },
+  height: 118,
+  skin: SKIN_PALE,
+  face: { shape: 'jowl', lid: 0.4, bags: 2, brow: 'raised', browCol: '#2A2420', nose: 'bulb', mouth: 'grin', wrinkles: 2, look: [1.2, 0.2] },
+  hair: RAINBOW,
+  set: H.withHat(H.perm(RAINBOW), partyHat(tone('#7EA83A', '#5A7E26'), '#C8402E')),
+  faceUnder: clownPaint('#7EA83A'),
+  faceOver: clownNose,
+  headBox: TALL_BOX,
+  drop: 8,
+  torso: seq(shirtTorso({ top: tone('#E8E4D8', '#BCB8AC'), collar: 'polo', pants: tone('#7EA83A', '#5A7E26') }), W.suspenders('#2C6985'), bowTie(tone('#C8402E', '#8E2A1E')), W.apron(tone('#D8B060', '#A88A40'), { len: 7, stains: 6 }), splats(5, [KETCHUP, '#C8962E', MUSTARD])),
+  arm: armPaint({ sleeve: 'short', col: tone('#E8E4D8', '#BCB8AC'), stripes: '#C8402E', glove: tone('#E8E4D8', '#BCB8AC'), bulk: 1.06, itemL: pizzaPeel(50, 0.8) }),
+  leg: legPaint({ kind: 'pants', col: tone('#7EA83A', '#5A7E26'), shoe: 'clog', shoeCol: tone('#C8402E', '#8E2A1E'), stripe: '#2C6985' }),
+});
+
 // ---------------------------------------------------------------- the monsters
 const bigfoot = mk({
   body: 'sumo',
@@ -1724,6 +1995,18 @@ const RAID_CAST: Record<string, RaidEntry> = {
   staff_boss: staff(staff_boss),
   staff_boss_b: staff(staff_boss_b),
   boss_boss: chef(boss_boss),
+  staff_sushi: staff(staff_sushi),
+  staff_sushi_b: staff(staff_sushi_b),
+  boss_sushi: chef(boss_sushi),
+  staff_taco: staff(staff_taco),
+  staff_taco_b: staff(staff_taco_b),
+  boss_taco: chef(boss_taco),
+  staff_lab: staff(staff_lab),
+  staff_lab_b: staff(staff_lab_b),
+  boss_lab: chef(boss_lab),
+  staff_clown: staff(staff_clown),
+  staff_clown_b: staff(staff_clown_b),
+  boss_clown: chef(boss_clown),
   bigfoot: { look: bigfoot, z: true, faces: BEAST_FACES3 },
   werewoof: { look: werewoof, z: true, faces: BEAST_FACES3, face: wolfFace },
 };

@@ -50,7 +50,7 @@ describe('art v3 raid cast', () => {
     expect(RAID3_IDS).toContain('bigfoot');
     expect(RAID3_IDS).toContain('werewoof');
     expect(new Set(RAID3_IDS).size).toBe(RAID3_IDS.length);
-    expect(RAID3_IDS.length).toBe(20);
+    expect(RAID3_IDS.length).toBe(32);
   });
 
   it('returns null for ids it does not cover (quads, the joint cast)', () => {

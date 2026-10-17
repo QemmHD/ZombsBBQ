@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ArtAsset } from '../src/art/types';
 import { MAP3_H, MAP3_LAYOUT, MAP3_W, RSIGN_META, buildRaidMap3 } from '../src/art3/raidmap3';
 
-const RIVALS = ['chuck', 'hank', 'vera', 'crunch', 'snob', 'boss'];
+import { RIVALS as SIM_RIVALS } from '../src/sim/rivals';
+const RIVALS = SIM_RIVALS.map((r) => r.id as string);
 const KEYS = ['map_bg', 'map_home', ...RIVALS.map((r) => `map_joint_${r}`), 'map_closed', 'map_steal', ...RIVALS.map((r) => `rsign_${r}`)];
 
 const all = buildRaidMap3();
@@ -96,7 +97,7 @@ describe('art3 raid map frames', () => {
 
 describe('MAP3_LAYOUT', () => {
   const spots = Object.entries(MAP3_LAYOUT);
-  it('has home, the five rivals and the boss', () => {
+  it('has home and a pin for every rival on the road, plus the boss', () => {
     expect(Object.keys(MAP3_LAYOUT).sort()).toEqual(['home', ...RIVALS].sort());
   });
 
