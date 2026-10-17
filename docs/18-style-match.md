@@ -203,3 +203,10 @@ How the measured numbers were met:
 - **Clothes.** `C.denim`, `C.navy` and `C.teal` were re-toned (16 + 8 + 2 uses), so most characters pick up one saturated garment through their jeans or trousers; `C.royal` and `C.lilac` are new (accountant's tie, jane's top).
 
 Still off against the reference after this pass: the original's interior face lines taper (ours are uniform), its furniture grime is airbrushed (ours is flat low-opacity blobs), and the walls are still authored in cream rather than tinted at runtime (item 11).
+
+### Remaining items
+- §3 item 11: walls authored in greys and tinted at runtime (`room.ts` + scene tint); wallpaper variants come free once this is done.
+- Tapered interior lines (nose, folds, lids) — ours are uniform-width strokes.
+- Airbrushed furniture grime (soft radial fades) instead of flat low-opacity blobs; the fridge / stove rust streaks are still noisy.
+- Accent garments for the rest of the cast (only joe, jane, hipster and the accountant were hand-picked; the others get chroma through re-toned denim / navy / teal).
+- `tests/smoke.mjs` timed out once at the "Rest button" step (`tapSel('[data-a="rest"]')`) on this Windows host after step 6; not art-related, re-check on the next pass.
