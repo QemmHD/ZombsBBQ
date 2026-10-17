@@ -21,8 +21,8 @@ export const CHAR_H = 100;
 
 // ---------------------------------------------------------------- palette (muted, dirty, mid-value)
 export const INK = '#16120C'; // outlines: warm near-black
-export const LW = 1.25; // prop outline width (world units)
-export const LW_THIN = 0.8; // interior detail lines
+export const LW = 1.8; // prop outline width (world units): ~1.9 % of a tile, like the original's 3-4 px on 164
+export const LW_THIN = 1.0; // interior detail lines
 export const PAL = {
   grass: ['#577922', '#4A6615', '#3A4F0F', '#6B8A2C', '#7E9A3A'],
   concrete: '#C6C7C2',
