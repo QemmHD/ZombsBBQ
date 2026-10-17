@@ -254,7 +254,15 @@ if (zid) {
     if (st.status === 'done' || st.status === 'burnt') sim.plateDish(ctl.state, st.id);
     for (let i = 0; i < 100 && st.status !== 'empty'; i++) ctl.update(0.1);
   });
+  // a fresh zombie strolls about (and starts in the doorway): hold it still for the tap, or on this slow
+  // renderer the finger lands on the door it just left and closes the café
+  await page.evaluate((id) => {
+    const w = window.zbbq.ctl.state.workers.find((w) => w.id === id);
+    w.wanderAt = Infinity;
+    w.path = [];
+  }, zid);
   await tapActor(zid);
+  check(await page.evaluate(() => !window.zbbq.ctl.state.closed), 'tapping the new zombie leaves the café open');
   await tapWorld(sp.x, sp.y - 20);
   await tapSel('[data-dish="sliders"]', 'zombie dish');
   await ff(6);
