@@ -109,7 +109,7 @@ export class Hud {
       <div class="card hidden play-only" data-k="card"></div>
       <div class="editbar edit-only" data-k="editbar"></div>
       <div class="raidhud raid-only" data-k="raidhud"></div>
-      <div class="toasts" data-k="toasts"></div>
+      <div class="toasts" data-k="toasts" role="status" aria-live="polite"></div>
       <div class="modal-root" data-k="modal"></div>
     `;
     this.root.querySelectorAll<HTMLElement>('[data-k]').forEach((n) => (this.el[n.dataset.k!] = n));
@@ -163,7 +163,7 @@ export class Hud {
   openModal(html: string, opts: { cls?: string; onClose?: () => void; noClose?: boolean } = {}): HTMLElement {
     this.closeModal();
     const root = this.el.modal;
-    root.innerHTML = `<div class="modal-bg"><div class="modal ${opts.cls ?? ''}">${opts.noClose ? '' : `<button class="x" data-close aria-label="Close">${icon('ui_cancel', 'x-ico')}</button>`}${html}</div></div>`;
+    root.innerHTML = `<div class="modal-bg"><div class="modal ${opts.cls ?? ''}" role="dialog" aria-modal="true">${opts.noClose ? '' : `<button class="x" data-close aria-label="Close">${icon('ui_cancel', 'x-ico')}</button>`}${html}</div></div>`;
     const bg = root.querySelector<HTMLElement>('.modal-bg')!;
     const close = () => {
       if (this.modalClose === close) this.modalClose = null;

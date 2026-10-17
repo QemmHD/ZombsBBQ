@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc --noEmit && vite build && node tools/inline.mjs",
+    "build": "tsc --noEmit && node tools/icons.mjs && vite build && node tools/inline.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "smoke": "node tests/smoke.mjs",
@@ -16,6 +16,7 @@
     "phaser": "4.2.1"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
     "playwright-core": "1.56.1",
     "typescript": "5.9.3",
     "vite": "8.3.2",

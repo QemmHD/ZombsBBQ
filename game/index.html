@@ -7,9 +7,58 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Zombs BBQ" />
+    <meta name="application-name" content="Zombs BBQ" />
     <meta name="theme-color" content="#5C0F1D" />
+    <meta name="format-detection" content="telephone=no" />
     <title>Zombs BBQ</title>
-    <link rel="icon" href="data:," />
+    <!-- icons and the web app manifest are drawn by tools/icons.mjs at build time -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <style>
+      /* iOS: no long-press callouts or text selection on the game, no page pinch-zoom; only the lists scroll */
+      html,
+      body,
+      #game,
+      #hud {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      #game,
+      #game canvas {
+        touch-action: none;
+      }
+      .card,
+      .modal,
+      .rh-tray {
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
+      }
+      .tabs {
+        touch-action: pan-x;
+      }
+      img {
+        -webkit-user-drag: none;
+      }
+      /* small buttons keep their look but get a finger-sized (44 pt) invisible hit area */
+      .gear,
+      .btn.tiny {
+        position: relative;
+      }
+      .gear::after,
+      .x::after {
+        content: '';
+        position: absolute;
+        inset: -7px;
+      }
+      .btn.tiny::after {
+        content: '';
+        position: absolute;
+        inset: -7px -2px;
+      }
+    </style>
   </head>
   <body>
     <div id="game"></div>
