@@ -66,7 +66,7 @@ function capFront(o: CapO, seed: number): string {
   const rx = 20.4 + v;
   const ry = 21 + v;
   dd += `Q${f(fr[0] + 1.6)},${f(fr[1] - 1.6)} ${f(1 + Math.cos(-0.6) * rx)},${f(-77 + Math.sin(-0.6) * ry)}`;
-  dd += n > 0 ? arcClumps(1, -77, rx, ry, -34, -205, n + 3, o.topD ?? 2.6, seed + 3) : arcClumps(1, -77, rx, ry, -34, -205, 7, 0.9, seed + 3);
+  dd += n > 0 ? arcClumps(1, -77, rx, ry, -34, -205, n + 3, o.topD ?? 2.6, seed + 3) : arcClumps(1, -77, rx, ry, -34, -205, 8, 2.2, seed + 3);
   dd += `C-21.4,-69 -20.6,${f(nape - 2)} -17.6,${f(nape)}`;
   dd += `C-14,${f(nape - 1.4)} -10,${f(side + 1.6)} -6.6,${f(side)}Z`;
   return dd;
@@ -81,7 +81,7 @@ function capBack(o: { vol?: number; nape?: number; napeN?: number; topN?: number
   let dd = `M-16.8,${f(nape)}`;
   dd += clumps([-16.8, nape], [12, nape - 2.4], o.napeN ?? 7, -2.4, seed);
   dd += 'C12.6,-66 12.8,-73 13.8,-79';
-  dd += arcClumps(0.6, -78, rx, ry, -17, -198, n > 0 ? n + 3 : 8, n > 0 ? o.topD ?? 2.4 : 1, seed + 2);
+  dd += arcClumps(0.6, -78, rx, ry, -17, -198, n > 0 ? n + 3 : 9, n > 0 ? o.topD ?? 2.4 : 2.4, seed + 2);
   dd += `C${f(0.6 - rx - 0.2)},-68 -20.4,${f(nape - 4)} -16.8,${f(nape)}Z`;
   return dd;
 }
@@ -109,7 +109,7 @@ const NAPE_W: [number, number, number][] = [[-15, -57.4, 7], [-9, -57, 9], [-3, 
 const STRANDS_F =
   'M8,-100Q2,-94 -1.6,-86.6M12,-99Q10,-93 7,-86.6M16,-97Q16,-92 14,-87.4M2,-101Q-6,-96 -10,-86M-6,-100Q-14,-94 -17,-82M-12,-97Q-19,-88 -19.4,-74';
 const STRANDS_B =
-  'M-3,-90Q-10,-84 -14,-66M-3,-90Q-2,-80 -4,-64M-3,-90Q6,-82 6,-66M-3,-90Q-14,-94 -19,-84M-3,-90Q4,-98 14,-94M-3,-90Q-6,-98 -12,-99';
+  'M-3,-90Q-10,-84 -14,-66M-3,-90Q-2,-80 -4,-64M-3,-90Q6,-82 6,-66M-3,-90Q-14,-94 -19,-84M-3,-90Q4,-98 14,-94';
 
 function whorl(t: Tone): string {
   return line('M-4.6,-89q1.6,-3 4.4,-1.6M-2,-91.6q2.6,0.4 2.4,3', 0.55, t.d, 'opacity="0.8"');
@@ -294,7 +294,7 @@ export function bob(t: Tone): HairSet {
       return s;
     },
     hairBack: (c) => {
-      const cap = `M-21,-56` + clumps([-21, -56], [10.6, -57], 6, -1.4, c.seed) + `C11.4,-64 11,-72 13.4,-79C17,-82 21,-83 21.6,-87C21.4,-96 13,-103 2,-103C-10,-103 -22,-96 -22.8,-84C-23.4,-74 -23,-64 -21,-56Z`;
+      const cap = `M-21,-56` + clumps([-21, -56], [10.6, -57], 6, -1.4, c.seed) + `C11.4,-64 11,-72 13.4,-79C17,-82 21,-83 21.6,-87` + arcClumps(0, -84, 22, 19, -8, -187, 7, 2.6, c.seed + 5) + `C-23.4,-74 -23,-64 -21,-56Z`;
       return hairMass(c, cap, t, 'M-3,-96Q-10,-84 -14,-58M-3,-96Q-3,-80 -4,-58M-3,-96Q6,-80 6,-58M-3,-96Q-16,-92 -20,-60', 'M-14,-95Q0,-101 12,-97Q0,-98 -14,-92Z') + balding(c, cap, [[-2, -92, 7, 5]]);
     },
   };
@@ -351,7 +351,7 @@ export function waves(t: Tone): HairSet {
       return s;
     },
     hairBack: (c) => {
-      const cap = `M-24,-56C-20,-52 -12,-51 -6,-53C0,-51 8,-53 11,-58C11.4,-66 11,-74 13.4,-79C17,-82 22,-83 22.6,-88C22,-98 13,-105 2,-105C-12,-105 -24,-97 -25,-84C-26,-74 -26,-62 -24,-56Z`;
+      const cap = `M-24,-56C-20,-52 -12,-51 -6,-53C0,-51 8,-53 11,-58C11.4,-66 11,-74 13.4,-79C17,-82 22,-83 22.6,-88` + arcClumps(-0.5, -85, 24, 20.5, -8, -187, 7, 2.8, c.seed + 5) + `C-26,-74 -26,-62 -24,-56Z`;
       return hairMass(c, cap, t, 'M-3,-98Q-14,-86 -18,-56M-3,-98Q-4,-80 -8,-54M-3,-98Q6,-80 4,-54M-3,-98Q-20,-94 -23,-62', 'M-16,-96Q0,-102 14,-97Q0,-99 -16,-92Z') + balding(c, cap, [[0, -92, 8, 5]]);
     },
   };
@@ -432,7 +432,7 @@ export function longHair(t: Tone, tip: string): HairSet {
       return s;
     },
     hairBack: (c) => {
-      const cap = `M-24,-46C-16,-43 2,-43 10,-46C11,-58 11,-72 13.4,-79C17,-82 21,-83 21.6,-87C21.4,-96 13,-103 2,-103C-10,-103 -22,-96 -23.4,-84C-24.6,-72 -25,-56 -24,-46Z`;
+      const cap = `M-24,-46C-16,-43 2,-43 10,-46C11,-58 11,-72 13.4,-79C17,-82 21,-83 21.6,-87` + arcClumps(0, -84, 22.4, 19, -8, -187, 7, 2.6, c.seed + 5) + `C-24.6,-72 -25,-56 -24,-46Z`;
       return hairMass(c, cap, t, 'M-3,-102V-46M-3,-100Q-12,-80 -16,-46M-3,-100Q4,-80 4,-46M-3,-100Q-20,-92 -22,-48') + tips(c, cap) + line(cap, 1.2) + balding(c, cap, [[-3, -92, 7, 5]]);
     },
   };
@@ -482,13 +482,13 @@ export function hardHat(col: Tone): HatPaint {
       inner += outl('M-12,-98h7.4v5h-7.4Z', '#C8C2AE', 0.5) + line('M-11,-96.6h5M-11,-95h4', 0.4, '#6A3A2A');
       let s = shade(c.d, dome(false), col, { inner });
       const brim = 'M-24,-85.6C-24,-87.6 -20,-88 -14,-87.6L22,-87.6C26,-87.8 29.6,-87 29.4,-85.2C29.2,-83.4 26,-83 22,-83.2L-20,-83.2C-23,-83.2 -24,-84 -24,-85.6Z';
-      s += shade(c.d, brim, { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.5 });
+      s += shade(c.d, brim, { b: col.s, s: col.d, d: col.d }, { lw: 1.1 });
       if (c.z) s += line('M10,-107l2,4l-1.6,2l2.4,4', 0.7) + stain(-6, -92, 1.6, BLOOD, c.seed + 2, 0.6);
       return s;
     },
     back: (c) => {
       let s = shade(c.d, dome(true), col, { inner: line('M1,-108V-86', 2.2, col.s) + line('M1,-108V-86', 0.6) + grime([-18, -106, 22, -86], 5, '#5A4A22', c.seed + 3, 2.4, 0.3) });
-      s += shade(c.d, 'M-26,-85.6C-26,-87.6 -22,-88 -16,-87.6L20,-87.6C24,-87.8 26,-87 26,-85.2C26,-83.4 23,-83 19,-83.2L-22,-83.2C-25,-83.2 -26,-84 -26,-85.6Z', { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.5 });
+      s += shade(c.d, 'M-26,-85.6C-26,-87.6 -22,-88 -16,-87.6L20,-87.6C24,-87.8 26,-87 26,-85.2C26,-83.4 23,-83 19,-83.2L-22,-83.2C-25,-83.2 -26,-84 -26,-85.6Z', { b: col.s, s: col.d, d: col.d }, { lw: 1.1 });
       s += line('M-14,-82Q0,-78 14,-82', 0.9, '#2A2420');
       return s;
     },
@@ -503,7 +503,7 @@ export function peakCap(crown: Tone, band: Tone, badge: string): HatPaint {
       let s = shade(c.d, cr, crown, { inner: fold('M-10,-100Q2,-104 18,-100M-14,-92Q0,-96 16,-93', crown.s, 0.6) + speck([-20, -106, 26, -86], 20, [crown.d], c.seed, 0.2, 0.45, 0.4) });
       s += shade(c.d, 'M-19.4,-88.4C-18,-91 18,-91.6 19.6,-88.6L19.8,-84.6C18,-82.6 -18,-82.4 -19.6,-84.4Z', band, { lw: 1.1 });
       s += outl('M2.6,-93.4l2.4,-2.6l2.4,2.6l-0.6,3.2h-3.6Z', badge, 0.6) + circ(5, -92.2, 0.6, dk(badge, 0.6));
-      s += shade(c.d, 'M8,-84.6C14,-86 24,-86 29.4,-83.6C30.4,-82.4 29,-80.4 26,-80.2C20,-80 12,-81 8,-82.6Z', C.black, { lw: 1.1, k: 0.5 }) + fill(ellD(22, -82.8, 4, 0.8), '#8A8A86', 'opacity="0.5"');
+      s += shade(c.d, 'M8,-84.6C14,-86 24,-86 29.4,-83.6C30.4,-82.4 29,-80.4 26,-80.2C20,-80 12,-81 8,-82.6Z', C.black, { lw: 1.1 }) + fill(ellD(22, -82.8, 4, 0.8), '#8A8A86', 'opacity="0.5"');
       if (c.z) s += stain(-8, -96, 1.6, BLOOD, c.seed + 6, 0.6) + line('M14,-104l-2,3l1.4,1.6', 0.6);
       return s;
     },
@@ -577,7 +577,7 @@ export function backCap(col: Tone, logo?: string): HatPaint {
       // strap opening at the front with a tuft of hair
       s += fill('M12,-90.6C14,-93.4 18,-93.6 20.4,-90.4Z', '#2A2420') + line('M12,-90.6C14,-93.4 18,-93.6 20.4,-90.4', 0.7);
       // bill pointing back-left
-      s += shade(c.d, 'M-18,-90C-22,-92 -28,-91 -31,-88C-32,-86 -29,-85 -25,-85.6C-22,-86 -19.6,-86.8 -18.6,-87.6Z', { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.4 });
+      s += shade(c.d, 'M-18,-90C-22,-92 -28,-91 -31,-88C-32,-86 -29,-85 -25,-85.6C-22,-86 -19.6,-86.8 -18.6,-87.6Z', { b: col.s, s: col.d, d: col.d }, { lw: 1.1 });
       s += circ(2, -106.2, 1, col.s) + line(ellD(2, -106.2, 1, 1), 0.4);
       void logo;
       return s;
@@ -586,7 +586,7 @@ export function backCap(col: Tone, logo?: string): HatPaint {
       const cr = 'M-21,-87C-22,-98 -13,-106 1,-106C13,-106 21,-99 21,-88.6C12,-91 -11,-90.6 -21,-87Z';
       let s = shade(c.d, cr, col, { inner: line('M1,-106Q0,-98 0,-89.6', 0.55, col.d) });
       // bill toward the camera (down-left)
-      s += shade(c.d, 'M-20,-88.4C-22,-86 -24,-82 -21,-80C-14,-78 -2,-79 4,-82C6,-84 4,-87 0,-88.4Z', { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.4 });
+      s += shade(c.d, 'M-20,-88.4C-22,-86 -24,-82 -21,-80C-14,-78 -2,-79 4,-82C6,-84 4,-87 0,-88.4Z', { b: col.s, s: col.d, d: col.d }, { lw: 1.1 });
       if (logo) s += fill(ellD(-1, -96, 3.6, 3), logo, 'opacity="0.9"') + line(ellD(-1, -96, 3.6, 3), 0.5);
       return s;
     },

@@ -3,25 +3,27 @@
  * Texture URLs (--tex-*) are set at boot from the v3 UI art (src/art3/ui3.ts).
  */
 :root {
-  --maroon: #6d1727;
-  --maroon-light: #7e454e;
+  --maroon: #691122;
+  --maroon-light: #7a414c;
   --maroon-deep: #3f0c16;
-  --cream: #e8dfc4;
+  --cream: #f0ebdd;
   --cream-2: #d8cca6;
   --ink: #16120c;
   --gold: #d9b44a;
   --gold-deep: #a8822a;
-  --zgreen: #8fa84a;
-  --zgreen-deep: #5e7a26;
+  --zgreen: #88aa66;
+  --zgreen-deep: #556644;
   --sauce: #9bd62e;
   --fire: #c9762a;
-  --red: #a3342a;
+  --red: #df1e00;
   --blue: #3e6f86;
   --grass: #4f5a2c;
   --olive: #658433;
   --olive-d: #486d0d;
   --chalk: #e6e4d6;
-  --paper: #e9dfa8;
+  --chalk-slate: #1e1e1e;
+  --frame-wood: #563f27;
+  --paper: #ffec80;
   /* bundled OFL faces (src/fonts): Lilita One for display, Nunito for body text */
   --font: 'Lilita One', 'Arial Black', system-ui, sans-serif;
   --font-body: Nunito, 'Trebuchet MS', system-ui, sans-serif;
@@ -324,7 +326,7 @@ svg.st {
 /* ---------- context card + menus: a chalkboard in a beat-up wood frame ---------- */
 .card,
 .modal {
-  background: #2d3a2c;
+  background: var(--chalk-slate);
   border-style: solid;
   border-width: 14px;
   border-image: var(--tex-chalk) 24 fill / 14px stretch;
@@ -521,7 +523,7 @@ svg.st {
 
 /* ---------- decorating toolbar ---------- */
 .editbar {
-  background: #2d3a2c;
+  background: var(--chalk-slate);
   border-style: solid;
   border-width: 10px;
   border-image: var(--tex-chalk) 24 fill / 10px stretch;

@@ -41,22 +41,22 @@ function grass(seed: number) {
     // patches, a couple of broader faint ones, so neighbouring tiles blend into one lawn
     let patches = '';
     for (let k = 0; k < 2; k++) patches += F(blob(10 + r() * (W - 20), 8 + r() * (H - 16), 14 + r() * 10, 7 + r() * 5, seed * 37 + k), k ? PAL.grass[3] : PAL.grass[1], 0, `opacity="${f(0.1 + r() * 0.08)}"`);
-    for (let k = 0; k < 16; k++) {
+    for (let k = 0; k < 6; k++) {
       const x = 4 + r() * (W - 8);
       const y = 3 + r() * (H - 6);
       const col = [PAL.grass[1], PAL.grass[3], PAL.grass[2], PAL.grass[4]][k % 4];
-      patches += F(blob(x, y, 2.5 + r() * 5, 1.5 + r() * 3, seed * 31 + k), col, 0, `opacity="${f(0.12 + r() * 0.14)}"`);
+      patches += F(blob(x, y, 2.5 + r() * 5, 1.5 + r() * 3, seed * 31 + k), col, 0, `opacity="${f(0.08 + r() * 0.1)}"`);
     }
     s += d.clip(DIA, patches);
     // grass tufts: little V and W strokes, dark below, light tips
     let tufts = '';
-    for (let k = 0; k < 46; k++) {
+    for (let k = 0; k < 28; k++) {
       const x = 4 + r() * (W - 8);
       const y = 4 + r() * (H - 8);
       const h = 1.6 + r() * 2.4;
       const lean = (r() - 0.5) * 1.6;
       const dark = r() > 0.35;
-      const col = dark ? PAL.grass[2] : PAL.grass[4];
+      const col = dark ? PAL.grass[1] : PAL.grass[3];
       tufts += L(`M${f(x - 1.2)},${f(y)}L${f(x - 1.6 + lean)},${f(y - h)}M${f(x)},${f(y)}L${f(x + lean)},${f(y - h - 0.8)}M${f(x + 1.2)},${f(y)}L${f(x + 1.8 + lean)},${f(y - h * 0.8)}`, 0.55, col, `opacity="${dark ? 0.8 : 0.65}"`);
     }
     // the odd weed flower / pebble

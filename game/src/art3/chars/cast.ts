@@ -13,7 +13,7 @@ import { tankTop } from './wear';
 import * as PR from './props';
 import {
   INK, f, ellD, fill, line, outl, circ, inside, shade, hatch, stain, tone,
-  SKIN, SKIN_TAN, SKIN_DARK, SKIN_PALE, ZSKINS, BLOOD, C, fly, fold, speck, rip,
+  SKIN, SKIN_PEACH, SKIN_TAN, SKIN_DARK, SKIN_PALE, ZSKINS, BLOOD, C, fly, fold, speck, rip,
 } from './paint';
 import type { Tone, Pt } from './paint';
 
@@ -72,14 +72,14 @@ function seqE(...ps: (((c: Ctx, e: Expr) => string) | undefined)[]): (c: Ctx, e:
 
 // ---------------------------------------------------------------- hair tones
 const HAIR = {
-  brown: tone('#5A4430', '#3E2E1E'),
+  brown: tone('#665533', '#443322'),
   dark: tone('#3A2E24', '#261E16'),
   black: tone('#2A2622', '#1A1714'),
   grey: tone('#8E8A80', '#6A665C'),
   white: tone('#B8B4A6', '#908C7E'),
-  blond: tone('#B89E5E', '#8E763E'),
+  blond: tone('#DDCC77', '#AA9933'),
   bleach: tone('#C8BC8A', '#A09464'),
-  ginger: tone('#9A5A2E', '#74401E'),
+  ginger: tone('#BB7733', '#774411'),
   mouse: tone('#6E6048', '#504432'),
   perm: tone('#A6A2AA', '#86828C'),
 };
@@ -137,26 +137,28 @@ const joe = mk({
     top: tone('#7E7C70'),
     collar: 'tee',
     untucked: true,
-    pants: C.denim,
+    pants: C.navy,
     extra: (c) => (c.back ? '' : stain(-3, c.b.shY + 10, 1.6, '#7A3A1E', c.seed + 1, 0.7) + stain(6, c.b.tBot - 7, 1.1, '#5A4A2A', c.seed + 2, 0.6)),
   }),
   arm: armPaint({ sleeve: 'short', col: tone('#7E7C70') }),
-  leg: legPaint({ kind: 'pants', col: C.denim, shoe: 'sneaker', shoeCol: tone('#A8A290'), zBareSide: 1 }),
+  leg: legPaint({ kind: 'pants', col: C.navy, shoe: 'sneaker', shoeCol: tone('#A8A290'), zBareSide: 1 }),
 });
 
 const jane = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 101,
   face: { shape: 'heart', lid: 0.55, bags: 2, brow: 'thin', nose: 'small', mouth: 'frown', lips: '#7A4A4A', lash: true, wrinkles: 1, zMouth: 'slack' },
   hair: HAIR.mouse,
   set: H.bob(HAIR.mouse),
   earHidden: true,
-  torso: jacketTorso({ top: tone('#C8BC9C'), collar: 'scoop', pants: C.grey, untucked: false }, { col: tone('#6A6A44'), open: 6, buttons: 3 }),
+  torso: jacketTorso({ top: C.lilac, collar: 'scoop', pants: C.teal, untucked: false }, { col: tone('#6A6A44'), open: 6, buttons: 3 }),
   arm: armPaint({ sleeve: 'long', col: tone('#6A6A44'), band: true, itemL: PR.purse(tone('#5A3A2A')) }),
-  leg: legPaint({ kind: 'pants', col: C.grey, shoe: 'flat', shoeCol: C.black }),
+  leg: legPaint({ kind: 'pants', col: C.teal, shoe: 'flat', shoeCol: C.black }),
 });
 
 const senior = mk({
+  skin: SKIN_PEACH,
   body: 'old',
   height: 99,
   face: { shape: 'long', lid: 0.55, bags: 2, brow: 'bushy', browCol: '#C8C4B8', nose: 'bulb', mouth: 'frown', wrinkles: 3, stubble: true, zMouth: 'toothless' },
@@ -170,6 +172,7 @@ const senior = mk({
 });
 
 const hipster = mk({
+  skin: SKIN_TAN,
   body: 'slim',
   bodyMod: { hipX: 4.4, legW: 6 },
   height: 105,
@@ -179,12 +182,13 @@ const hipster = mk({
   faceUnder: W.fullBeard(HAIR.dark, 0.3),
   faceOver: W.glasses('round', '#3A2A1E'),
   headBackOver: W.glassesBack('#3A2A1E'),
-  torso: jacketTorso({ top: C.charcoal, collar: 'tee', untucked: true, pants: tone('#3E4A5A'), extra: (c) => (c.back ? '' : outl(`M-1,${f(c.b.shY + 8)}l6,0l-1,5l-5,0Z`, '#8A8270', 0.4) + line(`M0.4,${f(c.b.shY + 10)}h3.6`, 0.5, '#3A3833')) }, { col: tone('#5A6A7E'), open: 6, buttons: 0, pockets: true }),
+  torso: jacketTorso({ top: C.charcoal, collar: 'tee', untucked: true, pants: C.teal, extra: (c) => (c.back ? '' : outl(`M-1,${f(c.b.shY + 8)}l6,0l-1,5l-5,0Z`, '#8A8270', 0.4) + line(`M0.4,${f(c.b.shY + 10)}h3.6`, 0.5, '#3A3833')) }, { col: tone('#5A6A7E'), open: 6, buttons: 0, pockets: true }),
   arm: armPaint({ sleeve: 'rolled', col: tone('#5A6A7E'), itemL: PR.coffeeCup() }),
-  leg: legPaint({ kind: 'pants', col: tone('#3E4A5A'), shoe: 'boot', shoeCol: tone('#6A4A2E'), cuffs: true }),
+  leg: legPaint({ kind: 'pants', col: C.teal, shoe: 'boot', shoeCol: tone('#6A4A2E'), cuffs: true }),
 });
 
 const accountant = mk({
+  skin: SKIN_PEACH,
   body: 'std',
   bodyMod: { wTop: 9, shX: 9, belly: 1.4 },
   height: 100,
@@ -196,7 +200,7 @@ const accountant = mk({
   torso: shirtTorso({
     top: C.white,
     collar: 'shirt',
-    tie: tone('#6A4A30'),
+    tie: C.royal,
     pants: C.khaki,
     belt: '#4A3424',
     buckle: '#9A8A5A',
@@ -214,7 +218,7 @@ const accountant = mk({
 const yoga = mk({
   body: 'slim',
   height: 107,
-  skin: SKIN_TAN,
+  skin: SKIN_PEACH,
   face: { shape: 'heart', lid: 0.58, bags: 0, brow: 'arched', browCol: '#4A3A2A', nose: 'small', mouth: 'lips', lips: '#7A4A4E', lash: true, shadow: '#6A5A70', wrinkles: 0, zMouth: 'snarl' },
   hair: tone('#A88E58'),
   set: H.withHat(H.bun(tone('#A88E58')), H.headband(C.teal)),
@@ -224,6 +228,7 @@ const yoga = mk({
 });
 
 const teen = mk({
+  skin: SKIN_PEACH,
   body: 'teen',
   height: 101,
   face: { shape: 'small', lid: 0.62, bags: 2, brow: 'sparse', nose: 'pug', mouth: 'chew', wrinkles: 0, zMouth: 'gape', look: [0.4, 1] },
@@ -237,6 +242,7 @@ const teen = mk({
 });
 
 const politician = mk({
+  skin: SKIN_PEACH,
   body: 'stocky',
   bodyMod: { belly: 2.6 },
   height: 104,
@@ -297,6 +303,7 @@ const cop = mk({
 });
 
 const ceo = mk({
+  skin: SKIN_PEACH,
   body: 'std',
   height: 102,
   face: { shape: 'long', lid: 0.5, bags: 1, brow: 'raised', browCol: '#7A766C', nose: 'hook', mouth: 'sneer', wrinkles: 3, zMouth: 'stitched' },
@@ -357,6 +364,7 @@ const lumberjack = mk({
 });
 
 const cheerleader = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 106,
   face: { shape: 'heart', lid: 0.5, bags: 1, brow: 'arched', browCol: '#6A5030', nose: 'small', mouth: 'lips', lips: '#7A3440', lash: true, shadow: '#6A5A6A', wrinkles: 0, zMouth: 'crooked' },
@@ -405,6 +413,7 @@ const boxer = mk({
 });
 
 const grandma = mk({
+  skin: SKIN_PEACH,
   body: 'granny',
   height: 100,
   face: { shape: 'jowl', lid: 0.5, bags: 2, brow: 'sparse', browCol: '#8A8680', nose: 'hook', mouth: 'lips', lips: '#7A3A44', wrinkles: 3, zMouth: 'toothless' },
@@ -423,6 +432,7 @@ const grandma = mk({
 });
 
 const moviestar = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 106,
   face: { shape: 'heart', lid: 0.6, bags: 0, brow: 'arched', browCol: '#6A5A3A', nose: 'small', mouth: 'lips', lips: '#6D1727', lash: true, shadow: '#5A4A60', wrinkles: 0, zMouth: 'crooked' },
@@ -468,6 +478,7 @@ const sumo = mk({
 });
 
 const influencer = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 102,
   face: { shape: 'heart', lid: 0.4, bags: 0, brow: 'arched', browCol: '#3A2A20', nose: 'small', mouth: 'pout', lips: '#8A4A5A', lash: true, shadow: '#5A6A80', wrinkles: 0, zMouth: 'snarl', look: [1.4, 0] },
@@ -482,7 +493,7 @@ const influencer = mk({
 const celebrity = mk({
   body: 'std',
   height: 108,
-  skin: SKIN_TAN,
+  skin: SKIN_PEACH,
   face: { shape: 'long', lid: 0.55, bags: 1, brow: 'thin', nose: 'pointy', mouth: 'smirk', wrinkles: 1, zMouth: 'jaw' },
   hair: HAIR.bleach,
   set: H.spiky(HAIR.bleach, HAIR.dark),
@@ -528,11 +539,11 @@ function cowboyHat(col: Tone, band: string): H.HatPaint {
     front: (c) => {
       let s = shade(c.d, crown(0), col, { inner: fold('M2,-110Q3,-100 2,-90', col.s, 0.7) + speck([-18, -112, 22, -86], 20, [col.d], c.seed, 0.2, 0.5, 0.5) });
       s += shade(c.d, `M-17.4,-91.6C-8,-94 12,-94.4 21.4,-91.6L21.4,-87.6C12,-90 -8,-90 -17.6,-87.6Z`, tone(band), { lw: 0.9 }) + circ(14, -89.8, 0.9, '#B8963E');
-      s += shade(c.d, brim(0), { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.5 });
+      s += shade(c.d, brim(0), { b: col.s, s: col.d, d: col.d }, { lw: 1.1 });
       if (c.z) s += stain(-4, -100, 1.6, BLOOD, c.seed + 2, 0.6) + line('M12,-109l-2,3l1.6,1.6', 0.6);
       return s;
     },
-    back: (c) => shade(c.d, crown(-1), col, { inner: fold('M1,-110Q2,-100 1,-90', col.s, 0.7) }) + shade(c.d, brim(-2), { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.5 }),
+    back: (c) => shade(c.d, crown(-1), col, { inner: fold('M1,-110Q2,-100 1,-90', col.s, 0.7) }) + shade(c.d, brim(-2), { b: col.s, s: col.d, d: col.d }, { lw: 1.1 }),
   };
 }
 
@@ -635,6 +646,7 @@ const firefighter = mk({
 });
 
 const bride = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 106,
   face: { shape: 'heart', lid: 0.55, bags: 1, brow: 'arched', browCol: '#6A5030', nose: 'small', mouth: 'lips', lips: '#7A3440', lash: true, shadow: '#5A6A80', wrinkles: 0, zMouth: 'crooked' },
@@ -672,6 +684,7 @@ const headbanger = mk({
 });
 
 const surgeon = mk({
+  skin: SKIN_PEACH,
   body: 'std',
   height: 104,
   face: { shape: 'egg', lid: 0.55, bags: 2, brow: 'raised', browCol: '#3A2E24', nose: 'pointy', mouth: 'flat', wrinkles: 1, zMouth: 'stitched', look: [0.8, 0.2] },
@@ -685,6 +698,7 @@ const surgeon = mk({
 });
 
 const tycoon = mk({
+  skin: SKIN_PEACH,
   body: 'fat',
   bodyMod: { belly: 6 },
   height: 106,
@@ -729,7 +743,7 @@ const pitmaster = mk({
 const you = mk({
   body: 'std',
   height: 103,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'std', lid: 0.5, bags: 2, brow: 'thick', nose: 'big', mouth: 'smirk', stubble: true, wrinkles: 1 },
   hair: HAIR.dark,
   set: H.messy(HAIR.dark, { vol: 2.4 }),

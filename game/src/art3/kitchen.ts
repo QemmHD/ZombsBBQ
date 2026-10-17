@@ -634,7 +634,7 @@ function counterPlain(): ArtAsset {
     const body = tone('#7E7C58', 0.12, 0.32);
     // one handle snapped off: just its two screw holes left
     const front = doors2('#8A8862', CHROME) + F(rrect(26.4, 4.4, 2.2, 6.2, 0.6), '#8A8862') + dot(27.5, 5.4, 0.45, '#2A2622') + dot(27.5, 9.4, 0.45, '#2A2622');
-    const c = cabinet(d, t, { body, top: tone('#CFC6A2', 0.04), edge: tone(CHROME, 0.1, 0.38), kick: '#2E2B26', topZ: 36 }, front);
+    const c = cabinet(d, t, { body, top: tone('#6688AA', 0.04), edge: tone(CHROME, 0.1, 0.38), kick: '#2E2B26', topZ: 36 }, front);
     let s = c.base;
     const fc = faces(t, [CB[0], CB[1], CB[2], CB[3]], [CB[0], CB[1], CB[2], CB[3]], 3, 34);
     const fl = t.p(CB[0], CB[3], 3);
@@ -642,7 +642,9 @@ function counterPlain(): ArtAsset {
     s += d.clip(fc.side, smear(...t.p(CB[1], 0, 6), 18, 5, 7, PAL.grimeD, 0.4) + scratches(...t.p(CB[1], 0.4, 30), 40, 24, 8, 8, '#3A3622', 0.4, 4));
     s += c.top;
     // laminate: boomerang flecks, scuffs, a cigarette burn, coffee rings
-    let lam = speckle(d, c.topD, OFFW, 120, ['#9C9478', '#E6DFC2', '#7A8A6A', '#A87A5A'], 9, 0.3, 0.7, 0.8);
+    // blue laminate (the original's counter top #6688AA): a few flecks, then two soft painted grime patches instead of noise
+    let lam = speckle(d, c.topD, OFFW, 40, ['#4E6A88', '#8AAAC4', '#5A7A99', '#A87A5A'], 9, 0.3, 0.7, 0.7);
+    lam += F(blob(...t.p(0.12, -0.08, 36), 10, 4.6, 14, 8, 0.5), PAL.grimeD, 0, 'opacity="0.18"') + F(blob(...t.p(-0.24, 0.26, 36), 6.5, 3.4, 15, 8, 0.5), PAL.grimeD, 0, 'opacity="0.22"');
     const r = rnd(12);
     for (let k = 0; k < 9; k++) {
       const [x, y] = t.p(-0.4 + r() * 0.8, -0.4 + r() * 0.8, 36);
@@ -1403,8 +1405,9 @@ export const KITCHEN_KEYS = [
 ] as const;
 
 export function buildKitchen(): ArtAsset[] {
-  const cabEnamel: CabOpt = { body: tone(ENAMEL, 0.08, 0.32), top: tone('#D2CCB8', 0.05), edge: tone(CHROME, 0.1, 0.38), kick: '#2E2B26', topZ: 36 };
-  const cabCream: CabOpt = { body: tone('#7E8A6A', 0.12, 0.32), top: tone('#DCD6C2', 0.05), edge: tone(CHROME, 0.1, 0.38), kick: '#2E2B26', topZ: 36 };
+  // sink tops are the original's blue (#6688AA / #7799AA)
+  const cabEnamel: CabOpt = { body: tone(ENAMEL, 0.08, 0.32), top: tone('#6688AA', 0.05), edge: tone(CHROME, 0.1, 0.38), kick: '#2E2B26', topZ: 36 };
+  const cabCream: CabOpt = { body: tone('#7E8A6A', 0.12, 0.32), top: tone('#7799AA', 0.05), edge: tone(CHROME, 0.1, 0.38), kick: '#2E2B26', topZ: 36 };
   return [
     stoveDirty(), stovePlain(), stoveSteel(), stoveSuper(), grill(), smoker(), fryer(),
     steam(1), steam(2), steam(3), grillFlames(), fryerBubbles(), potBurnt(),

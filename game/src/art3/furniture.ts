@@ -79,7 +79,7 @@ function tablePlain(name: TintName): ArtAsset {
     tex += scratches(...t.p(-0.3, -0.1, TOP_Z), 50, 26, 10, name.length * 3, p.scuff, 0.55, 5);
     tex += L(ell(...t.p(0.18, -0.12, TOP_Z), 5.4, 3.3), 0.8, '#6A4A22', 'opacity="0.4"');
     tex += F(blob(...t.p(-0.22, 0.2, TOP_Z), 1.6, 1, 4), '#2A2016', 0, 'opacity="0.6"');
-    tex += speckle(d, top, OFF, 30, [dk(p.base, 0.2), lt(p.base, 0.3)], 5 + name.length, 0.3, 0.6, 0.6);
+    tex += speckle(d, top, OFF, 12, [dk(p.base, 0.2), lt(p.base, 0.3)], 5 + name.length, 0.3, 0.6, 0.5);
     // dried food smear + a ketchup drip running off the near edge
     tex += F(blob(...t.p(-0.05, 0.22, TOP_Z), 7, 2.6, 13 + name.length, 8, 0.6), '#6A4A22', 0, 'opacity="0.28"');
     tex += F(blob(...t.p(0.26, 0.36, TOP_Z), 2.6, 1.3, 21), '#7A2A22', 0, 'opacity="0.7"');
@@ -108,12 +108,14 @@ function tableDiner(): ArtAsset {
     s += ped.svg + L(`M${f(ped.top.cx - 1.4)},${f(ped.top.cy + 2)}V${f(base.top.cy - 2)}`, 0.6, CHROME_HI);
     s += box(d, t, [-0.12, 0.12, -0.12, 0.12, 24, 26.4], tone(CHROME_D, 0.2, 0.3), { sw: 0.8, grad: 0 });
     // the top: chrome-banded edge, red speckled formica
-    s += box(d, t, [-0.43, 0.43, -0.43, 0.43, 26.4, TOP_Z], { top: '#8E3A30', front: '#C3C7C5', side: '#8C9290' }, { sw: LW, grad: 0 });
+    s += box(d, t, [-0.43, 0.43, -0.43, 0.43, 26.4, TOP_Z], { top: '#CC1111', front: '#C3C7C5', side: '#8C9290' }, { sw: LW, grad: 0 });
     const ec = faces(t, [-0.43, 0.43, -0.43, 0.43], [-0.43, 0.43, -0.43, 0.43], 26.4, TOP_Z);
     s += L(seg(t, [-0.43, 0.43, 28.4], [0.43, 0.43, 28.4]) + seg(t, [0.43, 0.43, 28.4], [0.43, -0.43, 28.4]), 0.5, '#5E6462');
     s += d.clip(ec.front, L(seg(t, [-0.43, 0.43, 29.6], [0.43, 0.43, 29.6]), 0.6, CHROME_HI));
     const top = t.qd(-0.43, 0.43, -0.43, 0.43, TOP_Z);
-    let tex = speckle(d, top, OFF, 110, ['#5E1E1A', '#B0564A', '#D8C9B0', '#3A1410'], 12, 0.3, 0.75, 0.85);
+    // saturated diner red with a light fleck, grime as two soft patches rather than noise
+    let tex = speckle(d, top, OFF, 40, ['#AA0E0E', '#E24A3A', '#F0D8CC', '#771111'], 12, 0.3, 0.75, 0.8);
+    tex += F(blob(...t.p(0.14, -0.1, TOP_Z), 9, 4.4, 17, 8, 0.5), DEEP, 0, 'opacity="0.16"') + F(blob(...t.p(-0.22, 0.24, TOP_Z), 6, 3.2, 18, 8, 0.5), DEEP, 0, 'opacity="0.2"');
     tex += F(top, d.linear(...t.p(-0.43, -0.43, TOP_Z), ...t.p(0.43, 0.43, TOP_Z), [[0, '#FFFFFF', 0.12], [0.5, '#FFFFFF', 0], [1, DEEP, 0.15]]));
     tex += L(seg(t, [-0.35, 0.3, TOP_Z], [0.25, -0.35, TOP_Z]), 2.4, '#FFFFFF', 'opacity="0.1"');
     tex += scratches(...t.p(-0.3, 0, TOP_Z), 48, 24, 8, 3, '#E8D8C0', 0.4, 4);
@@ -356,7 +358,7 @@ function plainChair(name: TintName): ChairStyle {
   };
 }
 
-const VINYL = '#8A2E28';
+const VINYL = '#DD3322'; // diner-chair red (the original's #DD3322 / #771111)
 function dinerChair(): ChairStyle {
   const tube = (a: Pt, b: Pt) => L(`M${pp(a)}L${pp(b)}`, 2.6, INK) + L(`M${pp(a)}L${pp(b)}`, 1.6, CHROME) + L(`M${f(a[0] - 0.4)},${f(a[1])}L${f(b[0] - 0.4)},${f(b[1])}`, 0.45, CHROME_HI);
   return {
@@ -368,7 +370,7 @@ function dinerChair(): ChairStyle {
       const top = t.qd(-SI, SI, j0, j1, 20);
       // puffy cushion highlight + piping + a duct-taped tear
       let tex = F(top, d.radial(...t.p(-0.06, (j0 + j1) / 2 - 0.05, 20), 16, [[0, '#FFFFFF', 0.22], [1, '#FFFFFF', 0]]));
-      tex += L(t.qd(-SI + 0.03, SI - 0.03, j0 + 0.03, j1 - 0.03, 20), 0.5, '#5A1A16', 'opacity="0.6"');
+      tex += L(t.qd(-SI + 0.03, SI - 0.03, j0 + 0.03, j1 - 0.03, 20), 0.5, '#771111', 'opacity="0.7"');
       if (o > 0) {
         const [x, y] = t.p(0.06, j1 - 0.14, 20);
         tex += F(`M${f(x - 5)},${f(y - 1)}l9,2.6l-0.8,2.4l-9,-2.6z`, '#9A9C96', 0.4) + L(`M${f(x - 4)},${f(y + 0.4)}l7.6,2.2`, 0.3, '#6A6C66');

@@ -46,7 +46,7 @@ export function tone(base: string, top = 0.12, side = 0.3, front = 0.06): Tone {
 }
 
 // ---------------------------------------------------------------- shared materials
-export const ENAMEL = '#DAD6C8';
+export const ENAMEL = '#F4F4F0'; // white enamel: the original's fridges and stoves are #FFFFFF / #EEEEEE / #DDDDDD
 export const CAST = '#2E2B26';
 export const CAST_HI = '#5A564C';
 export const CHROME = '#BFC3C1';

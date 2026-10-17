@@ -107,7 +107,7 @@ export function goatee(t: Tone): (c: Ctx, e: Expr) => string {
 
 /** Sideburn strips in front of the ear. */
 export function sideburns(t: Tone, len = 6): (c: Ctx) => string {
-  return (c) => shade(c.d, `M-6.8,-74L-3.6,-74L-3.8,${f(-68 + len - 6)}L-6.4,${f(-67 + len - 6)}Z`, t, { lw: 0.8, k: 0 });
+  return (c) => shade(c.d, `M-6.8,-74L-3.6,-74L-3.8,${f(-68 + len - 6)}L-6.4,${f(-67 + len - 6)}Z`, t, { lw: 0.8 });
 }
 
 // ---------------------------------------------------------------- makeup / face paint
@@ -147,7 +147,7 @@ export function apron(col: Tone, o: { len?: number; stains?: number; pocket?: bo
       const bx = -1.6 + x0;
       s += shade(d, `M${f(bx)},${f(wy)}C${f(bx - 2.6)},${f(wy - 3.4)} ${f(bx - 6)},${f(wy - 2.6)} ${f(bx - 5.4)},${f(wy + 0.2)}C${f(bx - 5)},${f(wy + 2.4)} ${f(bx - 2.4)},${f(wy + 1.6)} ${f(bx)},${f(wy)}Z`, col, { lw: 0.8 });
       s += shade(d, `M${f(bx)},${f(wy)}C${f(bx + 2.6)},${f(wy - 3.4)} ${f(bx + 6)},${f(wy - 2.6)} ${f(bx + 5.4)},${f(wy + 0.2)}C${f(bx + 5)},${f(wy + 2.4)} ${f(bx + 2.4)},${f(wy + 1.6)} ${f(bx)},${f(wy)}Z`, col, { lw: 0.8 });
-      s += shade(d, `M${f(bx - 0.6)},${f(wy + 0.6)}L${f(bx - 3)},${f(wy + 8 + (z ? 1 : 0))}L${f(bx - 1.2)},${f(wy + 7.4)}L${f(bx + 0.6)},${f(wy + 0.6)}ZM${f(bx + 0.4)},${f(wy + 0.6)}L${f(bx + 2.6)},${f(wy + 7.8)}L${f(bx + 1)},${f(wy + 7)}Z`, col, { lw: 0.7, k: 0 });
+      s += shade(d, `M${f(bx - 0.6)},${f(wy + 0.6)}L${f(bx - 3)},${f(wy + 8 + (z ? 1 : 0))}L${f(bx - 1.2)},${f(wy + 7.4)}L${f(bx + 0.6)},${f(wy + 0.6)}ZM${f(bx + 0.4)},${f(wy + 0.6)}L${f(bx + 2.6)},${f(wy + 7.8)}L${f(bx + 1)},${f(wy + 7)}Z`, col, { lw: 0.7 });
       s += outl(ellD(bx, wy, 1.2, 1.1), col.s, 0.7);
       return s;
     }

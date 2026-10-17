@@ -181,3 +181,32 @@ Why:
 - Then draw them in SVG.
 
 The same goes for a quick 3D layout of rival cafés, to check camera framing.
+
+## 5. What changed (2026-10-17, branch `feat/anim`)
+
+§3 items 1–10 and 12–14 are in, one commit per step (item 11, runtime wall tinting, is not: it is a `room.ts` rewrite, not a constant). Screenshots live in `game/test-results-style/` (git-ignored); `before/` is the state before this pass, `stepN/` after step N. Pose sheets come from `tools/poses.html?c=<id>&k=2&rows=idle,walk,sit`, the joint and raid shots from `tests/gallery.mjs`.
+
+| Step | Item | Files | Before → after |
+|---|---|---|---|
+| 1 | 1–4: cooler greens, peach skins, hard cel, brush-weight ink | `chars/paint.ts`, `cast.ts`, `raidcast.ts`, `theme3.css` | `before/poses-joe.png` → `step1/poses-joe.png`; `before/poses-jane.png` → `step1/poses-jane.png` |
+| 2 | 5: prop outlines 1.8 / 1.0 | `kit.ts` | `before/joint-zoom.png` → `step2/joint-zoom.png` |
+| 3 | 6: big white eyes, pin pupils, heavy lid, zombie eye ring | `chars/head.ts` | `step1/poses-senior.png` → `step3/poses-senior.png` |
+| 4 | 7: hair clumps, jagged crowns, measured hair tones | `chars/head.ts` (`strandClumps`), `hair.ts`, `cast.ts` | `step3/poses-joe.png` → `step4/poses-joe.png` (back view), `step4/poses-jane.png` |
+| 5 | 8: torso 8.6 / 11.2, arms 8.8 | `chars/rig.ts` | `step4/poses-joe.png` → `step5/poses-joe.png`, `step5/poses-construction.png` |
+| 6 | 9: bright paper / legal pad / slate + wood / olive and red stickers / awning | `ui3.ts`, `theme3.css` | `step2/joint.png` → `step6/joint.png`; cards in `step6-smoke/02-dish-picker.png`, `06-infect-card.png` |
+| 7 | 10, 12, 13, 14: white enamel, diner reds, blue tops, soft grime blobs, flat grass, FX colours, saturated clothes accents | `p1kit.ts`, `kitchen.ts`, `furniture.ts`, `decor.ts`, `ground.ts`, `kit.ts`, `fx.ts`, `chars/paint.ts`, `cast.ts` | `step6/joint.png` → `step7/joint.png`, `step7/joint-zoom.png`, `step7/poses-jane.png` |
+
+How the measured numbers were met:
+- **Ink.** `shade()` now paints a second, wider stroke (`LW_SHADOW` 2.0) offset `+0.55,+0.55` *under* the fill, so only its bottom-right half shows past the silhouette: ~1.5 % of a character's height on the lit side, ~2.3 % on the shadow side (measured 1.05 % median, up to ~2 %). `vgrad` / `xgrad` and the `k` / `across` options are gone; every character part is one flat shadow tone plus the base shape shifted `[-2.2, -2]`.
+- **Hair.** `strandClumps()` turns each authored strand curve into a tapered wedge 5.2 units wide at the root, filled in the hair's shadow tone, so the fifty-odd hand-placed strand paths across the styles became clumps without redrawing any style.
+- **Skins.** 16 of 33 joint humans and 14 of 30 raid humans are `SKIN_PEACH`; khaki stays for joe, critic, benchwarmer, biker and the raid defaults.
+- **Clothes.** `C.denim`, `C.navy` and `C.teal` were re-toned (16 + 8 + 2 uses), so most characters pick up one saturated garment through their jeans or trousers; `C.royal` and `C.lilac` are new (accountant's tie, jane's top).
+
+Still off against the reference after this pass: the original's interior face lines taper (ours are uniform), its furniture grime is airbrushed (ours is flat low-opacity blobs), and the walls are still authored in cream rather than tinted at runtime (item 11).
+
+### Remaining items
+- §3 item 11: walls authored in greys and tinted at runtime (`room.ts` + scene tint); wallpaper variants come free once this is done.
+- Tapered interior lines (nose, folds, lids) — ours are uniform-width strokes.
+- Airbrushed furniture grime (soft radial fades) instead of flat low-opacity blobs; the fridge / stove rust streaks are still noisy.
+- Accent garments for the rest of the cast (only joe, jane, hipster and the accountant were hand-picked; the others get chroma through re-toned denim / navy / teal).
+- `tests/smoke.mjs` timed out once at the "Rest button" step (`tapSel('[data-a="rest"]')`) on this Windows host after step 6; not art-related, re-check on the next pass.
