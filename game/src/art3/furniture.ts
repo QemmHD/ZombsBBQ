@@ -23,7 +23,7 @@ import type { Pt } from '../art/svg';
 import { F, INK, Iso, L, LW, PAL, blob, crack, dot, objAsset, rnd, speckle } from './kit';
 import {
   BONE, BONE_D, CHROME, CHROME_D, CHROME_HI, DEEP, bone, box, cyl, disc, dk, faces, fly, hFor, lt, mix, onFront, onSide, pp, post,
-  prism, rust, scratches, seg, shadow, shadowDisc, tone,
+  prism, rust, scratches, seg, shadow, shadowDisc, streaks, tone, RUST,
 } from './p1kit';
 import type { Tone } from './p1kit';
 
@@ -39,7 +39,7 @@ export const TINTS = {
 } as const;
 export type TintName = keyof typeof TINTS;
 export const TINT_NAMES = Object.keys(TINTS) as TintName[];
-export const CHAIR_FAMILIES = ['plain', 'diner', 'wood', 'barrel', 'bone'] as const;
+export const CHAIR_FAMILIES = ['plain', 'diner', 'wood', 'barrel', 'bone', 'tire', 'cleaver', 'electric'] as const;
 export type ChairFamily = (typeof CHAIR_FAMILIES)[number];
 
 function paint(name: TintName): { tn: Tone; base: string; scuff: string; chip: string } {
@@ -663,13 +663,206 @@ function dividerWood(): ArtAsset {
   });
 }
 
+// ================================================================ late-game sets
+function tableDrum(): ArtAsset {
+  return objAsset('table_drum', hFor(36), (d, t) => {
+    let s = shadowDisc(d, t, 0, 0, 0.42, 0.3);
+    // a rusty blue oil drum with rolling hoops
+    const c = cyl(d, t, 0, 0, 0.28, 0, 27, tone('#3E5A6E', 0.14, 0.38));
+    s += c.svg;
+    let tex = speckle(d, c.body, OFF, 40, ['#22323E', '#7A9AAA'], 21, 0.3, 0.7, 0.6);
+    tex += F(blob(c.top.cx + 8, c.top.cy + 20, 4, 6, 22), RUST, 0, 'opacity="0.7"') + F(blob(c.top.cx - 10, c.top.cy + 26, 5, 3, 23), RUST, 0, 'opacity="0.6"');
+    tex += F(blob(c.top.cx - 4, c.top.cy + 14, 3, 2.4, 24), '#C9B03A', 0, 'opacity="0.5"'); // half a hazard sticker
+    s += d.clip(c.body, tex);
+    for (const z of [9, 18]) {
+      const e = disc(t, 0, 0, z, 0.285);
+      const arc = `M${f(e.cx - e.rx)},${f(e.cy)}A${f(e.rx)},${f(e.ry)} 0 0 0 ${f(e.cx + e.rx)},${f(e.cy)}`;
+      s += L(arc, 2.6, INK) + L(arc, 1.5, '#5A7A8E');
+    }
+    s += F(c.body, 'none', LW);
+    // a square of scrap plywood on top, one corner snapped
+    s += box(d, t, [-0.42, 0.42, -0.42, 0.42, 27, 29], tone('#A88E62', 0.1, 0.32), { sw: 1, grad: 0 });
+    s += box(d, t, [-0.43, 0.43, -0.43, 0.43, 29, TOP_Z], tone('#B89A6A', 0.08, 0.3), { sw: LW, grad: 0 });
+    const top = t.qd(-0.43, 0.43, -0.43, 0.43, TOP_Z);
+    let ply = '';
+    for (let k = 0; k < 7; k++) ply += L(seg(t, [-0.43, -0.4 + k * 0.13, TOP_Z], [0.43, -0.36 + k * 0.13, TOP_Z]), 0.4, '#8A6E44', 'opacity="0.6"');
+    ply += L(ell(...t.p(0.1, -0.15, TOP_Z), 5.4, 3.3), 0.9, '#3A3A3A', 'opacity="0.4"') + F(blob(...t.p(-0.2, 0.2, TOP_Z), 6, 3, 25), '#3A2A1A', 0, 'opacity="0.3"');
+    ply += speckle(d, top, OFF, 30, ['#6A5232', '#D8C090'], 26, 0.3, 0.6, 0.7);
+    s += d.clip(top, ply);
+    s += F(`M${pp(t.p(0.43, 0.25, TOP_Z))}L${pp(t.p(0.43, 0.43, TOP_Z))}L${pp(t.p(0.28, 0.43, TOP_Z))}Z`, '#6A5232', 0.5);
+    return s;
+  });
+}
+
+function tableButcher(): ArtAsset {
+  return objAsset('table_butcher', hFor(40), (d, t) => {
+    let s = shadow(d, t, -0.46, 0.46, -0.46, 0.46, 0.32);
+    const legT = tone('#6E4A2A', 0.12, 0.32);
+    for (const [i, j] of [[-0.34, -0.34], [0.34, -0.34], [-0.34, 0.34], [0.34, 0.34]] as [number, number][]) s += post(d, t, i, j, 0.12, 0, 22, legT, 1);
+    s += box(d, t, [-0.36, 0.36, -0.36, 0.36, 4, 7], legT, { sw: 0.8, grad: 0 }); // bottom shelf
+    // the thick end-grain block
+    s += box(d, t, [-0.44, 0.44, -0.44, 0.44, 22, TOP_Z + 1], tone('#9A7246', 0.12, 0.32));
+    const fc = faces(t, [-0.44, 0.44, -0.44, 0.44], [-0.44, 0.44, -0.44, 0.44], 22, TOP_Z + 1);
+    let side = '';
+    for (let k = 0; k < 9; k++) side += L(`M${f(k * 4.7)},0V9`, 0.5, '#5A3A1E', 'opacity="0.7"');
+    s += d.clip(fc.front, onFront(t, -0.44, 0.44, TOP_Z + 1, side)) + d.clip(fc.side, onSide(t, 0.44, 0.44, TOP_Z + 1, side));
+    const top = t.qd(-0.44, 0.44, -0.44, 0.44, TOP_Z + 1);
+    let tx = F(top, '#B08A58');
+    for (let a = 0; a < 6; a++) for (let b = 0; b < 6; b++) {
+      const i0 = -0.44 + a * (0.88 / 6);
+      const j0 = -0.44 + b * (0.88 / 6);
+      tx += F(t.qd(i0 + 0.005, i0 + 0.142, j0 + 0.005, j0 + 0.142, TOP_Z + 1), (a + b) % 2 ? '#A07A48' : '#B89260', 0);
+    }
+    // a worn hollow in the middle, knife scores, old blood
+    tx += F(blob(...t.p(0, 0, TOP_Z + 1), 18, 9, 31), '#5A3A1E', 0, 'opacity="0.25"');
+    tx += scratches(...t.p(-0.3, 0, TOP_Z + 1), 60, 30, 18, 32, '#3A2410', 0.6, 5);
+    tx += F(blob(...t.p(0.2, 0.15, TOP_Z + 1), 6, 3, 33), '#6A1A14', 0, 'opacity="0.55"') + F(blob(...t.p(-0.25, -0.2, TOP_Z + 1), 4, 2, 34), '#6A1A14', 0, 'opacity="0.4"');
+    s += d.clip(top, tx) + F(top, 'none', LW);
+    // a cleaver bitten into the far corner
+    const [cx, cy] = t.p(-0.3, -0.3, TOP_Z + 1);
+    s += F(`M${f(cx - 8)},${f(cy - 1)}L${f(cx + 4)},${f(cy + 2)}L${f(cx + 5)},${f(cy - 9)}L${f(cx - 7)},${f(cy - 12)}Z`, '#A8ACA8', 0.8) + dot(cx - 4, cy - 8, 0.9, '#2A2622');
+    s += L(`M${f(cx + 5)},${f(cy - 5)}L${f(cx + 13)},${f(cy - 4)}`, 2.6, INK) + L(`M${f(cx + 5)},${f(cy - 5)}L${f(cx + 13)},${f(cy - 4)}`, 1.6, '#4A2E18');
+    // blood drip down the front edge
+    s += onFront(t, -0.44, 0.44, TOP_Z + 1, F('M28,0q0,5 1,7q1,1 1.4,-0.6q0,-4 0.4,-6.4Z', '#6A1A14', 0.4));
+    return s;
+  });
+}
+
+function tableMorgue(): ArtAsset {
+  return objAsset('table_morgue', hFor(40), (d, t) => {
+    let s = shadow(d, t, -0.46, 0.46, -0.46, 0.46, 0.3);
+    // a steel pedestal and a drain bucket
+    s += cyl(d, t, 0, 0, 0.24, 0, 3, tone(CHROME_D, 0.2, 0.4), 1).svg;
+    s += cyl(d, t, 0, 0, 0.1, 3, 25, tone(CHROME, 0.2, 0.42), 1).svg;
+    // the slab: steel tray with a raised lip and a drain hole
+    s += box(d, t, [-0.45, 0.45, -0.45, 0.45, 25, TOP_Z], { top: '#B8BCB8', front: '#A2A6A2', side: '#7A7E7A' }, { sw: LW, grad: 0 });
+    const top = t.qd(-0.45, 0.45, -0.45, 0.45, TOP_Z);
+    let tx = F(t.qd(-0.4, 0.4, -0.4, 0.4, TOP_Z), '#9EA29E', 0.5);
+    tx += streaks(d, top, ...t.p(-0.45, -0.45, TOP_Z), 90, 50, 18, 41, 0.4, 0.3);
+    tx += L(seg(t, [-0.4, 0, TOP_Z], [0.4, 0, TOP_Z]), 0.6, '#6A6E6A') + F(ell(...t.p(0.32, 0, TOP_Z), 1.6, 1), '#2A2826', 0.4);
+    tx += F(blob(...t.p(0.25, 0.05, TOP_Z), 5, 2, 42), '#6A1A14', 0, 'opacity="0.35"');
+    s += d.clip(top, tx);
+    // the toe tag dangling off the near corner on its string
+    const [tx0, ty0] = t.p(0.45, 0.42, TOP_Z - 1);
+    s += L(`M${f(tx0)},${f(ty0)}q1,4 -1,7`, 0.5, '#8A8270');
+    s += `<g transform="rotate(12 ${f(tx0 - 1)} ${f(ty0 + 9)})">${F(`M${f(tx0 - 3.6)},${f(ty0 + 7)}h6l1.4,2.4l-1.4,2.4h-6Z`, '#D8CC98', 0.5)}${L(`M${f(tx0 - 2.6)},${f(ty0 + 9)}h4M${f(tx0 - 2.6)},${f(ty0 + 10.4)}h3`, 0.35, '#5A5040')}${dot(tx0 + 2.4, ty0 + 9.4, 0.4, '#5A5040')}</g>`;
+    return s;
+  });
+}
+
+function tireChair(): ChairStyle {
+  const rub = '#2A2826';
+  const tire = (d: Doc, t: Iso, cj: number, z0: number, z1: number) => {
+    const c = cyl(d, t, 0, cj, 0.23, z0, z1, tone(rub, 0.12, 0.3), 1);
+    let s = c.svg + d.clip(c.body, L(`M0,${f(c.top.cy + (z1 - z0) / 2 + c.top.ry)}H200`, 0.5, '#4A4846', 'opacity="0.8"'));
+    for (let k = -4; k <= 4; k++) s += L(`M${f(c.top.cx + (k / 4.6) * c.top.rx)},${f(c.top.cy + Math.sqrt(1 - (k / 4.6) ** 2) * c.top.ry + 1)}v${f(z1 - z0 - 2)}`, 0.5, '#4A4846');
+    s += F(ell(c.top.cx, c.top.cy, c.top.rx * 0.55, c.top.ry * 0.55), '#141210', 0.6);
+    return { s, top: c.top };
+  };
+  return {
+    seatZ: 18,
+    shadow: (d, t) => shadowDisc(d, t, 0, 0, 0.3, 0.28),
+    leg: () => '',
+    seat: (d, t, _j0, _j1, o) => {
+      let s = tire(d, t, o * SEAT_CJ, 0, 8).s;
+      const up = tire(d, t, o * SEAT_CJ, 8, 15);
+      s += up.s;
+      // a milk-crate seat on top
+      s += box(d, t, [-0.2, 0.2, o * SEAT_CJ - 0.2, o * SEAT_CJ + 0.2, 15, 18], tone('#5E7A3A', 0.14, 0.32), { sw: 1, grad: 0 });
+      const tp = t.qd(-0.2, 0.2, o * SEAT_CJ - 0.2, o * SEAT_CJ + 0.2, 18);
+      let g = '';
+      for (let k = 1; k < 5; k++) g += L(seg(t, [-0.2 + k * 0.08, o * SEAT_CJ - 0.2, 18], [-0.2 + k * 0.08, o * SEAT_CJ + 0.2, 18]), 0.7, '#2E3E1E') + L(seg(t, [-0.2, o * SEAT_CJ - 0.2 + k * 0.08, 18], [0.2, o * SEAT_CJ - 0.2 + k * 0.08, 18]), 0.7, '#2E3E1E');
+      s += d.clip(tp, g);
+      return s;
+    },
+    back: (_d, t, jb, o) => {
+      // a bald tyre standing on edge behind the seat, chained on
+      const c = t.p(0, jb, 28);
+      const ring = (rx: number, ry: number) => `M${f(c[0] - rx)},${f(c[1])}a${f(rx)},${f(ry)} 0 1 0 ${f(rx * 2)},0a${f(rx)},${f(ry)} 0 1 0 ${f(-rx * 2)},0Z`;
+      const outer = ring(12, 13);
+      const inner = ring(6.4, 7);
+      let s = `<path d="${outer}${inner}" fill="${o > 0 ? '#22201E' : '#2E2C2A'}" fill-rule="evenodd" stroke="${INK}" stroke-width="${LW}"/>`;
+      s += L(ring(9.2, 10), 0.5, '#4A4846');
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        s += L(`M${f(c[0] + Math.cos(a) * 9.6)},${f(c[1] + Math.sin(a) * 10.4)}l${f(Math.cos(a) * 2)},${f(Math.sin(a) * 2.2)}`, 0.6, '#4A4846');
+      }
+      s += L(`M${f(c[0] - 5)},${f(c[1] + 11)}l2,6M${f(c[0] + 5)},${f(c[1] + 11)}l-2,6`, 1.6, '#7F8584');
+      return s;
+    },
+  };
+}
+
+function cleaverChair(): ChairStyle {
+  const w = tone('#7A5634', 0.12, 0.32);
+  const steel = '#A8ACA8';
+  return {
+    seatZ: 18,
+    leg: (d, t, i, j) => post(d, t, i, j, 0.06, 0, 15, w),
+    seat: (d, t, j0, j1, o) => {
+      let s = box(d, t, [-SI, SI, j0, j1, 14, 18], tone('#8A6038', 0.12, 0.32), { sw: 1.1, grad: 0 });
+      const top = t.qd(-SI, SI, j0, j1, 18);
+      s += d.clip(top, scratches(...t.p(-0.15, (j0 + j1) / 2 - 0.1, 18), 22, 10, 6, 50 + o, '#3A2410', 0.5, 3) + F(blob(...t.p(0.05, (j0 + j1) / 2, 18), 3, 1.6, 51 + o), '#6A1A14', 0, 'opacity="0.35"'));
+      return s;
+    },
+    back: (d, t, jb, o) => {
+      // the backrest is one huge cleaver: wooden grip as the left upright, the blade as the panel
+      let s = post(d, t, -LI, jb, 0.06, 0, 30, w) + post(d, t, LI, jb, 0.06, 0, 30, w);
+      const W = (2 * SI + 0.04) * 48;
+      let bl = F(`M0,0H${f(W)}V16L${f(W - 3)},20H0Z`, steel, 0.9);
+      bl += L(`M1,18.6H${f(W - 3.4)}`, 0.8, '#E8ECE8') + F(ell(W - 5, 4.4, 1.8, 1.8), '#2A2826', 0.4);
+      if (o > 0) bl += F(blob(10, 12, 4, 3, 52), '#6A1A14', 0, 'opacity="0.5"');
+      bl += L(`M3,3L${f(W - 10)},5`, 0.6, '#FFFFFF', 'opacity="0.5"');
+      s += onFront(t, -SI - 0.02, jb, 50, bl);
+      // the handle sticking up past the blade
+      const a = t.p(-SI - 0.02, jb, 48);
+      s += L(`M${pp(a)}l-2,-10`, 4, INK) + L(`M${pp(a)}l-2,-10`, 2.8, '#5A3A1E') + dot(a[0] - 0.6, a[1] - 3, 0.5, '#B8BAB4') + dot(a[0] - 1.4, a[1] - 7, 0.5, '#B8BAB4');
+      return s;
+    },
+  };
+}
+
+function electricChair(): ChairStyle {
+  const w = tone('#5E4A36', 0.12, 0.34);
+  const strap = '#3A2A1E';
+  return {
+    seatZ: 19,
+    leg: (d, t, i, j) => post(d, t, i, j, 0.07, 0, 15, w) + box(d, t, [i - 0.04, i + 0.04, j - 0.02, j + 0.02, 4, 7], tone(strap), { sw: 0.6, grad: 0 }),
+    seat: (d, t, j0, j1) => {
+      let s = box(d, t, [-SI - 0.03, SI + 0.03, j0, j1, 15, 19], w, { sw: 1.1, grad: 0 });
+      const top = t.qd(-SI - 0.03, SI + 0.03, j0, j1, 19);
+      s += d.clip(top, F(blob(...t.p(0, (j0 + j1) / 2, 19), 5, 2.4, 61), '#2A1E14', 0, 'opacity="0.4"'));
+      // armrests with leather straps and buckles
+      for (const i of [-SI - 0.02, SI + 0.02]) {
+        s += box(d, t, [i - 0.03, i + 0.03, j0 + 0.04, j1 - 0.02, 19, 28], w, { sw: 0.8, grad: 0 });
+        s += box(d, t, [i - 0.045, i + 0.045, (j0 + j1) / 2 - 0.03, (j0 + j1) / 2 + 0.03, 26.5, 29], tone(strap), { sw: 0.6, grad: 0 });
+        s += dot(...t.p(i + 0.045, (j0 + j1) / 2, 27.6), 0.6, '#B8963E');
+      }
+      return s;
+    },
+    back: (d, t, jb, o) => {
+      let s = post(d, t, -LI, jb, 0.07, 0, 52, w) + post(d, t, LI, jb, 0.07, 0, 52, w);
+      s += box(d, t, [-SI, SI, jb - 0.02, jb + 0.02, 24, 46], tone('#6E5A42', 0.12, 0.32), { sw: 1, grad: 0 });
+      s += box(d, t, [-SI - 0.01, SI + 0.01, jb - 0.03, jb + 0.03, 36, 38.5], tone(strap), { sw: 0.6, grad: 0 });
+      // the steel skullcap on its arm, wires snaking down, a warning sign
+      const cap = t.p(0, jb + o * 0.06, 58);
+      s += L(`M${pp(t.p(LI, jb, 52))}Q${f(cap[0] + 8)},${f(cap[1] - 8)} ${f(cap[0] + 2)},${f(cap[1] - 3)}`, 2.4, INK) + L(`M${pp(t.p(LI, jb, 52))}Q${f(cap[0] + 8)},${f(cap[1] - 8)} ${f(cap[0] + 2)},${f(cap[1] - 3)}`, 1.4, '#7F8584');
+      s += F(`M${f(cap[0] - 6)},${f(cap[1])}C${f(cap[0] - 6)},${f(cap[1] - 7)} ${f(cap[0] + 6)},${f(cap[1] - 7)} ${f(cap[0] + 6)},${f(cap[1])}Z`, '#A8ACA8', 0.9) + L(`M${f(cap[0] - 4)},${f(cap[1] - 3)}h8`, 0.5, '#6A6E6A');
+      s += L(`M${f(cap[0] + 5)},${f(cap[1] - 4)}C${f(cap[0] + 14)},${f(cap[1] + 4)} ${f(cap[0] + 10)},${f(cap[1] + 30)} ${f(cap[0] + 14)},${f(cap[1] + 50)}`, 1.2, '#2A2826');
+      s += `<g opacity="0.85">${L(`M${f(cap[0] - 2)},${f(cap[1] - 9)}l2,-3l-1,2.6l2.4,-3`, 0.7, '#E6E07A')}</g>`;
+      if (o > 0) s += onFront(t, -0.1, jb + 0.03, 34, F('M0,0L5,8.6H-5Z', '#C9B03A', 0.5) + L('M0,2.6l-1,2.6h2l-1,2.4', 0.5, INK));
+      return s;
+    },
+  };
+}
+
 // ================================================================ meta + export
-const SEAT_Z: Record<ChairFamily, number> = { plain: 18, diner: 20, wood: 18, barrel: 18, bone: 17 };
+const SEAT_Z: Record<ChairFamily, number> = { plain: 18, diner: 20, wood: 18, barrel: 18, bone: 17, tire: 18, cleaver: 18, electric: 19 };
 const screenOff = (i: number, j: number) => ({ dx: Math.round((i - j) * 48 * 100) / 100, dy: Math.round((i + j) * 30 * 100) / 100 });
 
 const TABLE_TOP: Record<string, number> = {};
 for (const n of TINT_NAMES) TABLE_TOP[`table_plain_${n}`] = TOP_Z;
-Object.assign(TABLE_TOP, { table_diner: TOP_Z, table_wood: 31, table_barrel: TOP_Z, table_coffin: 31 });
+Object.assign(TABLE_TOP, { table_diner: TOP_Z, table_wood: 31, table_barrel: TOP_Z, table_coffin: 31, table_drum: TOP_Z, table_butcher: TOP_Z + 1, table_morgue: TOP_Z });
 
 export const FURN_META = {
   tints: TINTS,
@@ -689,7 +882,7 @@ export const FURN_META = {
     nw: screenOff(-SEAT_CJ, 0),
   },
   /** Backrest top height (for sorting / bubbles). */
-  backTopZ: { plain: 47, diner: 46, wood: 49, barrel: 38, bone: 55 } as Record<ChairFamily, number>,
+  backTopZ: { plain: 47, diner: 46, wood: 49, barrel: 38, bone: 55, tire: 41, cleaver: 60, electric: 66 } as Record<ChairFamily, number>,
   /** Plate centre relative to the table tile centre in screen units (the middle of the top). */
   plateOffset: Object.fromEntries(Object.entries(TABLE_TOP).map(([k, z]) => [k, { dx: 0, dy: -z }])) as Record<string, { dx: number; dy: number }>,
   /** Divider height. */
@@ -703,9 +896,9 @@ export function chairFamilyOf(key: string): ChairFamily | null {
 
 export const FURN_KEYS: string[] = [
   ...TINT_NAMES.map((n) => `table_plain_${n}`),
-  'table_diner', 'table_wood', 'table_barrel', 'table_coffin',
+  'table_diner', 'table_wood', 'table_barrel', 'table_coffin', 'table_drum', 'table_butcher', 'table_morgue',
   ...TINT_NAMES.flatMap((n) => ['sw', 'ne', 'ne_back'].map((s) => `chair_plain_${n}_${s}`)),
-  ...['diner', 'wood', 'barrel', 'bone'].flatMap((fam) => ['sw', 'ne', 'ne_back'].map((s) => `chair_${fam}_${s}`)),
+  ...['diner', 'wood', 'barrel', 'bone', 'tire', 'cleaver', 'electric'].flatMap((fam) => ['sw', 'ne', 'ne_back'].map((s) => `chair_${fam}_${s}`)),
   'divider_plain', 'divider_brick', 'divider_wood',
 ];
 
@@ -718,6 +911,10 @@ export function buildFurniture(): ArtAsset[] {
   out.push(...chairSet('wood', woodChair()));
   out.push(...chairSet('barrel', barrelChair()));
   out.push(...chairSet('bone', boneChair(), hFor(60, 0.4)));
+  out.push(tableDrum(), tableButcher(), tableMorgue());
+  out.push(...chairSet('tire', tireChair()));
+  out.push(...chairSet('cleaver', cleaverChair(), hFor(62, 0.4)));
+  out.push(...chairSet('electric', electricChair(), hFor(72, 0.4)));
   out.push(dividerPlain(), dividerBrick(), dividerWood());
   return out;
 }

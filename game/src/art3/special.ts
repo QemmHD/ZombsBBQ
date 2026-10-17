@@ -606,6 +606,198 @@ function foosball(): ArtAsset {
   });
 }
 
+// ---------------------------------------------------------------- late-game money-makers
+function gumballEyes(): ArtAsset {
+  return objAsset('gumball_eyes', 128, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.3, 0.26);
+    // red cast-iron stand, coin box, chute
+    s += cyl(d, X, Y, 14, 8, 0, 4, '#7A2A22', '#4A1612', '#9A3A2E').s;
+    s += cyl(d, X, Y - 2, 5, 4, 4, 30, '#7A2A22', '#4A1612', '#9A3A2E').s;
+    const b = box(t, -0.16, 0.16, -0.16, 0.16, 30, 46, '#A83A2E', '#8A2A22', '#5A1A14');
+    s += b.fills + boxShade(d, t, b, -0.16, 0.16, 0.16, 30, 46) + b.lines;
+    let fc = F(rect(4, -13, 11, -8), '#C8C2AE', 0.6) + F(ell(7.5, -10.5, 2, 2), '#7F8584', 0.4) + L('M6.4,-10.5h2.2', 0.6, INK);
+    fc += F(rect(6, -4, 10, -1), '#141210', 0.5);
+    s += grp(fc, swFace(t, -0.16, 0.16, 30));
+    // the globe, packed with eyeballs (a few looking at you)
+    const gy = Y - 64;
+    const globe = ell(X, gy, 18, 18);
+    s += F(globe, '#3A4A40', 0);
+    const r = rnd(101);
+    let eyes = '';
+    for (let k = 0; k < 26; k++) {
+      const a = r() * Math.PI * 2;
+      const m = Math.sqrt(r()) * 15;
+      const ex = X + Math.cos(a) * m;
+      const ey = gy + 4 + Math.sin(a) * m * 0.9;
+      if (ey < gy - 6) continue;
+      eyes += eyeball(ex, ey, 3.2, ['#4F6A3A', '#4E6A86', '#7A4A2A', EYE_Z][k % 4], (r() - 0.5) * 0.8, (r() - 0.5) * 0.6);
+    }
+    s += d.clip(globe, eyes + F(ell(X, gy - 12, 22, 6), '#2A3A30', 0, 'opacity="0.6"'));
+    s += F(globe, d.radial(X - 7, gy - 8, 22, [[0, '#FFFFFF', 0.35], [0.4, '#FFFFFF', 0.05], [1, '#000', 0.25]]), LW);
+    s += F(ell(X - 7, gy - 9, 4, 2.4), '#FFFFFF', 0, 'opacity="0.6" transform="rotate(-30 ' + f(X - 7) + ' ' + f(gy - 9) + ')"');
+    s += cyl(d, X, gy - 14, 7, 7, 0, 4, '#A83A2E', '#5A1A14', '#C04A3A').s + F(ell(X, gy - 19, 2.4, 1.6), '#C8C2AE', 0.6);
+    s += fly(X + 16, Y - 90, 1);
+    return s;
+  });
+}
+
+function clawMachine(): ArtAsset {
+  return objAsset('claw_machine', 172, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.44, 0.4);
+    const i0 = -0.36;
+    const i1 = 0.36;
+    const j0 = -0.36;
+    const j1 = 0.36;
+    // base cabinet
+    const base = box(t, i0, i1, j0, j1, 0, 36, '#3E5A6E', '#2E4A5E', '#1E3240');
+    s += base.fills + boxShade(d, t, base, i0, i1, j1, 0, 36) + base.lines;
+    let bf = F(rect(6, -30, 18, -18), '#141210', 0.6) + F(rect(8, -16, 16, -10), '#2A2826', 0.5) + L('M10,-13h4', 0.8, '#B8963E');
+    bf += F(ell(28, -24, 3, 3), '#C8B03A', 0.6) + L('M28,-24l2,-6', 1.6, INK) + F(ell(30, -31, 1.8, 1.8), '#B83A2A', 0.5);
+    s += grp(bf, swFace(t, i0, j1, 0));
+    // glass case: back panes tinted, the prize pile, then the front panes
+    const gz0 = 36;
+    const gz1 = 84;
+    s += F(poly([t.p(i0, j0, gz0), t.p(i1, j0, gz0), t.p(i1, j0, gz1), t.p(i0, j0, gz1)]), '#2A3A44', 0.8);
+    s += F(poly([t.p(i0, j0, gz0), t.p(i0, j1, gz0), t.p(i0, j1, gz1), t.p(i0, j0, gz1)]), '#22323C', 0.8);
+    s += F(t.qd(i0, i1, j0, j1, gz0), '#5A4A3A', 0.6);
+    const r = rnd(102);
+    for (let k = 0; k < 12; k++) {
+      const [x, y] = t.p(i0 + 0.08 + r() * 0.56, j0 + 0.08 + r() * 0.56, gz0 + 2);
+      s += k % 3 === 0 ? finger(x, y, -0.6 - r(), 6, 2.6, '#B3B294') : F(blob(x, y - 2, 4, 3, 1020 + k), ['#C86A7A', '#6E9A2A', '#B8963E', '#5E7A9A'][k % 4], 0.6) + dot(x - 1, y - 3, 0.7, INK) + dot(x + 1, y - 3, 0.7, INK);
+    }
+    // the claw on its cable, gripping a severed hand
+    const [cx, cy] = t.p(0.05, 0, gz1);
+    s += L(`M${f(cx)},${f(cy)}v18`, 0.8, '#7F8584');
+    s += F(`M${f(cx - 4)},${f(cy + 18)}h8v4h-8Z`, '#BFC3C1', 0.7);
+    for (const dx of [-4, 0, 4]) s += L(`M${f(cx + dx * 0.6)},${f(cy + 22)}q${f(dx)},4 ${f(dx * 0.4)},8`, 1.4, INK) + L(`M${f(cx + dx * 0.6)},${f(cy + 22)}q${f(dx)},4 ${f(dx * 0.4)},8`, 0.8, '#BFC3C1');
+    s += F(blob(cx, cy + 31, 4, 3, 103), '#B3B294', 0.6) + finger(cx - 2, cy + 33, 1.9, 4, 1.8, '#B3B294') + finger(cx + 1, cy + 34, 1.4, 4, 1.8, '#B3B294');
+    // front panes with reflections
+    const front = poly([t.p(i0, j1, gz0), t.p(i1, j1, gz0), t.p(i1, j1, gz1), t.p(i0, j1, gz1)]);
+    const side = poly([t.p(i1, j1, gz0), t.p(i1, j0, gz0), t.p(i1, j0, gz1), t.p(i1, j1, gz1)]);
+    s += F(front, '#A8C8D0', 0, 'opacity="0.2"') + F(side, '#88A8B0', 0, 'opacity="0.3"') + sheen(d, front, t.p(i0, j1, gz1)[0], t.p(i0, j1, gz1)[1], 34, 60, 2, 0.35, 104) + sheen(d, side, t.p(i1, j1, gz1)[0], t.p(i1, j0, gz1)[1], 34, 60, 2, 0.25, 105);
+    s += L(front, LW) + L(side, LW) + F(blob(...t.p(-0.1, j1, 50), 4, 6, 106), '#B8C0A0', 0, 'opacity="0.35"'); // greasy hand smear
+    // marquee: a lit box on top with a row of bulbs
+    const m = box(t, i0, i1, j0, j1, gz1, gz1 + 12, '#2E4A5E', '#3E5A6E', '#1E3240');
+    s += m.fills + m.lines;
+    let bulbs = '';
+    for (let k = 0; k < 6; k++) bulbs += glow(d, dot(4 + k * 6, -6, 1.6, k === 2 ? '#55534A' : '#F0D070'), 1, k === 2 ? 0 : 0.8) + dot(4 + k * 6, -6, 1.1, k === 2 ? '#55534A' : '#FFF0B0');
+    s += grp(bulbs, swFace(t, i0, j1, gz1));
+    s += fly(X + 30, Y - 110, 1);
+    return s;
+  });
+}
+
+function fortuneTeller(): ArtAsset {
+  return objAsset('fortune_teller', 180, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.42, 0.36);
+    const i0 = -0.34;
+    const i1 = 0.34;
+    const j0 = -0.3;
+    const j1 = 0.3;
+    // carved cabinet base
+    const base = box(t, i0, i1, j0, j1, 0, 40, '#6A3A4A', '#5A2E3E', '#3A1A26');
+    s += base.fills + grain(d, base.left, [X - 40, Y - 60, 50, 60], 10, 107, '#2A1018', '#8A5A6A', true) + boxShade(d, t, base, i0, i1, j1, 0, 40) + base.lines;
+    s += grp(F('M6,-34h20v-2h-20Z', '#B8963E', 0.5) + F('M14,-26h4v-2h-4Z', '#141210', 0.5) + L('M8,-10q8,-6 16,0', 1, '#B8963E') + F(ell(16, -18, 3, 3), '#B8963E', 0.6), swFace(t, i0, j1, 0));
+    // the glass booth with the swami inside
+    const gz1 = 104;
+    s += F(poly([t.p(i0, j0, 40), t.p(i1, j0, 40), t.p(i1, j0, gz1), t.p(i0, j0, gz1)]), '#2A1A26', 0.8);
+    s += F(poly([t.p(i0, j0, 40), t.p(i0, j1, 40), t.p(i0, j1, gz1), t.p(i0, j0, gz1)]), '#22121E', 0.8);
+    // the swami: zombie mannequin in a turban, hands over a glowing crystal ball
+    const [bx, by] = t.p(0, 0.1, 46);
+    s += F(`M${f(bx - 16)},${f(by)}C${f(bx - 14)},${f(by - 24)} ${f(bx + 14)},${f(by - 24)} ${f(bx + 16)},${f(by)}Z`, '#5A2E6A', LW);
+    s += F(ell(bx, by - 30, 10, 11), '#88BB44', LW) + F(ell(bx + 4, by - 26, 3, 6), '#427E40', 0, 'opacity="0.5"');
+    s += F(`M${f(bx - 11)},${f(by - 34)}C${f(bx - 12)},${f(by - 50)} ${f(bx + 12)},${f(by - 50)} ${f(bx + 11)},${f(by - 34)}Q${f(bx)},${f(by - 30)} ${f(bx - 11)},${f(by - 34)}Z`, '#C8B080', LW) + F(ell(bx, by - 38, 2.6, 3), '#7A2A6A', 0.6) + L(`M${f(bx - 8)},${f(by - 42)}q8,4 16,0`, 0.6, '#8A7040');
+    s += F(ell(bx - 4, by - 31, 2.2, 1.6), EYE_Z, 0.5) + F(ell(bx + 4, by - 31, 2.2, 1.6), EYE_Z, 0.5) + L(`M${f(bx - 4)},${f(by - 24)}q4,2 8,0`, 0.8, INK) + L(`M${f(bx - 6)},${f(by - 21)}q6,4 12,1`, 0.5, '#2E4E26');
+    s += glow(d, F(ell(bx, by - 6, 10, 9), '#9BD62E'), 3, 0.6) + F(ell(bx, by - 6, 7, 7), d.radial(bx - 2, by - 8, 8, [[0, '#E6FA9A'], [1, '#5E8F1C']]), 0.8) + dot(bx - 2, by - 9, 1.2, '#FFFFFF', 0.8);
+    for (const sx of [-1, 1]) s += F(ell(bx + sx * 7, by - 9, 3, 2), '#88BB44', 0.7);
+    // front panes, crown, a ticket slot spitting a fortune card
+    const front = poly([t.p(i0, j1, 40), t.p(i1, j1, 40), t.p(i1, j1, gz1), t.p(i0, j1, gz1)]);
+    const side = poly([t.p(i1, j1, 40), t.p(i1, j0, 40), t.p(i1, j0, gz1), t.p(i1, j1, gz1)]);
+    s += F(front, '#C8B0D0', 0, 'opacity="0.15"') + F(side, '#A890B0', 0, 'opacity="0.3"') + sheen(d, front, t.p(i0, j1, gz1)[0], t.p(i0, j1, gz1)[1], 32, 64, 2, 0.3, 108) + L(front, LW) + L(side, LW);
+    const top = box(t, i0 - 0.03, i1 + 0.03, j0 - 0.03, j1 + 0.03, gz1, gz1 + 8, '#7A4A5A', '#6A3A4A', '#3A1A26');
+    s += top.fills + top.lines;
+    const [cx2, cy2] = t.p(0, 0, gz1 + 8);
+    s += F(`M${f(cx2 - 10)},${f(cy2)}L${f(cx2 - 8)},${f(cy2 - 10)}L${f(cx2 - 3)},${f(cy2 - 4)}L${f(cx2)},${f(cy2 - 13)}L${f(cx2 + 3)},${f(cy2 - 4)}L${f(cx2 + 8)},${f(cy2 - 10)}L${f(cx2 + 10)},${f(cy2)}Z`, '#B8963E', 0.9);
+    const [tx, ty] = t.p(i0 + 0.48, j1, 30);
+    s += F(`M${f(tx)},${f(ty)}l6,3.8l-1.6,5l-6,-3.8Z`, '#D8CC98', 0.6) + L(`M${f(tx + 0.6)},${f(ty + 2.6)}l3.6,2.2`, 0.4, '#5A5040');
+    return s;
+  });
+}
+
+function photoBooth(): ArtAsset {
+  return objAsset('photo_booth', 188, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.46, 0.42);
+    const i0 = -0.4;
+    const i1 = 0.4;
+    const j0 = -0.36;
+    const j1 = 0.36;
+    const H = 112;
+    const b = box(t, i0, i1, j0, j1, 0, H, '#C8C2AE', '#B0A890', '#7A7460');
+    s += b.fills + boxShade(d, t, b, i0, i1, j1, 0, H, 0.45) + b.lines;
+    // the curtain doorway on the front (+j) face, someone's shoes showing
+    const W = (i1 - i0) * 48;
+    const door = rect(5, -96, W - 13, -6);
+    let fr = F(door, '#141210', 0.8);
+    let cur = F(`M5,-96H${f(W - 13)}V-14C${f(W - 16)},-10 ${f(W - 20)},-14 ${f(W - 22)},-10C${f(W - 25)},-14 ${f(W - 29)},-9 ${f(W - 31)},-13C${f(W - 34)},-9 ${f(W - 38)},-13 5,-12Z`, '#7A2A2E', 0.8);
+    for (let k = 0; k < 5; k++) cur += L(`M${f(8 + k * 4.6)},-94q-1,40 0.6,80`, 0.7, '#4A1418', 'opacity="0.8"');
+    fr += cur + F(rect(10, -12, 16, -6), '#2A2724', 0.5) + F(rect(17, -12, 23, -6), '#2A2724', 0.5) + F(ell(13, -6, 4, 1.4), '#2A2724', 0.4) + F(ell(20, -6, 4, 1.4), '#2A2724', 0.4);
+    fr += L(`M5,-96H${f(W - 13)}`, 1.6, '#7F8584');
+    // the photo-strip slot with a fresh strip: four frames of a face turning zombie
+    fr += F(rect(W - 10, -52, W - 3, -50), '#141210', 0.4);
+    let strip = F(rect(W - 9.4, -50, W - 3.6, -20), '#E8E2CC', 0.5);
+    for (let k = 0; k < 4; k++) {
+      const y = -48 + k * 7.2;
+      strip += F(rect(W - 8.8, y, W - 4.2, y + 6), '#4A4440', 0.3) + F(ell(W - 6.5, y + 3.2, 1.6, 2), k > 1 ? '#88BB44' : '#B3B294', 0.3) + dot(W - 7.2, y + 2.8, 0.35, k > 1 ? EYE_Z : INK) + dot(W - 5.8, y + 2.8, 0.35, k > 1 ? EYE_Z : INK);
+    }
+    fr += strip;
+    // a lightbulb marquee sign above the door (no words, just bulbs and a camera icon)
+    fr += F(rect(4, -110, W - 4, -100), '#2A2724', 0.7);
+    for (let k = 0; k < 7; k++) fr += glow(d, dot(7 + k * 4.4, -105, 1.4, '#F0D070'), 0.8, 0.8) + dot(7 + k * 4.4, -105, 0.9, '#FFF0B0');
+    fr += F(rect(W / 2 - 5, -109, W / 2 + 5, -101), '#C8C2AE', 0.4) + F(ell(W / 2, -105, 2.4, 2.4), '#3A3833', 0.4);
+    s += grp(fr, swFace(t, i0, j1, 0));
+    // flash going off inside
+    s += glow(d, F(ell(...t.p(0.1, 0.36, 60), 6, 10), '#FFFFFF'), 3, 0.5);
+    s += fly(X - 26, Y - 128, 1);
+    return s;
+  });
+}
+
+function mechBull(): ArtAsset {
+  return objAsset('mech_bull', 112, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    // padded mat, then the pivot drum, then the bull
+    let s = F(t.qd(-0.48, 0.48, -0.48, 0.48, 0), '#5A6A3A', LW) + F(t.qd(-0.4, 0.4, -0.4, 0.4, 0.5), '#6E7E4A', 0.6);
+    s += d.clip(t.qd(-0.48, 0.48, -0.48, 0.48, 0), L(`M${f(X - 50)},${f(Y)}L${f(X + 50)},${f(Y)}M${f(X)},${f(Y - 40)}L${f(X)},${f(Y + 40)}`, 0.6, '#3E4A26'));
+    s += cyl(d, X, Y, 8, 8, 0, 22, '#5A5C58', '#2E302C', '#7A7C78').s;
+    // body along i (tilted, mid-buck)
+    const [bx, by] = t.p(0, 0, 36);
+    s += grp(F(ell(0, 0, 26, 12), '#4A3022', LW) + F(ell(-4, -4, 18, 5), '#6A4630', 0) + F(ell(6, 5, 18, 5), '#2E1C12', 0, 'opacity="0.5"'), `translate(${f(bx)} ${f(by)}) rotate(24)`);
+    // saddle
+    s += F(ell(bx + 2, by - 8, 8, 4), '#8A6A3A', 0.9) + L(`M${f(bx + 2)},${f(by - 4)}v10`, 1.2, '#5A3A1E');
+    // head with horns (front, screen-left-up), stitched-on ear, eyes glowing
+    const [hx, hy] = [bx - 22, by - 14];
+    s += F(ell(hx, hy, 9, 8), '#4A3022', LW) + F(ell(hx - 5, hy + 4, 4.4, 3.4), '#8A6A5A', 0.8) + dot(hx - 6.4, hy + 4, 0.7, INK) + dot(hx - 3.6, hy + 4.6, 0.7, INK);
+    s += L(`M${f(hx - 3)},${f(hy - 6)}C${f(hx - 10)},${f(hy - 12)} ${f(hx - 14)},${f(hy - 10)} ${f(hx - 16)},${f(hy - 16)}`, 3, INK) + L(`M${f(hx - 3)},${f(hy - 6)}C${f(hx - 10)},${f(hy - 12)} ${f(hx - 14)},${f(hy - 10)} ${f(hx - 16)},${f(hy - 16)}`, 1.8, '#D6CDAE');
+    s += L(`M${f(hx + 3)},${f(hy - 7)}C${f(hx + 8)},${f(hy - 14)} ${f(hx + 6)},${f(hy - 18)} ${f(hx + 10)},${f(hy - 22)}`, 3, INK) + L(`M${f(hx + 3)},${f(hy - 7)}C${f(hx + 8)},${f(hy - 14)} ${f(hx + 6)},${f(hy - 18)} ${f(hx + 10)},${f(hy - 22)}`, 1.8, '#D6CDAE');
+    s += glow(d, dot(hx - 4, hy - 2, 1.6, '#E04A2A') + dot(hx + 3, hy - 2, 1.6, '#E04A2A'), 1, 0.9) + dot(hx - 4, hy - 2, 0.9, '#FF8A6A') + dot(hx + 3, hy - 2, 0.9, '#FF8A6A');
+    s += F(ell(hx - 5, hy + 8, 2, 1.6), 'none', 0) + L(ell(hx - 5, hy + 8.6, 2, 1.6), 0.8, '#B8963E');
+    // tail and a cowboy hat (with a bite out of it) lost on the mat
+    s += L(`M${f(bx + 22)},${f(by + 8)}q6,4 4,12`, 1.2, INK);
+    const [cx, cy] = t.p(0.3, 0.32, 0);
+    s += F(ell(cx, cy - 2, 9, 3.6), '#8A6A3A', LW) + F(`M${f(cx - 5)},${f(cy - 3)}C${f(cx - 5)},${f(cy - 10)} ${f(cx + 5)},${f(cy - 10)} ${f(cx + 5)},${f(cy - 3)}Z`, '#9A7A46', LW) + F(ell(cx + 6, cy - 3, 2, 1.4), '#5A6A3A', 0);
+    return s;
+  });
+}
+
 export function buildSpecial(): ArtAsset[] {
-  return [...vending(), ...atm(), jukebox(), ...arcade(), ...slotMachine(), ...pinball(), ...phonebooth(), ...comicRack(), foosball()];
+  return [...vending(), ...atm(), jukebox(), ...arcade(), ...slotMachine(), ...pinball(), ...phonebooth(), ...comicRack(), foosball(), gumballEyes(), clawMachine(), fortuneTeller(), photoBooth(), mechBull()];
 }

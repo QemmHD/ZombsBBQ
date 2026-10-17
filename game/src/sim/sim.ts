@@ -6,6 +6,7 @@ import {
   LEVEL_CAP,
   TUNING,
   VARIANT_DISHES,
+  VERY_DISHES,
   attackThreshold,
   crewCapForLevel,
   rechargeMult,
@@ -15,10 +16,11 @@ import {
   xpToNext,
   zombieLevel,
 } from './data';
-import { DIR_STEP, FLOOR_BY_ID, ITEM_BY_ID, WALL_BY_ID, type ItemDef } from './catalog';
+import { DIR_STEP, FLOOR_BY_ID, ITEM_BY_ID, STOVE_TIER_BURN, STOVE_TIER_SPEED, WALL_BY_ID, type ItemDef } from './catalog';
 import { DOOR_X, findPath, isInside, key, reachable, restSpots, streetEnds, walkable, type Pt, type Room } from './grid';
 import { makeWorker, maxEnergy, type Customer, type Furniture, type GameState, type Mover, type Stove, type Worker } from './state';
-import { updateProgress } from './progress';
+import { fryerCooked, updateProgress } from './progress';
+import { masterVariant } from './cookbook';
 import { stealingRivals } from './rivals';
 
 // ---------- helpers ----------
@@ -218,7 +220,7 @@ export function dishAvailable(s: GameState, dishId: string): boolean {
 
 /** A dish followed by the rare variants of it the player has learned (for menus and pickers). */
 export function withLearnedVariants(s: GameState, list: DishDef[] = DISHES): DishDef[] {
-  return list.flatMap((d) => [d, ...VARIANT_DISHES.filter((v) => v.base === d.id && s.recipes.includes(v.id))]);
+  return list.flatMap((d) => [d, ...[...VARIANT_DISHES, ...VERY_DISHES].filter((v) => v.base === d.id && s.recipes.includes(v.id))]);
 }
 
 /** Which dishes a stove can cook: its own cookbook (every stove can do the house menu). */
@@ -227,7 +229,7 @@ export function stoveCooks(st: Stove, dishStation: string): boolean {
 }
 
 const stoveFurn = (s: GameState, st: Stove) => furnById(s, st.furnitureId)!;
-const stoveSpeed = (s: GameState, st: Stove) => itemOf(stoveFurn(s, st)).speed ?? 1;
+const stoveSpeed = (s: GameState, st: Stove) => (itemOf(stoveFurn(s, st)).speed ?? 1) * (1 + STOVE_TIER_SPEED * (stoveFurn(s, st).tier ?? 0));
 
 // ---------- player actions (validate and return an error string or null) ----------
 
@@ -1023,10 +1025,12 @@ function finishStove(s: GameState, st: Stove) {
   st.status = 'done';
   st.left = 0;
   // Frozen variants take FROZEN_BURN_MULT times longer to burn
-  const wait = Math.max(TUNING.burnMinSec, dish.cookSec) * (f.keepWarm ? TUNING.keepWarmFactor : 1) * (dish.burnMult ?? 1);
+  const wait = Math.max(TUNING.burnMinSec, dish.cookSec) * (f.keepWarm ? TUNING.keepWarmFactor : 1) * (dish.burnMult ?? 1) * (1 + STOVE_TIER_BURN * (f.tier ?? 0));
   st.burnAt = s.now + wait;
   addXp(s, dish.xp);
   s.stats.cooked[dish.id] = (s.stats.cooked[dish.id] ?? 0) + 1;
+  masterVariant(s, dish.id);
+  fryerCooked(s);
   s.events.push({ t: 'xp', x: f.x, y: f.y, amount: dish.xp });
   s.events.push({ t: 'dishDone', stoveId: st.id });
   const cook = s.workers.find((w) => w.id === st.cookId);

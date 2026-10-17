@@ -11,11 +11,12 @@
  */
 import type { ArtAsset } from '../art/types';
 import type { Doc } from '../art/svg';
-import { P, ell, f, hull, poly, rrect } from '../art/svg';
+import { P, capsule, ell, f, hull, poly, rrect } from '../art/svg';
+import { eyeball, finger } from './dishes';
 import type { Pt } from '../art/svg';
 import { F, INK, Iso, L, LW, PAL, asset, blob, crack, dot, objAsset, rnd, speckle } from './kit';
 import {
-  BONE, CAST, CAST_HI, CHROME, CHROME_D, CHROME_HI, DEEP, ENAMEL, RUST, RUST_D, STEEL, TOXIC, TOXIC_D, box, cyl, disc, dk, faces, fly,
+  BONE, CAST, CAST_HI, bone, CHROME, CHROME_D, CHROME_HI, DEEP, ENAMEL, RUST, RUST_D, STEEL, TOXIC, TOXIC_D, box, cyl, disc, dk, faces, fly,
   handprint, hazard, hFor, lt, onFront, onSide, pp, ringI, roach, rust, rustDrip, scratches, seg, shadow, shadowDisc, smear,
   streaks, tbox, tone,
 } from './p1kit';
@@ -997,14 +998,399 @@ function kegToxic(): ArtAsset {
   });
 }
 
+// ================================================================ late-game stations
+/** Courses of bricks filling a w x h face frame (x right, y down). */
+function brickFace(w: number, h: number, seed: number, cols: string[], rowH = 4.6, len = 9): string {
+  const r = rnd(seed);
+  let s = F(`M0,0H${f(w)}V${f(h)}H0Z`, '#5E5040');
+  const rows = Math.ceil(h / rowH);
+  for (let row = 0; row < rows; row++) {
+    const y0 = row * rowH + 0.35;
+    const off = row % 2 ? -len / 2 : 0;
+    for (let x = off; x < w; x += len) {
+      const x0 = Math.max(0, x + 0.35);
+      const x1 = Math.min(w, x + len - 0.35);
+      if (x1 - x0 < 0.8) continue;
+      s += F(rrect(x0, y0, x1 - x0, rowH - 0.7, 0.4), cols[Math.floor(r() * cols.length)]) + L(`M${f(x0 + 0.4)},${f(y0 + 0.4)}H${f(x1 - 0.4)}`, 0.35, '#D08A62', 'opacity="0.45"');
+    }
+  }
+  return s;
+}
+const BRICKS = ['#8E4A2E', '#7E3E26', '#9A5634', '#6E3420', '#86462A'];
+
+/** Ember bed: glowing blobs + a blurred glow, inside a clip. */
+function embers(d: Doc, cx: number, cy: number, rx: number, ry: number, seed: number, n = 14): string {
+  const r = rnd(seed);
+  let s = F(ell(cx, cy, rx, ry), '#2A1A10');
+  s += F(ell(cx, cy, rx * 0.8, ry * 0.7), '#D0602A', 0, `opacity="0.55" filter="${d.blur(2)}"`);
+  for (let k = 0; k < n; k++) {
+    const a = r() * Math.PI * 2;
+    const m = Math.sqrt(r()) * 0.85;
+    s += F(blob(cx + Math.cos(a) * rx * m, cy + Math.sin(a) * ry * m, 2.2 + r() * 1.4, 1.3 + r(), seed * 7 + k, 6, 0.4), ['#3A2418', '#B2502A', '#E08A3A', '#4A2C1C'][k % 4], 0.3);
+  }
+  s += dot(cx - rx * 0.2, cy, 0.8, '#FFE0A0') + dot(cx + rx * 0.3, cy + ry * 0.2, 0.6, '#FFD080');
+  return s;
+}
+
+// ---------------------------------------------------------------- witch's cauldron (Mad Sauces)
+const CAUL_TOP = 46;
+function witchCauldron(): ArtAsset {
+  return objAsset('witch_cauldron', hFor(60), (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadowDisc(d, t, 0, 0.02, 0.46, 0.3);
+    // hearth: a ring of rough stones round a wood fire
+    const ring = cyl(d, t, 0, 0, 0.43, 0, 13, tone('#77706A', 0.12, 0.32));
+    s += ring.svg;
+    const r = rnd(41);
+    let st = '';
+    for (let row = 0; row < 3; row++)
+      for (let k = 0; k < 9; k++) {
+        const a = Math.PI * (0.02 + (k + (row % 2) * 0.5) / 8.6);
+        const x = X + Math.cos(a) * ring.top.rx * 1.02;
+        const y = Y + Math.sin(a) * ring.top.ry - 2 - row * 4.2;
+        st += F(blob(x, y, 4.4 + r() * 1.2, 2.1 + r() * 0.4, 400 + row * 9 + k, 7, 0.35), ['#8A847A', '#6E6860', '#9A948A', '#5E5A52'][(k + row) % 4], 0.5);
+      }
+    s += d.clip(ring.body, st);
+    s += F(ring.body, 'none', LW);
+    // fire opening at the front with logs and flames licking out
+    const mouth = `M${f(X - 9)},${f(Y + ring.top.ry - 1)}C${f(X - 9)},${f(Y + ring.top.ry - 12)} ${f(X + 9)},${f(Y + ring.top.ry - 12)} ${f(X + 9)},${f(Y + ring.top.ry - 1)}Z`;
+    s += F(mouth, '#1A120C', 0.8) + d.clip(mouth, embers(d, X, Y + ring.top.ry - 3, 9, 4, 42, 9) + flame(X - 3, Y + ring.top.ry - 2, 8, 2.2, -1) + flame(X + 3, Y + ring.top.ry - 2, 6, 2, 1));
+    s += F(capsule([X - 13, Y + ring.top.ry + 1], [X + 4, Y + ring.top.ry - 1], 3.2, 3), '#5A3E24', 0.7) + F(ell(X - 13, Y + ring.top.ry + 1, 1.5, 1.6), '#B08A5A', 0.5);
+    s += F(ring.top.d, '#3A2E26', 0.8);
+    s += F(ell(X, Y - 13, ring.top.rx * 0.8, ring.top.ry * 0.7), '#E07A2A', 0, `opacity="0.5" filter="${d.blur(2.4)}"`);
+    // the cauldron: a fat iron belly on three stubby feet
+    const top = disc(t, 0, 0, CAUL_TOP, 0.34);
+    const belly = `M${f(X - top.rx)},${f(top.cy)}C${f(X - top.rx - 9)},${f(Y - 34)} ${f(X - top.rx - 4)},${f(Y - 12)} ${f(X)},${f(Y - 11)}C${f(X + top.rx + 4)},${f(Y - 12)} ${f(X + top.rx + 9)},${f(Y - 34)} ${f(X + top.rx)},${f(top.cy)}Z`;
+    for (const [fx, fy] of [[-14, -14], [14, -14], [0, -10]] as [number, number][]) s += F(capsule([X + fx, Y + fy - 4], [X + fx * 1.15, Y + fy + 1], 3.2, 2.4), '#22201C', 0.8);
+    s += F(belly, d.linear(X - top.rx - 8, 0, X + top.rx + 8, 0, [[0, '#4A4740'], [0.3, '#5E5A52'], [0.62, '#2E2C28'], [1, '#1A1816']]));
+    let tex = F(belly, d.linear(0, Y - 30, 0, Y - 11, [[0, '#E07A2A', 0], [1, '#E07A2A', 0.3]]));
+    tex += F(blob(X + 13, Y - 22, 4, 3, 43), RUST, 0, 'opacity="0.5"') + F(blob(X - 16, Y - 30, 3, 2, 44), RUST_D, 0, 'opacity="0.45"');
+    // iron band with rivets
+    tex += L(`M${f(X - top.rx - 5)},${f(Y - 31)}Q${f(X)},${f(Y - 21)} ${f(X + top.rx + 5)},${f(Y - 31)}`, 2.6, INK) + L(`M${f(X - top.rx - 5)},${f(Y - 31)}Q${f(X)},${f(Y - 21)} ${f(X + top.rx + 5)},${f(Y - 31)}`, 1.6, '#3E3A34');
+    for (let k = -3; k <= 3; k++) tex += dot(X + k * 7.4, Y - 26.2 - Math.abs(k) * 0.9 + (Math.abs(k) > 2 ? -1 : 0), 0.7, '#8E8A80');
+    // sauce dribbling down the outside
+    tex += F(`M${f(X - 6)},${f(top.cy + top.ry - 1)}q-1,7 0,12q1,2 2,0q0.6,-6 1.4,-11.4Z`, '#6A2416', 0.5) + F(`M${f(X + 9)},${f(top.cy + top.ry - 2)}q0,4 0.8,6q1,1 1.4,-0.6q0,-3 0.2,-5Z`, '#6A2416', 0.5);
+    s += d.clip(belly, tex) + L(belly, LW);
+    // handles
+    s += L(`M${f(X - top.rx - 3)},${f(top.cy + 3)}q-6,1 -5,7`, 3, INK) + L(`M${f(X - top.rx - 3)},${f(top.cy + 3)}q-6,1 -5,7`, 1.6, '#55524C');
+    s += L(`M${f(X + top.rx + 3)},${f(top.cy + 3)}q6,1 5,7`, 3, INK) + L(`M${f(X + top.rx + 3)},${f(top.cy + 3)}q6,1 5,7`, 1.6, '#3A3833');
+    // thick rim, then the bubbling sauce (overlay bubbles sit on this surface)
+    s += F(ell(X, top.cy, top.rx + 2.2, top.ry + 1.4), '#4E4B44', LW);
+    const surf = ell(X, top.cy + 0.6, top.rx - 0.6, top.ry - 0.6);
+    s += F(surf, d.radial(X - 5, top.cy - 2, top.rx * 1.1, [[0, '#B0542C'], [0.55, '#7A2E1A'], [1, '#3E140C']]), 0.8);
+    s += d.clip(surf, F(blob(X + 6, top.cy + 2, 6, 2, 45), '#5E7A2A', 0, 'opacity="0.55"') + L(`M${f(X - 12)},${f(top.cy)}q5,-2 10,0t10,-1`, 0.6, '#E0A060', 'opacity="0.5"'));
+    s += eyeball(d, X + 3, top.cy - 1.4, 2.6, [-0.4, 0.3], '#4F6A3A', 46);
+    // a finger poking up, and the big stirring paddle
+    s += finger(d, [X - 8, top.cy + 1.6], [X - 10, top.cy - 6], 2.2);
+    s += L(`M${f(X + 10)},${f(top.cy + 1)}L${f(X + 24)},${f(top.cy - 30)}`, 4.2, INK) + L(`M${f(X + 10)},${f(top.cy + 1)}L${f(X + 24)},${f(top.cy - 30)}`, 2.8, '#8E6A40') + L(`M${f(X + 11)},${f(top.cy - 1)}L${f(X + 23)},${f(top.cy - 28)}`, 0.6, '#C9A877');
+    // a tiny witch's hat left on the hearth, a skull wedged in the stones
+    const [hx, hy] = t.p(0.38, 0.18, 13);
+    s += F(`M${f(hx - 7)},${f(hy)}Q${f(hx)},${f(hy + 3)} ${f(hx + 7)},${f(hy)}Q${f(hx)},${f(hy - 2.6)} ${f(hx - 7)},${f(hy)}Z`, '#2E2834', 0.8) + F(`M${f(hx - 3.6)},${f(hy - 0.6)}L${f(hx + 1)},${f(hy - 13)}Q${f(hx + 4)},${f(hy - 15)} ${f(hx + 6)},${f(hy - 12)}Q${f(hx + 2.6)},${f(hy - 11)} ${f(hx + 3.6)},${f(hy - 0.8)}Z`, '#3A3242', 0.8) + L(`M${f(hx - 3)},${f(hy - 2.4)}Q${f(hx)},${f(hy - 1.4)} ${f(hx + 3.4)},${f(hy - 2.6)}`, 1, '#7A5A2A');
+    const [kx, ky] = t.p(-0.36, 0.22, 9);
+    s += F(`M${f(kx - 3.6)},${f(ky)}C${f(kx - 4)},${f(ky - 6)} ${f(kx + 4)},${f(ky - 6)} ${f(kx + 3.6)},${f(ky)}L${f(kx + 2)},${f(ky + 2.6)}H${f(kx - 2)}Z`, BONE, 0.7) + F(ell(kx - 1.4, ky - 1.4, 1.1, 1.3), '#1E1810') + F(ell(kx + 1.4, ky - 1.4, 1.1, 1.3), '#1E1810');
+    return s;
+  });
+}
+
+function cauldronBubbles(): ArtAsset {
+  const W = 56;
+  const H = 46;
+  return asset('fx_cauldron_bubbles', W, H, 0.5, 1, (d) => {
+    const r = rnd(47);
+    let s = '';
+    // purple-green fumes curling up
+    for (let k = 0; k < 4; k++) {
+      const y = H - 10 - k * 8;
+      const x = W / 2 + Math.sin(k * 1.7) * 6;
+      s += F(blob(x, y, 5 + k * 1.6, 3.6 + k, 470 + k, 7, 0.45), k % 2 ? '#7E8A5A' : '#8A7A92', 0, `opacity="${f(0.55 - k * 0.1)}" filter="${d.blur(1.2)}"`);
+    }
+    // bubbles on the far half of the surface
+    for (let k = 0; k < 9; k++) {
+      const a = Math.PI + r() * Math.PI;
+      const x = W / 2 + Math.cos(a) * 15 * r();
+      const y = H - 1 + Math.sin(a) * 8 * r();
+      const rr = 1 + r() * 1.8;
+      s += P(ell(x, y, rr * 1.15, rr * 0.85), '#A4462A', 0.4, '#3E140C') + dot(x - rr * 0.35, y - rr * 0.3, rr * 0.3, '#F0B080');
+    }
+    // one big bubble bursting into a splash
+    s += L(ell(W / 2 - 5, H - 4, 3.4, 2), 0.6, '#C0603A') + dot(W / 2 - 9, H - 12, 0.9, '#8A2E1A') + dot(W / 2 - 2, H - 14, 0.7, '#8A2E1A') + dot(W / 2 + 1, H - 9, 0.6, '#8A2E1A');
+    return s;
+  });
+}
+
+// ---------------------------------------------------------------- brick pizza kiln (Wood-Fired Rot)
+const KILN_TOP = 70;
+function kiln(): ArtAsset {
+  return objAsset('kiln', hFor(90), (d, t) => {
+    const X = t.cx;
+    let s = shadow(d, t, -0.48, 0.48, -0.48, 0.5, 0.3);
+    // brick plinth with a log store under an arch
+    const B: Box = [-0.44, 0.44, -0.44, 0.44, 0, 30];
+    s += box(d, t, B, tone('#86462A', 0.12, 0.34));
+    const fc = faces(t, [B[0], B[1], B[2], B[3]], [B[0], B[1], B[2], B[3]], 0, 30);
+    const FWd = 0.88 * 48;
+    let fr = brickFace(FWd, 30, 51, BRICKS);
+    const arch = `M8,30V18C8,8 ${f(FWd - 8)},8 ${f(FWd - 8)},18V30Z`;
+    fr += F(arch, '#1E1610', 0.8);
+    for (let k = 0; k < 7; k++) {
+      const x = 11 + (k % 4) * 6.4 + (k > 3 ? 3 : 0);
+      const y = 27 - Math.floor(k / 4) * 5;
+      fr += F(ell(x, y, 3, 2.6), k % 2 ? '#8E6A40' : '#7A5A36', 0.6) + F(ell(x, y, 1.6, 1.4), '#C9A877', 0.3) + dot(x, y, 0.4, '#6A4A2A');
+    }
+    fr += L(`M7,18C7,6.6 ${f(FWd - 7)},6.6 ${f(FWd - 7)},18`, 2, '#B0603A') + L(`M7,18C7,6.6 ${f(FWd - 7)},6.6 ${f(FWd - 7)},18`, 0.5, INK);
+    fr += F(`M0,22H${f(FWd)}V30H0Z`, d.linear(0, 30, 0, 20, [[0, PAL.grimeD, 0.6], [1, PAL.grimeD, 0]]));
+    s += d.clip(fc.front, onFront(t, B[0], B[3], 30, fr));
+    s += d.clip(fc.side, onSide(t, B[1], B[3], 30, brickFace(FWd, 30, 52, BRICKS.map((c) => dk(c, 0.22))) + F(`M0,22H${f(FWd)}V30H0Z`, d.linear(0, 30, 0, 20, [[0, PAL.grimeD, 0.6], [1, PAL.grimeD, 0]]))));
+    s += F(fc.sil, 'none', LW);
+    // hearth slab
+    s += box(d, t, [-0.47, 0.47, -0.47, 0.47, 30, 33], tone('#A8A294', 0.12, 0.3), { sw: 1.1, grad: 0 });
+    // the dome
+    const base = disc(t, 0, -0.02, 33, 0.4);
+    const DH = 36;
+    const dome = `M${f(base.cx - base.rx)},${f(base.cy)}C${f(base.cx - base.rx)},${f(base.cy - DH * 0.9)} ${f(base.cx - base.rx * 0.45)},${f(base.cy - DH * 1.25)} ${f(base.cx)},${f(base.cy - DH * 1.25)}C${f(base.cx + base.rx * 0.45)},${f(base.cy - DH * 1.25)} ${f(base.cx + base.rx)},${f(base.cy - DH * 0.9)} ${f(base.cx + base.rx)},${f(base.cy)}A${f(base.rx)},${f(base.ry)} 0 0 1 ${f(base.cx - base.rx)},${f(base.cy)}Z`;
+    s += F(dome, d.radial(base.cx - 10, base.cy - DH, base.rx * 1.6, [[0, '#B88A6A'], [0.55, '#9A6A4A'], [1, '#5E3A26']]));
+    let dt = '';
+    for (let k = 1; k < 7; k++) {
+      const yy = base.cy - k * 5.6;
+      const w = base.rx * Math.sqrt(Math.max(0, 1 - Math.pow((k * 5.6) / (DH * 1.05), 2)));
+      dt += L(`M${f(base.cx - w)},${f(yy)}Q${f(base.cx)},${f(yy + base.ry * (w / base.rx) * 0.9)} ${f(base.cx + w)},${f(yy)}`, 0.5, '#5E3A26', 'opacity="0.7"');
+    }
+    dt += speckle(d, dome, [base.cx - base.rx, base.cy - DH * 1.3, base.rx * 2, DH * 1.6], 40, ['#5E3A26', '#D0A07A'], 53, 0.3, 0.7, 0.6);
+    dt += F(blob(base.cx + 6, base.cy - DH * 0.95, 14, 6, 54), '#141210', 0, 'opacity="0.35"'); // soot
+    dt += F(blob(base.cx + base.rx * 0.6, base.cy - 8, 6, 9, 55), '#2A2016', 0, 'opacity="0.3"');
+    s += d.clip(dome, dt) + L(dome, LW);
+    // the mouth: a brick-edged arch on the sw face, a dark oven with a pizza inside
+    let m = '';
+    const MW = 17;
+    const mouth = `M0,13V6C0,-1.6 ${f(MW)},-1.6 ${f(MW)},6V13Z`;
+    m += F(mouth, '#120C08', 0.9);
+    m += d.clip(mouth, F(ell(MW / 2, 11, 7, 3), '#E07A2A', 0, `opacity="0.6" filter="${d.blur(1.6)}"`) + F(ell(MW / 2, 11.4, 5.6, 1.6), '#C8963E', 0.4) + dot(MW / 2 - 2, 11.2, 0.7, '#7A2A22') + dot(MW / 2 + 1.6, 11.6, 0.7, '#7A2A22') + dot(MW / 2, 11, 0.5, '#E6DCC0'));
+    m += L(`M-1.6,13V6C-1.6,-3.6 ${f(MW + 1.6)},-3.6 ${f(MW + 1.6)},6V13`, 2.8, INK) + L(`M-1.6,13V6C-1.6,-3.6 ${f(MW + 1.6)},-3.6 ${f(MW + 1.6)},6V13`, 1.8, '#9A5634');
+    for (let k = 0; k < 7; k++) {
+      const a = Math.PI + (k / 6) * Math.PI;
+      m += L(`M${f(MW / 2 + Math.cos(a) * 8.6)},${f(6 + Math.sin(a) * 8.6)}l${f(Math.cos(a) * 1.8)},${f(Math.sin(a) * 1.8)}`, 0.5, INK);
+    }
+    s += onFront(t, -0.18, 0.37, 48, m);
+    // stovepipe chimney at the back with a rain cap
+    const ch = cyl(d, t, 0.06, -0.16, 0.06, 60, KILN_TOP + 14, tone('#4A4640', 0.12, 0.35), 1);
+    s += ch.svg + d.clip(ch.body, F(blob(ch.top.cx + 1, ch.top.cy + 10, 2, 4, 56), RUST, 0, 'opacity="0.6"'));
+    s += F(`M${f(ch.top.cx - 6)},${f(ch.top.cy - 2)}L${f(ch.top.cx)},${f(ch.top.cy - 6)}L${f(ch.top.cx + 6)},${f(ch.top.cy - 2)}Z`, '#3A3631', 0.8);
+    // a pizza peel leaning on the plinth, a rat on the hearth
+    const [px, py] = t.p(0.46, 0.2, 2);
+    s += L(`M${f(px)},${f(py)}L${f(px + 7)},${f(py - 34)}`, 2.6, INK) + L(`M${f(px)},${f(py)}L${f(px + 7)},${f(py - 34)}`, 1.6, '#9A7046');
+    s += F(`M${f(px + 4)},${f(py - 28)}C${f(px)},${f(py - 34)} ${f(px + 4)},${f(py - 48)} ${f(px + 11)},${f(py - 46)}C${f(px + 17)},${f(py - 44)} ${f(px + 14)},${f(py - 31)} ${f(px + 9)},${f(py - 27)}Z`, '#B08A5A', 0.9) + F(blob(px + 9, py - 38, 3, 2, 57), '#2A2016', 0, 'opacity="0.4"');
+    const [rx, ry] = t.p(-0.3, 0.42, 33);
+    s += F(ell(rx, ry - 2, 3.6, 2.2), '#5E5650', 0.6) + F(ell(rx - 3.4, ry - 3, 1.8, 1.4), '#6E6660', 0.5) + dot(rx - 4.2, ry - 3.4, 0.4, INK) + L(`M${f(rx + 3.4)},${f(ry - 2)}q3,1 4,-2`, 0.6, '#B08A86');
+    void X;
+    return s;
+  });
+}
+
+function kilnFire(): ArtAsset {
+  const W = 56;
+  const H = 52;
+  return asset('fx_kiln_fire', W, H, 0.5, 1, (d) => {
+    // flames and sparks out of the chimney (which stands 0.22 tile right of centre, ~16 units above this anchor)
+    const cx = W / 2 + 10.6;
+    const cy = H - 15;
+    const r = rnd(58);
+    let s = F(ell(cx, cy - 2, 6, 4), '#E07A2E', 0, `opacity="0.5" filter="${d.blur(2)}"`);
+    s += flame(cx - 2, cy, 11, 2.4, -2) + flame(cx + 1.6, cy, 14, 2.6, 1.5) + flame(cx, cy, 8, 1.8, 0);
+    for (let k = 0; k < 8; k++) s += dot(cx + (r() - 0.5) * 16, cy - 14 - r() * 20, 0.4 + r() * 0.5, k % 2 ? '#EBC452' : '#DE8A32', 0.9);
+    s += F(blob(cx + 4, cy - 30, 6, 4, 59), '#5A5650', 0, `opacity="0.4" filter="${d.blur(1.2)}"`);
+    return s;
+  });
+}
+
+// ---------------------------------------------------------------- pit oven (Feast of the Dead)
+const PIT_TOP = 14;
+function pitOven(): ArtAsset {
+  return objAsset('pit_oven', hFor(44), (d, t) => {
+    const X = t.cx;
+    let s = shadowDisc(d, t, 0, 0, 0.5, 0.3);
+    // dirt mound
+    s += F(t.ell(0, 0, 0.5, 0.48, 0), '#5E4A30', 0.8) + F(t.ell(0, 0, 0.44, 0.42, 4), '#6E5636', 0);
+    s += speckle(d, t.ell(0, 0, 0.5, 0.48, 0), [X - 50, t.cy - 30, 100, 60], 40, ['#4A3820', '#8A7048'], 61, 0.3, 0.7, 0.8);
+    // the pit: a stone ring round glowing coals and a leaf-wrapped beast on the grate
+    const pit = disc(t, 0, 0, PIT_TOP - 4, 0.3);
+    s += F(pit.d, '#1E140C', 0.8) + d.clip(pit.d, embers(d, pit.cx, pit.cy + 1, pit.rx * 0.9, pit.ry * 0.8, 62, 18));
+    // corrugated tin lid propped up at the back
+    const lid = [t.p(-0.36, -0.3, PIT_TOP), t.p(0.36, -0.3, PIT_TOP), t.p(0.36, -0.5, PIT_TOP + 26), t.p(-0.36, -0.5, PIT_TOP + 26)];
+    const lidD = poly(lid);
+    s += F(lidD, d.linear(lid[0][0], 0, lid[1][0], 0, [[0, '#8A8C86'], [0.5, '#6E706A'], [1, '#4E504A']]), LW);
+    let cor = '';
+    for (let k = 1; k < 9; k++) {
+      const u = -0.36 + k * 0.08;
+      cor += L(seg(t, [u, -0.3, PIT_TOP], [u, -0.5, PIT_TOP + 26]), 0.6, '#3A3C38', 'opacity="0.7"');
+    }
+    cor += F(blob(...t.p(0.1, -0.4, PIT_TOP + 14), 6, 4, 63), RUST, 0, 'opacity="0.6"') + F(blob(...t.p(-0.2, -0.45, PIT_TOP + 20), 4, 3, 64), RUST_D, 0, 'opacity="0.5"');
+    s += d.clip(lidD, cor) + F(lidD, 'none', LW);
+    s += L(seg(t, [0.32, -0.3, PIT_TOP], [0.3, -0.42, PIT_TOP + 18]), 1.6, INK) + L(seg(t, [0.32, -0.3, PIT_TOP], [0.3, -0.42, PIT_TOP + 18]), 0.9, '#8E6A40');
+    // grate
+    let gr = '';
+    for (let k = -3; k <= 3; k++) gr += L(seg(t, [-0.26, k * 0.07, PIT_TOP - 2], [0.26, k * 0.07, PIT_TOP - 2]), 1, '#1A1814') + L(seg(t, [-0.26, k * 0.07, PIT_TOP - 1.6], [0.26, k * 0.07, PIT_TOP - 1.6]), 0.4, '#8A867A');
+    s += d.clip(pit.d, gr);
+    // the parcel: banana-leaf bundle tied with twine, a trotter sticking out
+    const [bx, by] = t.p(0.02, 0.02, PIT_TOP + 2);
+    const parcel = `M${f(bx - 16)},${f(by + 1)}C${f(bx - 17)},${f(by - 9)} ${f(bx + 15)},${f(by - 11)} ${f(bx + 16)},${f(by - 1)}C${f(bx + 15)},${f(by + 6)} ${f(bx - 15)},${f(by + 8)} ${f(bx - 16)},${f(by + 1)}Z`;
+    s += F(parcel, d.linear(bx - 16, by - 8, bx + 10, by + 6, [[0, '#7A8A3A'], [1, '#3E4E1E']]), LW);
+    s += d.clip(parcel, L(`M${f(bx - 12)},${f(by - 6)}L${f(bx - 4)},${f(by + 6)}M${f(bx - 2)},${f(by - 8)}L${f(bx + 6)},${f(by + 5)}M${f(bx + 8)},${f(by - 7)}L${f(bx + 14)},${f(by + 2)}`, 0.5, '#2E3A14') + F(blob(bx + 4, by - 2, 8, 3, 65), '#2A2016', 0, 'opacity="0.4"'));
+    s += L(`M${f(bx - 5)},${f(by - 8)}Q${f(bx - 7)},${f(by)} ${f(bx - 4)},${f(by + 6)}M${f(bx + 6)},${f(by - 8)}Q${f(bx + 4)},${f(by)} ${f(bx + 7)},${f(by + 5)}`, 0.9, '#C9B080');
+    s += F(capsule([bx + 14, by - 2], [bx + 22, by - 7], 3, 2.4), '#C8A08A', 0.7) + F(`M${f(bx + 21)},${f(by - 9.4)}l3,0.6l-0.6,3l-3,-0.4Z`, '#3A2A22', 0.5);
+    // stones round the rim
+    const r = rnd(66);
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2 + 0.1;
+      if (Math.sin(a) < -0.5 && k % 2) continue;
+      const [x, y] = t.p(Math.cos(a) * 0.36, Math.sin(a) * 0.36, PIT_TOP - 4);
+      s += F(blob(x, y - 2, 5 + r() * 1.5, 3 + r(), 670 + k, 7, 0.35), ['#8A847A', '#6E6860', '#9A948A'][k % 3], 0.7);
+    }
+    // a shovel stuck in the dirt
+    const [sx, sy] = t.p(0.46, -0.12, 2);
+    s += L(`M${f(sx)},${f(sy)}L${f(sx + 3)},${f(sy - 34)}`, 2.6, INK) + L(`M${f(sx)},${f(sy)}L${f(sx + 3)},${f(sy - 34)}`, 1.6, '#8E6A40');
+    s += F(`M${f(sx - 4)},${f(sy - 34)}h${f(14)}v3h-14Z`, '#3A3631', 0.6);
+    s += F(`M${f(sx - 3.6)},${f(sy + 2)}L${f(sx + 4)},${f(sy + 2)}L${f(sx + 3)},${f(sy - 8)}L${f(sx - 3)},${f(sy - 8)}Z`, '#7A7C76', 0.8);
+    return s;
+  });
+}
+
+function pitEmbers(): ArtAsset {
+  const W = 64;
+  const H = 48;
+  return asset('fx_pit_embers', W, H, 0.5, 1, (d) => {
+    const r = rnd(68);
+    let s = F(ell(W / 2, H - 4, 22, 6), '#E07A2E', 0, `opacity="0.35" filter="${d.blur(2.4)}"`);
+    // heat shimmer + smoke wisps + rising sparks
+    for (let k = 0; k < 4; k++) s += L(`M${f(W / 2 - 16 + k * 10)},${f(H - 6)}q-3,-6 0,-12t0,-12`, 0.8, '#E8D0A0', `opacity="${f(0.35 - k * 0.05)}"`);
+    s += F(blob(W / 2 - 4, H - 30, 9, 5, 69), '#6A665E', 0, `opacity="0.4" filter="${d.blur(1.4)}"`) + F(blob(W / 2 + 6, H - 40, 7, 4, 70), '#7A766E', 0, `opacity="0.3" filter="${d.blur(1.4)}"`);
+    for (let k = 0; k < 12; k++) s += dot(W / 2 + (r() - 0.5) * 40, H - 6 - r() * 36, 0.4 + r() * 0.6, k % 3 ? '#EBC452' : '#DE6A2A', 0.95);
+    return s;
+  });
+}
+
+// ---------------------------------------------------------------- tomb smoker (Graveyard Grill)
+const TOMB_TOP = 84;
+function tombSmoker(): ArtAsset {
+  return objAsset('tomb_smoker', hFor(96, 0.5), (d, t) => {
+    let s = shadow(d, t, -0.46, 0.46, -0.46, 0.48, 0.32);
+    const stone = tone('#8A887E', 0.12, 0.34);
+    // the headstone chimney at the back (drawn first: it stands behind the sarcophagus)
+    const hs: Box = [-0.44, -0.02, -0.44, -0.32, 30, 76];
+    s += box(d, t, hs, stone);
+    const hf = faces(t, [hs[0], hs[1], hs[2], hs[3]], [hs[0], hs[1], hs[2], hs[3]], hs[4], hs[5]);
+    // rounded top
+    const [ax, ay] = t.p(hs[0], hs[3], 76);
+    const [bx, by] = t.p(hs[1], hs[3], 76);
+    const crown = `M${f(ax)},${f(ay)}C${f(ax)},${f(ay - 14)} ${f(bx)},${f(by - 14)} ${f(bx)},${f(by)}Z`;
+    s += F(crown, stone.front, LW);
+    const [cx2, cy2] = t.p(hs[1], hs[2], 76);
+    s += F(`M${f(bx)},${f(by)}C${f(bx + 0.4)},${f(by - 6)} ${f(cx2 - 1)},${f(cy2 - 6)} ${f(cx2)},${f(cy2)}Z`, stone.side, 0.8);
+    let ht = speckle(d, hf.front, [ax - 4, ay - 16, 60, 60], 30, ['#6A685E', '#B0AEA2'], 71, 0.3, 0.7, 0.7);
+    ht += F(blob(...t.p(-0.1, hs[3], 40), 8, 4, 72), '#5E7A2A', 0, 'opacity="0.45"');
+    s += d.clip(hf.front, ht);
+    // carved skull + crossed bones on the stone (no lettering, so it mirrors cleanly)
+    const HSW = 0.48 * 48;
+    let carve = F(`M${f(HSW / 2 - 4.4)},12C${f(HSW / 2 - 5)},4 ${f(HSW / 2 + 5)},4 ${f(HSW / 2 + 4.4)},12L${f(HSW / 2 + 2.4)},15H${f(HSW / 2 - 2.4)}Z`, '#6E6C62', 0.6);
+    carve += F(ell(HSW / 2 - 1.8, 10.4, 1.3, 1.5), '#3A3832') + F(ell(HSW / 2 + 1.8, 10.4, 1.3, 1.5), '#3A3832');
+    carve += L(`M${f(HSW / 2 - 7)},18L${f(HSW / 2 + 7)},24M${f(HSW / 2 + 7)},18L${f(HSW / 2 - 7)},24`, 1.4, '#6E6C62') + L(`M${f(HSW / 2 - 7)},18L${f(HSW / 2 + 7)},24M${f(HSW / 2 + 7)},18L${f(HSW / 2 - 7)},24`, 0.5, INK, 'opacity="0.6"');
+    s += onFront(t, hs[0], hs[3], 70, carve);
+    s += crack(...t.p(-0.1, hs[3], 60), 1.8, 10, 73, 0.5, '#4A4840', 1);
+    // iron flue out of the top of the headstone
+    const fl = cyl(d, t, -0.23, -0.38, 0.05, 74, TOMB_TOP + 2, tone('#3A3631', 0.12, 0.35), 0.9);
+    s += fl.svg + F(ell(fl.top.cx, fl.top.cy, fl.top.rx * 1.5, fl.top.ry * 1.5), '#2A2622', 0.8) + F(ell(fl.top.cx, fl.top.cy, fl.top.rx, fl.top.ry), '#141210');
+    // the sarcophagus firebox
+    const SB: Box = [-0.44, 0.44, -0.3, 0.44, 0, 32];
+    s += box(d, t, SB, stone);
+    const sf = faces(t, [SB[0], SB[1], SB[2], SB[3]], [SB[0], SB[1], SB[2], SB[3]], 0, 32);
+    const fl0 = t.p(SB[0], SB[3], 0);
+    let tex = speckle(d, sf.front, [fl0[0] - 4, fl0[1] - 60, 110, 70], 60, ['#6A685E', '#B0AEA2', '#5E5A50'], 74, 0.3, 0.8, 0.7);
+    tex += F(sf.front, d.linear(0, fl0[1], 0, fl0[1] - 26, [[0, PAL.grimeD, 0.55], [1, PAL.grimeD, 0]]));
+    tex += F(blob(fl0[0] + 8, fl0[1] - 4, 10, 4, 75), '#5E7A2A', 0, 'opacity="0.5"') + F(blob(...t.p(SB[1], 0.1, 3), 10, 4, 76), '#4E6A22', 0, 'opacity="0.45"');
+    s += d.clip(sf.front, tex) + d.clip(sf.side, speckle(d, sf.side, [fl0[0] + 30, fl0[1] - 70, 60, 70], 40, ['#5E5C54', '#9A988E'], 77, 0.3, 0.8, 0.7));
+    s += crack(...t.p(SB[1], 0.2, 28), 1.9, 14, 78, 0.55, '#4A4840', 1) + crack(...t.p(-0.2, SB[3], 30), 1.7, 9, 79, 0.5, '#4A4840', 0);
+    // coffin-shaped iron door with a glowing grate
+    const FWd = (SB[1] - SB[0]) * 48;
+    const door = `M${f(FWd / 2 - 6)},4L${f(FWd / 2 + 6)},4L${f(FWd / 2 + 9)},11L${f(FWd / 2 + 6)},27L${f(FWd / 2 - 6)},27L${f(FWd / 2 - 9)},11Z`;
+    let dr = F(door, '#2E2B26', 0.9) + L(door, 0.5, '#5A564C', 'transform="translate(0.6 0.6)" opacity="0.6"');
+    dr += F(rrect(FWd / 2 - 4, 8, 8, 6, 0.6), '#1A120C', 0.5) + F(rrect(FWd / 2 - 3.4, 9, 6.8, 4, 0.4), '#D0602A', 0, `filter="${d.blur(0.6)}"`);
+    for (let k = 0; k < 4; k++) dr += L(`M${f(FWd / 2 - 3.4 + k * 2.2)},8V14`, 0.7, INK);
+    dr += L(`M${f(FWd / 2 + 3)},20h4`, 1.6, '#7F8584') + dot(FWd / 2 - 4, 6, 0.5, '#7F8584') + dot(FWd / 2 + 4, 6, 0.5, '#7F8584') + dot(FWd / 2 - 4, 25, 0.5, '#7F8584') + dot(FWd / 2 + 4, 25, 0.5, '#7F8584');
+    dr += F(blob(FWd / 2 + 7, 20, 2, 3, 80), RUST, 0, 'opacity="0.6"');
+    s += onFront(t, SB[0], SB[3], 32, dr);
+    // heavy lid, shoved a little askew, with a green glow leaking out of the gap
+    const LB: Box = [-0.47, 0.41, -0.33, 0.47, 32, 38];
+    s += F(t.qd(-0.44, 0.44, -0.3, 0.44, 32.4), '#9BD62E', 0, `opacity="0.7" filter="${d.blur(1.6)}"`);
+    s += box(d, t, LB, tone('#9A988E', 0.14, 0.34), { sw: LW, grad: 0 });
+    const lt0 = t.qd(LB[0], LB[1], LB[2], LB[3], 38);
+    s += d.clip(lt0, speckle(d, lt0, [t.cx - 50, t.cy - 70, 100, 60], 40, ['#6A685E', '#C0BEB2'], 81, 0.3, 0.8, 0.7) + F(blob(...t.p(0.1, 0.1, 38), 12, 5, 82), '#2A2016', 0, 'opacity="0.25"'));
+    // a skeletal hand reaching out from under the lid
+    const [hx, hy] = t.p(0.05, 0.45, 33);
+    s += bone(t.p(0.02, 0.46, 33.5), [hx + 1, hy + 9], 1.3) + bone([hx + 1, hy + 9], [hx - 2, hy + 14], 0.9) + bone([hx + 1, hy + 9], [hx + 1.5, hy + 15], 0.9) + bone([hx + 1, hy + 9], [hx + 4, hy + 14], 0.9);
+    return s;
+  });
+}
+
+function tombSmoke(): ArtAsset {
+  const W = 60;
+  const H = 64;
+  return asset('fx_tomb_smoke', W, H, 0.5, 1, (d) => {
+    // ghostly green smoke out of the flue (at i -0.23, j -0.38: ~7 px right of and ~18 above the anchor)
+    const cx = W / 2 + 7.2;
+    const cy = H - 20;
+    let s = '';
+    for (let k = 4; k >= 0; k--) {
+      const y = cy - k * 9;
+      const x = cx + Math.sin(k * 1.3) * 4 - k * 2.2;
+      const rr = 3.4 + k * 1.8;
+      s += P(blob(x, y, rr * 1.25, rr, 840 + k, 7, 0.45), k % 2 ? '#8AB860' : '#A6CC7A', 0.5, '#3E5A26', `opacity="${f(0.85 - k * 0.13)}"`);
+    }
+    // a little ghost face in the biggest puff
+    s += dot(cx - 9.6, cy - 36, 1, '#2A3A1A', 0.8) + dot(cx - 5.6, cy - 36.4, 1, '#2A3A1A', 0.8) + F(ell(cx - 7.6, cy - 32.4, 1.4, 2), '#2A3A1A', 0, 'opacity="0.7"');
+    s += F(ell(cx, cy, 4, 2), '#9BD62E', 0, `opacity="0.5" filter="${d.blur(1.4)}"`);
+    return s;
+  });
+}
+
+// ---------------------------------------------------------------- the Magic Fridge
+function fridgeMagic(): ArtAsset {
+  const body = '#3E3448';
+  return fridge('fridge_magic', tone(body, 0.12, 0.34, 0.04), (d, t, fc) => {
+    let fr = fridgeDoors(lt(body, 0.06), '#B8963E');
+    // glowing runes + a sigil circle across both doors
+    const rune = 'M8,8l3,4l-3,4M14,9h4M16,7v6M24,8l2,5l2,-5M31,9l3,3l-3,3M8,34l4,3M10,32v6M20,33a3,3 0 1 0 0.1,0M28,32l3,6l3,-6M10,60h5M12.5,57v6M24,58l4,4M28,58l-4,4';
+    fr += `<g filter="${d.blur(1.2)}" opacity="0.8">${L(rune, 1.4, '#9BD62E')}</g>` + L(rune, 0.6, '#E6FA9A');
+    fr += L(ell(FW / 2, 46, 8, 8), 0.7, '#B88AD8', 'opacity="0.8"') + L(`M${f(FW / 2)},38L${f(FW / 2 + 6.4)},50.8L${f(FW / 2 - 7.6)},43L${f(FW / 2 + 7.6)},43L${f(FW / 2 - 6.4)},50.8Z`, 0.6, '#B88AD8', 'opacity="0.8"');
+    // an eye peeking out of the door gap
+    fr += F(ell(FW / 2 + 4, 25.6, 4, 1.3), '#141210') + F(ell(FW / 2 + 4, 25.6, 2.6, 0.9), '#DECC54') + dot(FW / 2 + 4.4, 25.6, 0.5, INK);
+    let front = onFront(t, FB[0], FB[3], FB[5], fr);
+    const fl = t.p(FB[0], FB[3], 4);
+    front += d.clip(fc.front, F(fc.front, d.linear(0, fl[1], 0, fl[1] - 40, [[0, '#9BD62E', 0.25], [1, '#9BD62E', 0]])) + scratches(fl[0], fl[1] - 70, 40, 60, 6, 9, '#8A7A9A', 0.35, 4));
+    // chains + padlock across the front
+    let ch = '';
+    for (let k = 0; k < 9; k++) ch += L(ell(3 + k * 4.4, 30 + k * 0.6, 2.2, 1.3), 1.1, INK) + L(ell(3 + k * 4.4, 30 + k * 0.6, 2.2, 1.3), 0.6, '#9A9C96');
+    ch += F(rrect(FW / 2 - 4, 31, 8, 7, 1.2), '#B8963E', 0.7) + L(`M${f(FW / 2 - 2.4)},31v-2.4a2.4,2.4 0 0 1 4.8,0V31`, 1, INK) + dot(FW / 2, 34.6, 0.7, INK);
+    front += onFront(t, FB[0], FB[3], FB[5], ch);
+    // purple frost dripping from under the door, a candle on top
+    let after = d.clip(fc.side, F(fc.side, d.linear(...t.p(FB[1], 0, 84), ...t.p(FB[1], 0, 0), [[0, '#000', 0], [1, '#000', 0.25]])));
+    after += onFront(t, FB[0], FB[3], 4, F('M6,0q0,4 1,6q1,1 1.6,-0.6q0,-3 0.4,-5.4ZM26,0q0,3 0.8,4.4q1,1 1.4,-0.6q0,-2 0.2,-3.8Z', '#8A6AAA', 0.4));
+    const [cx, cy] = t.p(0.1, -0.05, 84);
+    after += F(`M${f(cx - 2)},${f(cy)}V${f(cy - 8)}H${f(cx + 2)}V${f(cy)}Z`, '#D8D2BC', 0.7) + F(`M${f(cx - 2)},${f(cy - 8)}q1,2 0.6,4q-0.6,-1 -0.6,-4Z`, '#D8D2BC', 0.4);
+    after += F(ell(cx, cy - 10.4, 1.2, 2.2), '#9BD62E', 0.3) + F(ell(cx, cy - 10, 3, 4), '#9BD62E', 0, `opacity="0.4" filter="${d.blur(1.2)}"`);
+    return { front, after };
+  });
+}
+
 // ================================================================ export
 export const KITCHEN_META = {
   /** Cooking-surface height per station: overlays (anchor .5/1) go at (tileCenterX, tileCenterY - stoveTopZ). */
-  stoveTopZ: { stove_dirty: 36.5, stove_plain: 36.5, stove_steel: 36.5, stove_super: 36.5, grill: 36, smoker: 56, fryer: OIL_Z } as Record<string, number>,
+  stoveTopZ: { stove_dirty: 36.5, stove_plain: 36.5, stove_steel: 36.5, stove_super: 36.5, grill: 36, smoker: 56, fryer: OIL_Z, witch_cauldron: CAUL_TOP, kiln: KILN_TOP, pit_oven: PIT_TOP, tomb_smoker: TOMB_TOP } as Record<string, number>,
   counterTopZ: { counter_plain: 36, counter_steel: 36, counter_bar: 38 } as Record<string, number>,
   sinkTopZ: { sink_dirty: 36, sink_plain: 36, sink_steel: 36 } as Record<string, number>,
   /** Overlays and which stations they belong on. */
-  overlays: { fx_steam_1: 'any', fx_steam_2: 'any', fx_steam_3: 'any', grill_flames: 'grill', fryer_bubbles: 'fryer', pot_burnt: 'stove' } as Record<string, string>,
+  overlays: { fx_steam_1: 'any', fx_steam_2: 'any', fx_steam_3: 'any', grill_flames: 'grill', fryer_bubbles: 'fryer', pot_burnt: 'stove', fx_cauldron_bubbles: 'cauldron', fx_kiln_fire: 'kiln', fx_pit_embers: 'pit', fx_tomb_smoke: 'tomb' } as Record<string, string>,
+  /** The cooking overlay the scene shows on each station kind while it cooks. */
+  stationFx: { stove: 'fx_steam_1', smoker: 'fx_steam_1', grill: 'grill_flames', fryer: 'fryer_bubbles', cauldron: 'fx_cauldron_bubbles', kiln: 'fx_kiln_fire', pit: 'fx_pit_embers', tomb: 'fx_tomb_smoke' } as Record<string, string>,
 };
 
 export const KITCHEN_KEYS = [
@@ -1013,6 +1399,7 @@ export const KITCHEN_KEYS = [
   'counter_plain', 'counter_steel', 'counter_bar',
   'sink_dirty', 'sink_plain', 'sink_steel', 'trash_red', 'trash_green',
   'fridge_dirty', 'fridge_plain', 'fridge_steel', 'keg_toxic',
+  'witch_cauldron', 'kiln', 'pit_oven', 'tomb_smoker', 'fx_cauldron_bubbles', 'fx_kiln_fire', 'fx_pit_embers', 'fx_tomb_smoke', 'fridge_magic',
 ] as const;
 
 export function buildKitchen(): ArtAsset[] {
@@ -1027,6 +1414,7 @@ export function buildKitchen(): ArtAsset[] {
     sink({ key: 'sink_steel', cab: { body: STEEL, top: STEEL, edge: STEEL, kick: '#2E2B26', topZ: 36 }, front: doors2('#A9ACA6', CHROME), basin: '#A4A7A0', steel: true }),
     bin('trash_red', '#8A3A2E'), bin('trash_green', '#4F6A3A'),
     fridgeDirty(), fridgePlain(), fridgeSteel(), kegToxic(),
+    witchCauldron(), kiln(), pitOven(), tombSmoker(), cauldronBubbles(), kilnFire(), pitEmbers(), tombSmoke(), fridgeMagic(),
   ];
 }
 

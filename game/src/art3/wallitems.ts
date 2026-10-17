@@ -512,6 +512,100 @@ function paintingZombie(d: Doc): string {
   return s;
 }
 
+// ---------------------------------------------------------------- late-game wall items
+function gradeCard(d: Doc, mir: boolean): string {
+  const fr = slab(d, 10, 38, 112, 148, 2, '#3A3632', '#22201C', '#5A5650');
+  let s = fr.s;
+  const card = rect(12.4, -145.6, 35.6, -114.4);
+  let o = paper(d, card, '#D8D2BC', 31);
+  let tt = lettering('HEALTH', 24, -139, 3, '#2A2A3A', 0.6, { anchor: 'middle', gap: 0.3 }, 0);
+  tt += lettering('GRADE', 24, -134.4, 3, '#2A2A3A', 0.6, { anchor: 'middle', gap: 0.3 }, 0);
+  tt += lettering('F', 24, -118, 12, '#8A1A14', 2.4, { anchor: 'middle' }, 0.6);
+  o += unflip(tt, mir, 24);
+  // a gold "employee of the month" star stuck over it, and a grease handprint
+  o += F('M31,-125l1.2,2.6l2.8,0.3l-2.1,1.9l0.6,2.8l-2.5,-1.4l-2.5,1.4l0.6,-2.8l-2.1,-1.9l2.8,-0.3Z', '#C8A040', 0.4);
+  o += d.clip(card, F(blob(16, -120, 4, 5, 32), '#6E5A34', 0, 'opacity="0.3"') + F(blob(30, -127, 3, 2, 33), '#7A2A22', 0, 'opacity="0.35"'));
+  s += W(o, 2);
+  s += W(F('M23,-151l2,0l0,4l-2,0Z', '#3A3632', 0.5), 2.4);
+  return s;
+}
+
+function cleaverRack(d: Doc): string {
+  const board = slab(d, 3, 45, 118, 130, 2.4, '#7A5230', '#4E321A', '#9A6E44');
+  let s = board.s + W(grain(d, rect(3, -130, 45, -118), [3, -130, 42, 12], 10, 34, '#3A2412', '#A07448'), 2.4);
+  // six hooks, five cleavers of shrinking size, one empty hook with a dust outline
+  for (let k = 0; k < 6; k++) {
+    const x = 7 + k * 7;
+    let c = L(`M${f(x)},-121v4`, 1.2, '#7F8584');
+    if (k === 3) {
+      c += L(rect(x - 2.6, -116, x + 3, -104), 0.5, '#5A4A3A', 'stroke-dasharray="1 1" opacity="0.7"');
+    } else {
+      const h = 15 - k * 0.6;
+      c += F(rect(x - 3, -117, x + 3.2, -117 + h - 4), '#A8ACA8', 0.7) + L(`M${f(x - 3)},${f(-117 + h - 4.4)}h6.2`, 0.6, '#E2E6E2');
+      c += F(ell(x + 1.8, -114.6, 0.8, 0.8), '#2A2826', 0.3) + L(`M${f(x)},${f(-117 + h - 4)}v4`, 2.4, INK) + L(`M${f(x)},${f(-117 + h - 4)}v4`, 1.4, '#4A2E18');
+      if (k === 1) c += F(blob(x, -110, 2, 2.6, 35), '#6A1A14', 0, 'opacity="0.6"') + F(`M${f(x - 0.6)},${f(-117 + h - 4.4)}q0,3 0.6,4q0.6,-1 0.4,-4Z`, '#6A1A14', 0.3);
+    }
+    s += W(c, 3.4);
+  }
+  return s;
+}
+
+function jackalope(d: Doc): string {
+  const cx = 24;
+  let s = '';
+  const shield = `M${cx - 10},-132L${cx + 10},-132L${cx + 10},-116Q${cx + 10},-106 ${cx},-102Q${cx - 10},-106 ${cx - 10},-116Z`;
+  s += W(grp(F(shield, '#1A140C'), 'translate(1.6 2)'), 0) + W(F(shield, '#4A2E18'), 1.4) + W(F(shield, '#4A2E18'), 2.4);
+  s += W(F(shield, '#6E4828', LW) + grain(d, shield, [cx - 10, -132, 20, 30], 8, 36, '#3A2412', '#9A7044', true), 3);
+  // the rabbit head: grey-green fur, buck teeth, one eye on a stalk, antlers
+  const fur = '#8A8A72';
+  let h = F(`M${cx - 8},-120C${cx - 9},-130 ${cx + 9},-130 ${cx + 8},-120C${cx + 8},-113 ${cx + 4},-108 ${cx},-108C${cx - 4},-108 ${cx - 8},-113 ${cx - 8},-120Z`, fur, LW);
+  h += F(`M${cx - 6},-127C${cx - 9},-138 ${cx - 7},-146 ${cx - 4},-146C${cx - 2},-144 ${cx - 2},-134 ${cx - 3},-127Z`, fur, 0.9) + F(`M${cx - 5},-130C${cx - 6},-137 ${cx - 5},-142 ${cx - 4},-142C${cx - 3},-140 ${cx - 3},-134 ${cx - 3.6},-130Z`, '#B08A86', 0);
+  h += F(`M${cx + 3},-127C${cx + 6},-134 ${cx + 12},-138 ${cx + 13},-135C${cx + 13},-132 ${cx + 8},-128 ${cx + 5},-125Z`, fur, 0.9);
+  h += F(ell(cx, -114, 2, 1.4), '#5A3A3A', 0.5) + F(`M${cx - 1.6},-112.6h3.2v3.6h-3.2Z`, '#E8E2CC', 0.5) + L(`M${cx},-112.6v3.6`, 0.4, INK);
+  h += F(ell(cx - 4, -120, 2, 2), '#E8E2CC', 0.5) + dot(cx - 4, -120, 1, EYE_Z) + dot(cx - 4, -120, 0.4, INK);
+  h += L(`M${cx + 4},-120q4,4 3,10`, 0.6, '#9A3A3A') + F(ell(cx + 7, -109, 1.8, 1.8), '#E8E2CC', 0.5) + dot(cx + 7.4, -108.6, 0.8, EYE_Z);
+  h += L(`M${cx - 6},-116l3,1M${cx - 5.4},-114.6l1,-2`, 0.4, INK);
+  const tine = (p: string) => L(p, 2.8, INK) + L(p, 1.6, '#CDBF98');
+  h += tine(`M${cx - 2},-128C${cx - 4},-136 ${cx - 12},-140 ${cx - 15},-150`) + tine(`M${cx - 9},-139l-6,-2`) + tine(`M${cx + 2},-128C${cx + 4},-136 ${cx + 10},-142 ${cx + 12},-152`) + tine(`M${cx + 8},-141l5,-3`);
+  s += W(h, 4.4);
+  return s;
+}
+
+function neonBrain(d: Doc): string {
+  let s = '';
+  for (const z of [118, 146]) {
+    const rl = rect(4, -z - 2, 44, -z + 1);
+    s += W(grp(F(rl, '#1A140C'), 'translate(1 1.6)'), 0) + W(F(rl, '#3A3732', 0.8) + dot(6, -z - 0.5, 0.5, '#8E8A80') + dot(42, -z - 0.5, 0.5, '#8E8A80'), 1.4);
+  }
+  const outline = 'M8,-130C6,-142 16,-150 24,-146C30,-152 42,-148 41,-138C46,-132 43,-122 36,-122C33,-116 24,-116 22,-120C14,-116 6,-122 8,-130Z';
+  let tubes = neon(d, outline, '#F08AA0', '#FFE6EC', 1.6);
+  tubes += neon(d, 'M24,-146C22,-138 26,-130 23,-121', '#F08AA0', '#FFE6EC', 1.1);
+  tubes += neon(d, 'M12,-134q4,-4 7,0t6,-2M28,-140q4,-3 7,1M28,-130q3,-4 7,-1t5,-1', '#F08AA0', '#FFE6EC', 0.9);
+  // a green drool drip, and the stem flickering out
+  tubes += neon(d, 'M33,-121q1,4 0,7M33,-111v0.2', '#9BE04A', '#EEFFD0', 1.1);
+  tubes += neon(d, 'M24,-118v6', '#F08AA0', '#FFE6EC', 1.2, false);
+  s += W(tubes, 3.4);
+  for (const [x, y] of [[10, -124], [24, -148], [42, -134]] as [number, number][]) s += W(F(rect(x - 0.9, y - 0.9, x + 0.9, y + 0.9), '#8E8A80', 0.4), 3);
+  return s;
+}
+
+function goldRecord(d: Doc, mir: boolean): string {
+  const fr = slab(d, 6, 42, 96, 152, 3, '#1E1C1A', '#141210', '#3A3632');
+  let s = fr.s;
+  const inner = rect(8.4, -149.6, 39.6, -98.4);
+  let o = F(inner, '#2A2620', 0.7);
+  // the disc: platinum grooves, a brisket on the label
+  o += F(ell(24, -130, 13, 13), d.radial(20, -134, 16, [[0, '#F2F2EC'], [0.6, '#BFC3C1'], [1, '#7F8584']]), 0.8);
+  for (const r of [11, 9.4, 7.8]) o += L(ell(24, -130, r, r), 0.35, '#6E7270', 'opacity="0.7"');
+  o += F(ell(24, -130, 5, 5), '#7A2A22', 0.6) + F(blob(24, -130, 3, 1.8, 37), '#5A2A14', 0.4) + L('M22,-131h4', 0.4, '#C86A4A') + dot(24, -130, 0.6, '#141210');
+  o += sheen(d, ell(24, -130, 13, 13), 12, -144, 24, 28, 2, 0.4, 38);
+  o += F(rect(13, -112, 35, -101.4), '#B8A050', 0.5);
+  o += unflip(lettering('PLATINUM', 24, -107.6, 2.6, '#3A2A10', 0.5, { anchor: 'middle', gap: 0.2 }, 0) + L(textD('BRISKET', 24, -103, 2, { anchor: 'middle', gap: 0.3 }), 0.4, '#3A2A10'), mir, 24);
+  o += d.clip(inner, sheen(d, inner, 8, -150, 32, 52, 2, 0.12, 39));
+  s += W(o, 3);
+  return s;
+}
+
 export function buildWallItems(): ArtAsset[] {
   return [
     ...pair('sign_neon', signNeon),
@@ -528,5 +622,10 @@ export function buildWallItems(): ArtAsset[] {
     ...pair('menu_board', menuBoard),
     ...pair('tv_wall', tvWall, true),
     ...pair('painting_zombie', paintingZombie, true),
+    ...pair('grade_card', gradeCard),
+    ...pair('cleaver_rack', cleaverRack, true),
+    ...pair('jackalope', jackalope, true),
+    ...pair('neon_brain', neonBrain, true),
+    ...pair('gold_record', goldRecord),
   ];
 }

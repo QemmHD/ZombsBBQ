@@ -234,7 +234,7 @@ export class JointScene extends Phaser.Scene {
       const art = ITEM_BY_ID[f.item].art;
       const topY = p.y - (KITCHEN_META.stoveTopZ[art] ?? 36);
       const flip = f.dir === 'se';
-      const over = st.kind === 'grill' ? 'grill_flames' : st.kind === 'fryer' ? 'fryer_bubbles' : 'fx_steam_1';
+      const over = KITCHEN_META.stationFx[st.kind] ?? 'fx_steam_1';
       const fx = this.img(over, p.x, topY, flip)
         .setDepth(d + 3)
         .setVisible(false);

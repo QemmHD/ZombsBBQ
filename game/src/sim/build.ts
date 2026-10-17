@@ -5,7 +5,7 @@
  * stove, counter, sink, table and chair (or staff freeze), and outdoor items live on the front lawn.
  */
 import { TUNING } from './data';
-import { DIR2, DIR4, DIR_STEP, EXPANSIONS, FLOOR_BY_ID, ITEM_BY_ID, WALL_BY_ID, type Dir, type ItemDef } from './catalog';
+import { DIR2, DIR4, DIR_STEP, EXPANSIONS, FLOOR_BY_ID, ITEM_BY_ID, STOVE_TIERS, WALL_BY_ID, type Dir, type ItemDef } from './catalog';
 import { DOOR_X, isInside, key, onLawn, reachable, type Pt } from './grid';
 import { addFurniture, type Furniture, type GameState } from './state';
 import { addXp, furnById, itemOf, releaseJob, room } from './sim';
@@ -119,6 +119,41 @@ export function buyAndPlace(s: GameState, itemId: string, x: number, y: number, 
   pay(s, def);
   addFurniture(s, itemId, x, y, dir ?? dirsFor(def)[0]);
   bought(s, def);
+  if (def.withChair) placeSetChair(s, def.withChair, x, y);
+  return null;
+}
+
+/** A table set's chair goes on the first free side, facing the table (or into storage if none fits). */
+function placeSetChair(s: GameState, chair: string, x: number, y: number) {
+  for (const d of DIR4) {
+    const cx = x - DIR_STEP[d].x;
+    const cy = y - DIR_STEP[d].y;
+    if (!canPlace(s, chair, cx, cy, d)) {
+      addFurniture(s, chair, cx, cy, d);
+      return;
+    }
+  }
+  s.storage[chair] = (s.storage[chair] ?? 0) + 1;
+}
+
+/** Cost of the next stove upgrade tier, or null at the top tier. */
+export function stoveTierCost(s: GameState, stoveId: string): number | null {
+  const st = s.stoves.find((x) => x.id === stoveId);
+  const f = st && furnById(s, st.furnitureId);
+  return f ? (STOVE_TIERS[f.tier ?? 0] ?? null) : null;
+}
+
+/** Buy the next upgrade tier for a stove (any station). */
+export function upgradeStove(s: GameState, stoveId: string): string | null {
+  const st = s.stoves.find((x) => x.id === stoveId);
+  const f = st && furnById(s, st.furnitureId);
+  if (!f) return 'Nope.';
+  const cost = STOVE_TIERS[f.tier ?? 0];
+  if (cost === undefined) return 'Fully upgraded!';
+  if (s.cash < cost) return 'Not enough cash!';
+  s.cash -= cost;
+  f.tier = (f.tier ?? 0) + 1;
+  s.stats.purchases++;
   return null;
 }
 

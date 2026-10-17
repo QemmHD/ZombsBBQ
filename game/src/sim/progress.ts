@@ -5,6 +5,7 @@ import { grimeCount } from './build';
 import type { GameState, Pet } from './state';
 import { addToCounter, addXp, blockedTiles, chairTable, furnById, itemOf, move, rand, room, setPath, stars, zombies } from './sim';
 import { updateTodo } from './todo';
+import { freeMeal, freeRareRecipe, updateCookbook } from './cookbook';
 
 // ---------- goals (the clipboard) ----------
 
@@ -197,8 +198,7 @@ function updatePet(s: GameState, p: Pet, dt: number) {
 
 // ---------- daily raid items ----------
 
-export function today(): string {
-  const d = new Date();
+export function today(d = new Date()): string {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
@@ -206,7 +206,51 @@ export function refreshDaily(s: GameState, day = today()) {
   if (s.graves.day !== day) s.graves = { day, green: 5, red: 5 };
 }
 
+// ---------- Frequent Fryer: the daily cooking streak (original: "Online Frequent Fryer") ----------
+
+export interface FryerReward {
+  cash?: number;
+  sauce?: number;
+  /** free dishes you know, into the Fridge */
+  meals?: number;
+}
+/** Days 1..10 of a streak; day 11 starts the ladder again (the streak keeps counting). */
+export const FRYER_REWARDS: FryerReward[] = [{ cash: 25 }, { cash: 50 }, { meals: 1 }, { sauce: 1 }, { cash: 150 }, { meals: 2 }, { sauce: 2 }, { cash: 400 }, { meals: 3 }, { sauce: 5, cash: 1000 }];
+/** each day's reward also has this chance of a rare recipe in the Fridge */
+export const FRYER_RARE_CHANCE = 0.05;
+
+/** The calendar day after `day` ('YYYY-M-D'). */
+export function nextDay(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return today(new Date(y, m - 1, d + 1));
+}
+
+/** The first dish cooked on a calendar day keeps the streak going (or starts a new one) and pays out. */
+export function fryerCooked(s: GameState, day = today()) {
+  if (s.tut < 8 || s.fryer?.day === day) return; // the streak starts once the tutorial is done
+  const streak = s.fryer && nextDay(s.fryer.day) === day ? s.fryer.streak + 1 : 1;
+  s.fryer = { day, streak, best: Math.max(streak, s.fryer?.best ?? 0) };
+  const r = FRYER_REWARDS[(streak - 1) % FRYER_REWARDS.length];
+  const got: string[] = [];
+  if (r.cash) {
+    s.cash += r.cash;
+    s.stats.earned += r.cash;
+    got.push(`$${r.cash.toLocaleString('en-US')}`);
+  }
+  if (r.sauce) {
+    s.sauce += r.sauce;
+    got.push(`${r.sauce} Brain Sauce`);
+  }
+  for (let k = 0; k < (r.meals ?? 0); k++) {
+    const d = freeMeal(s);
+    if (d) got.push(DISH_BY_ID[d].name);
+  }
+  const rare = rand(s) < FRYER_RARE_CHANCE ? freeRareRecipe(s) ?? undefined : undefined;
+  s.events.push({ t: 'fryer', streak, reward: got.join(' + ') || 'a pat on the back (the Fridge is full)', rare });
+}
+
 export function updateProgress(s: GameState, dt: number) {
+  updateCookbook(s);
   updateTodo(s);
   syncPets(s);
   for (const p of s.pets) updatePet(s, p, dt);

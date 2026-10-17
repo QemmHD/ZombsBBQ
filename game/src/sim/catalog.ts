@@ -62,6 +62,10 @@ export interface ItemDef {
   max?: number;
   /** only comes with the starting café (not sold) */
   starter?: boolean;
+  /** the Magic Fridge: one free dish you know lands in the Fridge every day */
+  dailyDish?: boolean;
+  /** table sets: this chair is placed facing the table, free, in the same purchase */
+  withChair?: string;
   blurb: string;
 }
 
@@ -86,7 +90,7 @@ export const ITEMS: ItemDef[] = [
   I({ id: 'stove_dirty', name: 'Grimy Stove', tab: 'kitchen', kind: 'stove', level: 1, cash: 50, rating: -0.01, xp: 0, art: 'stove_dirty', station: 'stove', speed: 1, starter: true, blurb: 'One burner works. Mostly.' }),
   I({ id: 'stove_plain', name: 'Plain Stove', tab: 'kitchen', kind: 'stove', level: 1, cash: 500, art: 'stove_plain', station: 'stove', speed: 1, blurb: 'Cooks the house menu. Every joint needs two.' }),
   I({ id: 'stove_steel', name: 'Stainless Stove', tab: 'kitchen', kind: 'stove', level: 5, cash: 25000, rating: 0.02, art: 'stove_steel', station: 'stove', speed: 1.1, blurb: '10% faster. 100% shinier.' }),
-  I({ id: 'stove_super', name: 'Souped-Up Stove', tab: 'kitchen', kind: 'stove', level: 7, sauce: 20, rating: 0.01, art: 'stove_super', station: 'stove', speed: 1.2, blurb: 'Hot-rod pipes. 20% faster.' }),
+  I({ id: 'stove_super', name: 'Souped-Up Stove', tab: 'kitchen', kind: 'stove', level: 7, sauce: 10, rating: 0.01, art: 'stove_super', station: 'stove', speed: 1.2, blurb: 'Hot-rod pipes. 20% faster.' }),
   I({ id: 'grill', name: 'Rusty BBQ Grill', tab: 'kitchen', kind: 'stove', level: 2, cash: 1200, art: 'grill', station: 'grill', speed: 1, blurb: 'Unlocks the Grill cookbook: burgers, wings, kebabs.' }),
   I({ id: 'smoker', name: 'Barrel Smoker', tab: 'kitchen', kind: 'stove', level: 4, cash: 3000, art: 'smoker', station: 'smoker', speed: 1, blurb: 'Unlocks the Smoker cookbook. Low and slow.' }),
   I({ id: 'fryer', name: 'Deep Fryer', tab: 'kitchen', kind: 'stove', level: 6, cash: 5000, art: 'fryer', station: 'fryer', speed: 1, blurb: 'Unlocks the Fryer cookbook. If it moves, fry it.' }),
@@ -101,7 +105,13 @@ export const ITEMS: ItemDef[] = [
   I({ id: 'fridge_dirty', name: 'Grimy Fridge', tab: 'kitchen', kind: 'fridge', level: 1, cash: 50, rating: -0.01, xp: 0, art: 'fridge_dirty', starter: true, blurb: 'Stolen food goes here. "DON\'T EAT STAFF."' }),
   I({ id: 'fridge_plain', name: 'Plain Fridge', tab: 'kitchen', kind: 'fridge', level: 1, cash: 500, art: 'fridge_plain', blurb: 'Holds raid loot and gifts.' }),
   I({ id: 'fridge_steel', name: 'Stainless Fridge', tab: 'kitchen', kind: 'fridge', level: 5, cash: 25000, rating: 0.02, art: 'fridge_steel', blurb: 'Hums a little tune.' }),
-  I({ id: 'keg_toxic', name: 'Toxic Barrel', tab: 'special', kind: 'keg', level: 1, sauce: 50, art: 'keg_toxic', blurb: 'Resting zombies recover faster. Stacks!' }),
+  // late-game stations: each one opens its own cookbook
+  I({ id: 'witch_cauldron', name: "Witch's Cauldron", tab: 'kitchen', kind: 'stove', level: 11, cash: 8000, art: 'witch_cauldron', station: 'cauldron', speed: 1, blurb: 'Unlocks Mad Sauces: soups, stews, anything that bubbles back.' }),
+  I({ id: 'kiln', name: 'Brick Pizza Kiln', tab: 'kitchen', kind: 'stove', level: 15, cash: 20000, rating: 0.01, art: 'kiln', station: 'kiln', speed: 1, blurb: 'Unlocks the Wood-Fired Rot cookbook. Pizza, the Italian way. Ish.' }),
+  I({ id: 'pit_oven', name: 'Pit Oven', tab: 'kitchen', kind: 'stove', level: 21, cash: 45000, rating: 0.01, art: 'pit_oven', station: 'pit', speed: 1, blurb: 'Unlocks Feast of the Dead: whole beasts, roasted underground.' }),
+  I({ id: 'tomb_smoker', name: 'Tomb Smoker', tab: 'kitchen', kind: 'stove', level: 27, cash: 120000, rating: 0.02, art: 'tomb_smoker', station: 'tomb', speed: 1, blurb: 'Unlocks the Graveyard Grill. Smoke comes out green. Do not inhale.' }),
+  I({ id: 'fridge_magic', name: 'Magic Fridge', tab: 'kitchen', kind: 'fridge', level: 10, sauce: 30, rating: 0.02, art: 'fridge_magic', max: 1, dailyDish: true, blurb: 'Hums with dark magic: a free dish you know turns up in the Fridge every day.' }),
+  I({ id: 'keg_toxic', name: 'Toxic Barrel', tab: 'special', kind: 'keg', level: 1, sauce: 15, art: 'keg_toxic', blurb: 'Resting zombies recover faster. Stacks!' }),
   // ----- furniture: one-seat tables + separate chairs (the original's rule) -----
   ...TINTS.map((t, i) =>
     I({ id: `table_plain_${t.id}`, name: `Plain Table (${t.name})`, tab: 'furniture', kind: 'table', level: 1 + Math.floor(i / 2), cash: 150 + Math.floor(i / 2) * 50, art: `table_plain_${t.id}`, facing: 'none', blurb: 'Seats one customer, with a chair beside it.' }),
@@ -117,6 +127,13 @@ export const ITEMS: ItemDef[] = [
   I({ id: 'chair_barrel', name: 'Barrel Stool', tab: 'furniture', kind: 'chair', level: 9, cash: 600, art: 'chair_barrel', facing: 'four', blurb: 'Sit on it. Do not open it.' }),
   I({ id: 'table_coffin', name: 'Coffin Table', tab: 'furniture', kind: 'table', level: 12, sauce: 2, rating: 0.01, art: 'table_coffin', facing: 'none', blurb: 'Occupant optional.' }),
   I({ id: 'chair_bone', name: 'Bone Throne', tab: 'furniture', kind: 'chair', level: 12, sauce: 2, rating: 0.01, art: 'chair_bone', facing: 'four', blurb: 'Ergonomic, if you are a skeleton.' }),
+  I({ id: 'table_set', name: 'Diner Table Set', tab: 'furniture', kind: 'table', level: 3, cash: 450, art: 'table_diner', facing: 'none', withChair: 'chair_diner', blurb: 'A diner table AND its chair, placed together. Saves you a trip.' }),
+  I({ id: 'table_drum', name: 'Oil-Drum Table', tab: 'furniture', kind: 'table', level: 17, cash: 2500, art: 'table_drum', facing: 'none', blurb: 'Junkyard chic. Smells faintly of diesel.' }),
+  I({ id: 'chair_tire', name: 'Tire Stool', tab: 'furniture', kind: 'chair', level: 17, cash: 1100, art: 'chair_tire', facing: 'four', blurb: 'Bald tyre, milk-crate seat. Bounces.' }),
+  I({ id: 'table_butcher', name: 'Butcher Block', tab: 'furniture', kind: 'table', level: 25, cash: 6000, rating: 0.01, art: 'table_butcher', facing: 'none', blurb: 'A thousand chops deep. Do not ask about the stains.' }),
+  I({ id: 'chair_cleaver', name: 'Cleaver-back Chair', tab: 'furniture', kind: 'chair', level: 25, cash: 2500, rating: 0.01, art: 'chair_cleaver', facing: 'four', blurb: 'Sit up straight. Or else.' }),
+  I({ id: 'table_morgue', name: 'Morgue Slab', tab: 'furniture', kind: 'table', level: 34, sauce: 5, rating: 0.02, art: 'table_morgue', facing: 'none', blurb: 'Stainless steel, toe tag included.' }),
+  I({ id: 'chair_electric', name: 'Electric Chair', tab: 'furniture', kind: 'chair', level: 34, sauce: 5, rating: 0.02, art: 'chair_electric', facing: 'four', blurb: 'The house special. Wired for flavour.' }),
   I({ id: 'divider_plain', name: 'Plain Divider', tab: 'furniture', kind: 'divider', level: 4, cash: 200, art: 'divider_plain', blurb: 'Wall off the kitchen. Nobody wants to see that.' }),
   I({ id: 'divider_brick', name: 'Brick Half-wall', tab: 'furniture', kind: 'divider', level: 7, cash: 500, art: 'divider_brick', blurb: 'Sturdy. Mostly.' }),
   I({ id: 'divider_wood', name: 'Wood Divider', tab: 'furniture', kind: 'divider', level: 9, cash: 750, art: 'divider_wood', blurb: 'Saloon-style.' }),
@@ -138,6 +155,13 @@ export const ITEMS: ItemDef[] = [
   I({ id: 'coffin_upright', name: 'Peek-a-Boo Coffin', tab: 'decor', kind: 'decor', level: 8, sauce: 5, rating: 0.02, art: 'coffin_upright', blurb: 'Knock knock.' }),
   I({ id: 'aquarium', name: 'Murky Aquarium', tab: 'decor', kind: 'decor', level: 9, cash: 8000, rating: 0.01, art: 'aquarium', blurb: 'One fish. Zero pulse.' }),
   I({ id: 'cauldron', name: 'Bubbling Cauldron', tab: 'decor', kind: 'decor', level: 10, cash: 6000, rating: 0.01, art: 'cauldron', blurb: 'Soup of the day. Every day.' }),
+  I({ id: 'pig_spit', name: 'Pig on a Spit', tab: 'decor', kind: 'decor', level: 18, cash: 12000, rating: 0.01, art: 'pig_spit', blurb: 'Turning slowly. Forever. It blinks sometimes.' }),
+  I({ id: 'brain_jar', name: 'Brain in a Jar', tab: 'decor', kind: 'decor', level: 21, cash: 25000, rating: 0.02, art: 'brain_jar', blurb: 'Still thinking about lunch.' }),
+  I({ id: 'chainsaw_stump', name: 'Chainsaw Stump', tab: 'decor', kind: 'decor', level: 24, cash: 18000, rating: 0.01, art: 'chainsaw_stump', blurb: 'Somebody was carving the roast. Somebody got carried away.' }),
+  I({ id: 'trophy_spatula', name: 'Golden Spatula', tab: 'decor', kind: 'decor', level: 27, sauce: 12, rating: 0.04, art: 'trophy_spatula', blurb: 'Star item. First place, Rib-Off ’87. The other cooks were eaten.' }),
+  I({ id: 'mummy_case', name: 'Mummy Case', tab: 'decor', kind: 'decor', level: 31, cash: 90000, rating: 0.04, art: 'mummy_case', blurb: 'Star item. Imported. Occupied.' }),
+  I({ id: 'hog_skeleton', name: 'Hog Skeleton', tab: 'decor', kind: 'decor', level: 36, sauce: 25, rating: 0.07, art: 'hog_skeleton', blurb: 'Star item. Picked clean by the crew in four minutes flat.' }),
+  I({ id: 'grill_shrine', name: 'Shrine of the Eternal Grill', tab: 'decor', kind: 'decor', level: 40, cash: 400000, rating: 0.12, art: 'grill_shrine', blurb: 'Star item. Never goes out. Nobody knows who lit it.' }),
   I({ id: 'slime_fountain', name: 'Slime Fountain', tab: 'decor', kind: 'decor', level: 19, cash: 50000, rating: 0.03, art: 'slime_fountain', blurb: 'Make a wish. Lose a hand.' }),
   // ----- wall items (hung on a wall segment) -----
   I({ id: 'window_boarded', name: 'Boarded Window', tab: 'walls', kind: 'wall', level: 1, cash: 50, xp: 1, art: 'window_boarded', starter: true, blurb: 'Keeps the living out.' }),
@@ -156,22 +180,37 @@ export const ITEMS: ItemDef[] = [
   I({ id: 'dartboard', name: 'Dartboard', tab: 'walls', kind: 'wall', level: 15, cash: 2000, art: 'dartboard', blurb: 'Mind the eyeballs.' }),
   I({ id: 'tv_wall', name: 'Old Wall TV', tab: 'walls', kind: 'wall', level: 1, cash: 16000, rating: 0.02, art: 'tv_wall', blurb: 'Star item. All static, all day.' }),
   I({ id: 'painting_zombie', name: 'Portrait of a Zombie', tab: 'walls', kind: 'wall', level: 20, cash: 250000, rating: 0.12, art: 'painting_zombie', blurb: 'A masterpiece. The eyes follow you. Slowly.' }),
+  I({ id: 'grade_card', name: 'Health Grade "F"', tab: 'walls', kind: 'wall', level: 16, cash: 3000, art: 'grade_card', blurb: 'Framed with pride.' }),
+  I({ id: 'cleaver_rack', name: 'Cleaver Rack', tab: 'walls', kind: 'wall', level: 20, cash: 9000, rating: 0.01, art: 'cleaver_rack', blurb: 'One for each day of the week. Sunday’s is missing.' }),
+  I({ id: 'jackalope', name: 'Zombie Jackalope', tab: 'walls', kind: 'wall', level: 26, cash: 30000, rating: 0.02, art: 'jackalope', blurb: 'Mounted. Still twitching.' }),
+  I({ id: 'neon_brain', name: 'Neon Brain', tab: 'walls', kind: 'wall', level: 29, sauce: 15, rating: 0.05, art: 'neon_brain', blurb: 'Star item. It hums at the frequency of hunger.' }),
+  I({ id: 'gold_record', name: 'Platinum Brisket', tab: 'walls', kind: 'wall', level: 35, cash: 150000, rating: 0.06, art: 'gold_record', blurb: 'Star item. One million briskets sold. Zero survivors.' }),
   // ----- money-makers (cash per hour up to a cap; tap to collect, like the original) -----
-  I({ id: 'vending', name: 'Snack Machine', tab: 'special', kind: 'moneymaker', level: 1, cash: 16000, art: 'vending', payout: { perHour: 25, max: 250 }, blurb: 'Earns $25/hour, holds up to $250.' }),
-  I({ id: 'arcade', name: 'Zombie Panic Arcade', tab: 'special', kind: 'moneymaker', level: 1, cash: 50000, art: 'arcade', payout: { perHour: 75, max: 1000 }, blurb: 'Earns $75/hour, holds up to $1,000.' }),
-  I({ id: 'atm', name: 'Haunted ATM', tab: 'special', kind: 'moneymaker', level: 1, sauce: 60, art: 'atm', payout: { perHour: 200, max: 5000 }, blurb: 'Earns $200/hour, holds up to $5,000.' }),
-  I({ id: 'jukebox', name: 'Graveyard Jukebox', tab: 'special', kind: 'moneymaker', level: 5, cash: 40000, art: 'jukebox', payout: { perHour: 55, max: 1500 }, blurb: 'Earns $55/hour, holds up to $1,500.' }),
-  I({ id: 'comic_rack', name: 'Comic Rack', tab: 'special', kind: 'moneymaker', level: 6, cash: 18000, art: 'comic_rack', payout: { perHour: 30, max: 300 }, blurb: 'Earns $30/hour, holds up to $300.' }),
-  I({ id: 'phonebooth', name: 'Phone Booth', tab: 'special', kind: 'moneymaker', level: 9, sauce: 20, art: 'phonebooth', payout: { perHour: 80, max: 1900 }, blurb: 'Earns $80/hour, holds up to $1,900.' }),
-  I({ id: 'slot_machine', name: 'One-Armed Bandit', tab: 'special', kind: 'moneymaker', level: 12, cash: 100000, art: 'slot_machine', payout: { perHour: 150, max: 1800 }, blurb: 'Earns $150/hour. The arm is real.' }),
-  I({ id: 'pinball', name: 'Pinball', tab: 'special', kind: 'moneymaker', level: 13, sauce: 25, art: 'pinball', payout: { perHour: 100, max: 1200 }, blurb: 'Earns $100/hour, holds up to $1,200.' }),
-  I({ id: 'foosball', name: 'Foosball Table', tab: 'special', kind: 'moneymaker', level: 15, cash: 60000, art: 'foosball', payout: { perHour: 90, max: 1000 }, blurb: 'Earns $90/hour, holds up to $1,000.' }),
+  I({ id: 'vending', name: 'Snack Machine', tab: 'special', kind: 'moneymaker', level: 1, cash: 2500, art: 'vending', payout: { perHour: 25, max: 250 }, blurb: 'Earns $25/hour, holds up to $250.' }),
+  I({ id: 'arcade', name: 'Zombie Panic Arcade', tab: 'special', kind: 'moneymaker', level: 1, cash: 8000, art: 'arcade', payout: { perHour: 80, max: 800 }, blurb: 'Earns $80/hour, holds up to $800.' }),
+  I({ id: 'atm', name: 'Haunted ATM', tab: 'special', kind: 'moneymaker', level: 1, sauce: 30, art: 'atm', payout: { perHour: 200, max: 2000 }, blurb: 'Earns $200/hour, holds up to $2,000.' }),
+  I({ id: 'jukebox', name: 'Graveyard Jukebox', tab: 'special', kind: 'moneymaker', level: 5, cash: 6000, art: 'jukebox', payout: { perHour: 60, max: 600 }, blurb: 'Earns $60/hour, holds up to $600.' }),
+  I({ id: 'comic_rack', name: 'Comic Rack', tab: 'special', kind: 'moneymaker', level: 6, cash: 3000, art: 'comic_rack', payout: { perHour: 30, max: 300 }, blurb: 'Earns $30/hour, holds up to $300.' }),
+  I({ id: 'phonebooth', name: 'Phone Booth', tab: 'special', kind: 'moneymaker', level: 9, sauce: 20, art: 'phonebooth', payout: { perHour: 80, max: 800 }, blurb: 'Earns $80/hour, holds up to $800.' }),
+  I({ id: 'slot_machine', name: 'One-Armed Bandit', tab: 'special', kind: 'moneymaker', level: 12, cash: 18000, art: 'slot_machine', payout: { perHour: 180, max: 1800 }, blurb: 'Earns $180/hour. The arm is real.' }),
+  I({ id: 'pinball', name: 'Pinball', tab: 'special', kind: 'moneymaker', level: 13, sauce: 25, art: 'pinball', payout: { perHour: 100, max: 1000 }, blurb: 'Earns $100/hour, holds up to $1,000.' }),
+  I({ id: 'foosball', name: 'Foosball Table', tab: 'special', kind: 'moneymaker', level: 15, cash: 10000, art: 'foosball', payout: { perHour: 100, max: 1000 }, blurb: 'Earns $100/hour, holds up to $1,000.' }),
+  I({ id: 'gumball_eyes', name: 'Eyeball Gumballs', tab: 'special', kind: 'moneymaker', level: 18, cash: 24000, art: 'gumball_eyes', payout: { perHour: 250, max: 2500 }, blurb: 'Earns $250/hour. Chewy. Blinky.' }),
+  I({ id: 'claw_machine', name: 'Claw Machine', tab: 'special', kind: 'moneymaker', level: 22, cash: 36000, art: 'claw_machine', payout: { perHour: 375, max: 3750 }, blurb: 'Earns $375/hour. Win a hand! (It is a real hand.)' }),
+  I({ id: 'fortune_teller', name: 'Madame Rot-ini', tab: 'special', kind: 'moneymaker', level: 26, sauce: 40, art: 'fortune_teller', payout: { perHour: 400, max: 4000 }, blurb: 'Earns $400/hour. Your future: brains.' }),
+  I({ id: 'photo_booth', name: 'Photo Booth', tab: 'special', kind: 'moneymaker', level: 32, cash: 72000, art: 'photo_booth', payout: { perHour: 750, max: 7500 }, blurb: 'Earns $750/hour. Say “BRAINS!”' }),
+  I({ id: 'mech_bull', name: 'Mechanical Bull', tab: 'special', kind: 'moneymaker', level: 37, sauce: 60, art: 'mech_bull', payout: { perHour: 900, max: 9000 }, blurb: 'Earns $900/hour. Eight seconds. Nobody has lasted eight seconds.' }),
   // ----- outdoor: pets and raid tombstones live on the front lawn -----
   I({ id: 'pethouse_pug', name: 'Pug House', tab: 'special', kind: 'pethouse', level: 4, cash: 1000, art: 'pethouse_pug', pet: 'pug', outdoor: true, max: 1, blurb: 'Adopt a Zombie Pug. It sniffs out loose change.' }),
   I({ id: 'pethouse_kennel', name: 'Spiked Kennel', tab: 'special', kind: 'pethouse', level: 8, sauce: 10, art: 'pethouse_kennel', pet: 'rotweiler', outdoor: true, max: 1, blurb: 'Adopt a Rot-weiler. It fights in raids.' }),
   I({ id: 'tombstone_str', name: 'Strength Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_str', outdoor: true, boost: 'str', blurb: 'Raid boost: tap it mid-raid and your horde hits harder for 5 s. 5 uses a day.' }),
   I({ id: 'tombstone_hp', name: 'Health Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_hp', outdoor: true, boost: 'hp', blurb: 'Raid boost: tap it mid-raid and your horde heals for 5 s. 5 uses a day.' }),
 ];
+
+/** Stove upgrades (any station): each tier cooks 10% faster and widens the burn window 15%. */
+export const STOVE_TIERS = [2000, 6000, 15000, 35000, 70000];
+export const STOVE_TIER_SPEED = 0.1;
+export const STOVE_TIER_BURN = 0.15;
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 

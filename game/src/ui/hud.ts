@@ -23,6 +23,9 @@ import {
   infect,
   infectCost,
   keepWarmCost,
+  stoveTierCost,
+  upgradeStove,
+  STOVE_TIERS,
   refill,
   rest,
   stars,
@@ -40,7 +43,7 @@ import { sfx } from '../game/sfx';
 import { headUrl, artUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import { bindActions, energyColor, esc, fmt, fmtTime, icon, priceHtml, purpleStarsHtml, starsHtml } from './dom';
-import { openCookbook, openCrew, openFridge, openGoals, openLevelUp, openOffline, openRating, openSettings, openZombiepedia } from './panels';
+import { openCookbook, openCrew, openFridge, openFryer, openGoals, openLevelUp, openOffline, openRating, openSettings, openZombiepedia } from './panels';
 import { openStore } from './store';
 import { EditBar } from './editbar';
 import { RaidUi, openMap } from './raidui';
@@ -76,6 +79,7 @@ export class Hud {
   private cancelArmed = '';
   private modalClose: (() => void) | null = null;
   private pendingLevels: number[] = [];
+  private pendingFryer: { streak: number; reward: string; rare?: string } | null = null;
   readonly edit: EditBar;
   readonly raid: RaidUi;
 
@@ -146,6 +150,8 @@ export class Hud {
     ctl.onEvent((e) => {
       // never stomp another popup (e.g. raid results): queue it for the next quiet moment
       if (e.t === 'levelup') this.pendingLevels.push(e.level);
+      if (e.t === 'fryer') this.pendingFryer = e;
+      if (e.t === 'toast') ctl.info(e.text);
       if (e.t === 'infected') {
         const w = ctl.state.workers.find((x) => x.id === e.workerId);
         if (w) ctl.info(`${w.name} joined the crew!`);
@@ -258,6 +264,10 @@ export class Hud {
       const lv = this.pendingLevels.splice(0);
       openLevelUp(this, Math.min(...lv), Math.max(...lv));
     }
+    if (this.pendingFryer && !this.modalOpen && this.ctl.mode === 'play') {
+      openFryer(this, this.pendingFryer);
+      this.pendingFryer = null;
+    }
     if (this.ctl.offlineReport && !this.modalOpen) {
       openOffline(this, this.ctl.offlineReport);
       this.ctl.offlineReport = null;
@@ -340,7 +350,10 @@ export class Hud {
       const lamp = f.keepWarm
         ? `<div class="small">${icon('keep_warm', 'ico-s')} Heat lamp installed: food waits 50% longer before burning.</div>`
         : `<div class="actions"><button class="btn" data-a="lamp" ${s.level < 3 ? 'disabled' : ''}>Heat lamp · ${priceHtml({ cash: keepWarmCost() })}</button></div><div class="small">${s.level < 3 ? 'Unlocks at level 3. ' : ''}Finished food waits 50% longer before it burns.</div>`;
-      html = `<h3>${esc(name)}</h3><div class="sub">Station</div>${body}${lamp}`;
+      const tier = f.tier ?? 0;
+      const up = stoveTierCost(s, st.id);
+      const upg = `<div class="actions"><button class="btn" data-a="upgrade" ${up === null ? 'disabled' : ''}>${up === null ? 'Fully upgraded' : `Upgrade ${tier + 1}/${STOVE_TIERS.length} · ${priceHtml({ cash: up })}`}</button></div><div class="small">Tier ${tier}: cooks ${tier * 10}% faster, food waits ${tier * 15}% longer before it burns.</div>`;
+      html = `<h3>${esc(name)}</h3><div class="sub">Station</div>${body}${lamp}${upg}`;
     } else if (sel.kind === 'dishPicker') {
       const st = s.stoves.find((x) => x.id === sel.stoveId)!;
       const w = s.workers.find((x) => x.id === sel.workerId);
@@ -484,6 +497,13 @@ export class Hud {
       this.lastStructure = '';
       this.renderCard();
     }
+    if (sel?.kind === 'stove' && a === 'upgrade') {
+      const err = upgradeStove(s, sel.id);
+      if (err) this.ctl.toast(err);
+      else sfx('purchase');
+      this.lastStructure = '';
+      this.renderCard();
+    }
     if (sel?.kind === 'stove' && a === 'lamp') {
       const err = buyKeepWarm(s, sel.id);
       if (err) this.ctl.toast(err);
@@ -514,6 +534,6 @@ export function dishRow(id: string, s: Controller['state'], pickable: boolean): 
   const extra = v && (v.id === 'frozen' || v.id === 'fresh') ? ` · ${v.effect}` : '';
   return `<button class="dish ${!avail || cant ? 'locked' : ''} ${v ? 'variant' : ''}" ${pickable && avail ? `data-dish="${d.id}"` : ''}>
     <span class="dish-ico"><img src="${artUrl(d.icon)}" alt=""/>${v ? `<i class="var-dot v-${v.id}">${v.name[0]}</i>` : ''}</span>
-    <span><b>${esc(d.name)}${tag}</b><small>${!avail ? lockTxt : `⏱ ${fmtTime(d.cookSec)} · ${d.servings} servings · $${d.price}/serving · +${d.xp} XP${extra}`}</small></span>
+    <span><b>${esc(d.name)}${tag}</b><small>${!avail ? lockTxt : `⏱ ${fmtTime(d.cookSec)} · ${d.servings} servings · $${d.price}/serving ($${(d.price - d.cost / d.servings).toFixed(1)} profit) · +${d.xp} XP${extra}`}</small><small class="blurb">${esc(d.blurb)}</small></span>
     <span class="price">${priceHtml({ cash: d.cost })}</span></button>`;
 }

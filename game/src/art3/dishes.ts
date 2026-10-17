@@ -21,6 +21,10 @@ export const DISH3_IDS = [
   'pork', 'ribs', 'brisket', 'foie',
   // fryer
   'rings', 'nuggets', 'fries', 'chicken',
+  // the late game (levels 10-40) and the new stations' secret recipes
+  'chowder', 'corndog', 'eyesoup', 'stew', 'links', 'tbone', 'donuts', 'pizza', 'calzone', 'jerky', 'knots', 'meatballs', 'brats', 'swamp',
+  'hog', 'deepdish', 'fishchips', 'turducken', 'burntends', 'fondue', 'coffinribs', 'beans', 'stromboli', 'mammoth', 'tomahawk', 'mummywrap',
+  'potpie', 'tempura', 'hash', 'elixir', 'kraken', 'pizzaface', 'damned', 'apocalypse', 'toadstew', 'ratpizza', 'luau', 'tenders',
 ] as const;
 export type Dish3Id = (typeof DISH3_IDS)[number];
 
@@ -303,7 +307,603 @@ function slider(d: Doc, x: number, y: number, s: number, seed: number): string {
   return o;
 }
 
-const DISHES: Record<Dish3Id, Body> = {
+// ---------------------------------------------------------------- late-game dishes (levels 10-40, new stations)
+
+/** A deep bowl at the plate angle. Returns its art and the soup surface path (clip contents to it). */
+function bowl(d: Doc, soup: [string, string, string], o: { x?: number; y?: number; rx?: number; ry?: number; col?: [string, string]; speck?: boolean; seed?: number } = {}): { s: string; soup: string; x: number; y: number; rx: number; ry: number } {
+  const x = o.x ?? 18;
+  const y = o.y ?? 13.4;
+  const rx = o.rx ?? 9.6;
+  const ry = o.ry ?? 5.6;
+  const col = o.col ?? ['#8A7A5A', '#5A4A32'];
+  const body = `M${f(x - rx)},${f(y)}C${f(x - rx + 0.4)},${f(y + 8.2)} ${f(x + rx - 0.4)},${f(y + 8.2)} ${f(x + rx)},${f(y)}Z`;
+  let s = cel(d, body, col[0], col[1], 0.6, [-1.2, -0.5]);
+  if (o.speck) s += speckle(d, body, [x - rx, y, rx * 2, 7], 16, ['#D8DCD4', '#A8B4B4'], o.seed ?? 7, 0.2, 0.4, 0.9);
+  s += F(rell(x, y, rx, ry, 0, 30), lt(col[0], 0.35), 0.6) + L(rell(x, y, rx, ry, 0, 30), 0.5);
+  const surf = rell(x, y + 0.4, rx - 1.1, ry - 0.9, 0, 30);
+  s += F(surf, d.radial(x - 2, y - 1, rx, [[0, soup[0]], [0.7, soup[1]], [1, soup[2]]]));
+  return { s, soup: surf, x, y, rx, ry };
+}
+function lt(c: string, t: number): string {
+  const n = parseInt(c.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * t));
+  return '#' + ch.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+/** Seared meat: cel fill, a crust gradient and grill marks, clipped. */
+function seared(d: Doc, path: string, box: [number, number, number, number], seed: number, raw = '#8A3A2A', crust: [string, string] = ['#6A3A22', '#3E2012'], marks = true): string {
+  let s = cel(d, path, crust[0], crust[1], 0.55, [-0.7, -0.8]);
+  let tex = F(path, d.linear(box[0], box[1], box[0] + box[2], box[1] + box[3], [[0, '#FFFFFF', 0.08], [1, '#000000', 0.15]]));
+  const r = rnd(seed);
+  if (marks) for (let k = 0; k < 4; k++) tex += L(`M${f(box[0] + 2 + k * (box[2] / 4))},${f(box[1])}l${f(box[2] * 0.22)},${f(box[3])}`, 0.9, '#22120A', 'opacity="0.75"');
+  for (let k = 0; k < 6; k++) tex += dot(box[0] + r() * box[2], box[1] + r() * box[3], 0.3 + r() * 0.3, k % 2 ? '#C88A5A' : '#2A160C', 0.7);
+  s += d.clip(path, tex);
+  void raw;
+  return s;
+}
+
+/** A pizza (round, rim + sauce + cheese) with toppings drawn by `top` inside the cheese clip. */
+function pizzaDisc(d: Doc, cx: number, cy: number, rx: number, ry: number, seed: number, top: (clip: string) => string, missing = false): string {
+  const outer = rell(cx, cy, rx, ry, 0, 36);
+  let shape = outer;
+  if (missing) shape = `M${f(cx)},${f(cy)}L${f(cx + rx * Math.cos(-0.35))},${f(cy + ry * Math.sin(-0.35))}A${f(rx)},${f(ry)} 0 1 1 ${f(cx + rx * Math.cos(-1.35))},${f(cy + ry * Math.sin(-1.35))}Z`;
+  let s = F(shape, '#140E08', 0, 'opacity="0.25" transform="translate(0.6 0.9)"');
+  s += cel(d, shape, BUN[0], BUN[1], 0.6, [-0.5, -0.6]);
+  const inner = rell(cx, cy, rx * 0.84, ry * 0.8, 0, 36);
+  const sauceD = missing ? `M${f(cx)},${f(cy)}L${f(cx + rx * 0.84 * Math.cos(-0.35))},${f(cy + ry * 0.8 * Math.sin(-0.35))}A${f(rx * 0.84)},${f(ry * 0.8)} 0 1 1 ${f(cx + rx * 0.84 * Math.cos(-1.35))},${f(cy + ry * 0.8 * Math.sin(-1.35))}Z` : inner;
+  s += F(sauceD, '#8E2A1A');
+  const r = rnd(seed);
+  let ch = '';
+  for (let k = 0; k < 9; k++) ch += F(blob(cx + (r() - 0.5) * rx * 1.4, cy + (r() - 0.5) * ry * 1.3, 2.4 + r() * 1.6, 1.4 + r(), seed * 3 + k, 7, 0.5), k % 3 ? '#D8B85A' : '#E6CC7A', 0);
+  ch += top(sauceD);
+  s += d.clip(sauceD, ch);
+  s += L(sauceD, 0.35, '#5E1A10');
+  // burnt bubbles on the crust
+  for (let k = 0; k < 5; k++) {
+    const a = r() * Math.PI * 2;
+    s += dot(cx + Math.cos(a) * rx * 0.93, cy + Math.sin(a) * ry * 0.92, 0.45, '#4A2A10', 0.8);
+  }
+  return s;
+}
+function pepperoni(x: number, y: number, r = 1.5): string {
+  return F(rell(x, y, r, r * 0.66, 0, 14), '#9A3A22', 0.3) + dot(x - r * 0.3, y - r * 0.15, r * 0.22, '#C86A4A', 0.9) + dot(x + r * 0.35, y + r * 0.15, r * 0.16, '#6A1A10', 0.8);
+}
+
+/** Small cel-shaded crumbed/fried nugget shape. */
+function fried(d: Doc, path: string, x: number, y: number, rx: number, ry: number, seed: number, tone: [string, string] = FRIED): string {
+  const r = rnd(seed);
+  let t = '';
+  for (let k = 0; k < 9; k++) t += dot(x + (r() - 0.5) * rx * 1.8, y + (r() - 0.5) * ry * 1.6, 0.3 + r() * 0.3, k % 2 ? '#E4C070' : '#8A5E24', 0.85);
+  return cel(d, path, tone[0], tone[1], 0.5, [-0.6, -0.7]) + d.clip(path, t);
+}
+
+/** A sausage/finger-shaped link from a to b. */
+function link(d: Doc, a: Pt, b: Pt, w: number, col: [string, string] = ['#9A4A2C', '#6A2C18']): string {
+  const p = capsule(a, b, w, w * 0.92);
+  let s = cel(d, p, col[0], col[1], 0.5, [-0.3, -0.5]);
+  const mx = (a[0] + b[0]) / 2;
+  const my = (a[1] + b[1]) / 2;
+  s += gloss(mx - 0.8, my - w * 0.25, w * 0.9, w * 0.18, (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI, 0.35);
+  return s;
+}
+
+
+
+const LATE: Partial<Record<Dish3Id, Body>> = {
+  chowder: (d) => {
+    const b = bowl(d, ['#E6DCC0', '#CFC2A0', '#A89A78'], { col: ['#7A8A9A', '#4E5E6E'], speck: true, seed: 401 });
+    let c = '';
+    for (const [x, y] of [[-4, -1], [3, 1.6], [5.6, -1.4], [-1, 2]] as Pt[]) c += F(rell(b.x + x, b.y + y, 0.7, 0.5, 0, 8), '#D8B040', 0.25);
+    // clam shells, open
+    for (const [x, y, a] of [[-4.6, 1.4, -20], [1.4, -1.6, 15]] as [number, number, number][]) c += `<g transform="translate(${f(b.x + x)} ${f(b.y + y)}) rotate(${a})">${F('M-2.4,0C-2.4,-2.4 2.4,-2.4 2.4,0Z', '#B8AC98', 0.35)}${L('M-1.4,-0.2L-0.8,-1.6M0,-0.2V-1.8M1.4,-0.2L0.8,-1.6', 0.25, '#7A6E5A')}${F('M-1,0.1h2l-1,0.8Z', '#C88A8A', 0.2)}</g>`;
+    c += d.clip(b.soup, F(blob(b.x - 2, b.y - 1.6, 3, 1, 402), '#FFFFFF', 0, 'opacity="0.4"'));
+    let s = b.s + d.clip(b.soup, c);
+    // the sock, toe up, dangling over the rim
+    s += cel(d, 'M23.4,13.2C23.6,9.6 24.8,7.2 27.4,6.4C29.4,5.8 30.4,7.4 29.4,8.8C28.2,10.4 26.6,11.2 26.2,14Z', '#C8C0AE', '#9A9280', 0.5);
+    s += L('M23.6,12.2L26.4,12.8M23.8,11L26.6,11.6', 0.7, '#7A2A22') + F(blob(28.4, 7.4, 1.2, 0.8, 403), '#8A7A4A', 0, 'opacity="0.6"');
+    s += fly(9.4, 7.6, 1);
+    return s;
+  },
+  corndog: (d) => {
+    let s = '';
+    const dog = (x: number, y: number, rot: number, finger_: boolean) => {
+      let o = L('M5,0L13,0', 1.4, INK) + L('M5,0L13,0', 0.8, '#D9C08A');
+      o += cel(d, 'M-7,-2.8C-9.6,-2.8 -9.6,2.8 -7,2.8L4,2.6C6.6,2.6 6.6,-2.6 4,-2.6Z', '#C8963E', '#8E5E22', 0.55, [-0.4, -0.6]);
+      const r = rnd(410 + x);
+      for (let k = 0; k < 8; k++) o += dot(-7 + r() * 11, -2 + r() * 4, 0.35, k % 2 ? '#E6C070' : '#8A5A20', 0.85);
+      o += L('M-6,-1.2l1.4,-0.8l1.4,0.8l1.4,-0.8l1.4,0.8l1.4,-0.8l1.4,0.8l1.4,-0.8', 0.6, '#B89A2A');
+      if (finger_) o += finger(d, [-6, 0], [-11.6, -0.6], 2.6, SKIN, true, false);
+      else o += F('M-8.6,-1.6C-11,-1.6 -11,1.6 -8.6,1.6Z', '#9A4A2C', 0.4);
+      return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})">${o}</g>`;
+    };
+    s += dog(17.6, 12.6, -8, false) + dog(18.6, 18, 6, true);
+    s += smear(26.6, 17.6, 2.2, 1, 411, '#B8962A', 0.8);
+    return s;
+  },
+  eyesoup: (d) => {
+    const b = bowl(d, ['#8A9A4A', '#6A7A32', '#3E4A1A'], { col: ['#5A5E62', '#34383C'] });
+    let s = b.s;
+    s += d.clip(b.soup, F(blob(b.x + 3, b.y + 1, 3, 1, 420), '#B0B86A', 0, 'opacity="0.5"') + L(rell(b.x - 4, b.y + 0.4, 2.6, 1.2, 0, 16), 0.35, '#B0B86A'));
+    s += eyeball(d, b.x - 4, b.y + 0.2, 2.2, [0.6, 0.4], '#4E6A86', 421) + eyeball(d, b.x + 2.4, b.y - 1.2, 1.9, [-0.4, 0.5], '#6A4A2A', 422) + eyeball(d, b.x + 5.6, b.y + 1.4, 1.6, [-0.8, -0.2], '#4F6A3A', 423);
+    s += L('M24.8,12.6L31,4.8', 1.6, INK) + L('M24.8,12.6L31,4.8', 0.9, '#A8A8A0') + F(rell(24.6, 12.8, 1.8, 1, -50, 10), '#A8A8A0', 0.4);
+    return s;
+  },
+  stew: (d) => {
+    const b = bowl(d, ['#7A5A30', '#5E3E1E', '#3A2410'], { col: ['#3E3B36', '#22201C'] });
+    let s = b.s;
+    let c = '';
+    for (const [x, y, rr] of [[-4, 0.6, 1.6], [2, -1.4, 1.3], [4.6, 1.4, 1.5], [-1, 2, 1.1]] as [number, number, number][]) c += cel(d, blob(b.x + x, b.y + y, rr, rr * 0.7, 430 + x, 6, 0.4), '#8A5A3A', '#5A3A22', 0.35);
+    c += F(rell(b.x + 0.6, b.y + 0.2, 1.4, 0.8, 0, 10), '#C8A040', 0.3);
+    s += d.clip(b.soup, c);
+    // a frog leg kicking out and a bone
+    s += cel(d, 'M20.4,13.4C21.6,10.6 23.4,8.4 25.6,7.6L26.2,8.8C24.6,9.8 23.2,11.6 22.2,14Z', '#7E9A4A', '#526C2A', 0.45);
+    s += F('M25.6,7.6l1.6,-1.6l0.4,1.2l1.4,-0.8l-0.2,1.4l1.4,0.2l-2,1.2Z', '#7E9A4A', 0.4);
+    s += bone(d, [10.4, 13.6], [13.6, 7.6], 1.1);
+    s += glossSteam(d, 18, 6);
+    return s;
+  },
+  links: (d) => {
+    let s = '';
+    const pts: Pt[] = [[8.6, 17.4], [13.4, 13.4], [18.6, 15.8], [23.6, 12.6], [28, 15.6]];
+    for (let k = 0; k < pts.length - 1; k++) {
+      s += link(d, pts[k], pts[k + 1], 3, ['#8A4A2E', '#5E2C18']);
+      const [a, b] = [pts[k], pts[k + 1]];
+      // knuckle creases
+      const mx = (a[0] + b[0]) / 2;
+      const my = (a[1] + b[1]) / 2;
+      s += L(`M${f(mx - 0.6)},${f(my - 1.2)}q0.6,0.8 0,1.8M${f(mx + 0.5)},${f(my - 1.1)}q0.6,0.8 0,1.8`, 0.3, '#3A1A0E');
+    }
+    for (const p of pts.slice(1, -1)) s += F(rell(p[0], p[1], 1, 0.8, 0, 10), '#E6D6B0', 0.3); // twisted casing knots
+    s += F(rell(28, 15.6, 1.2, 0.9, 30, 10), '#DCD2B4', 0.3) + F(rell(8.4, 17.4, 1.2, 0.9, -30, 10), '#DCD2B4', 0.3); // nails at the ends
+    s += smear(14, 20.4, 3.4, 1, 440, '#B8962A', 0.7);
+    return s;
+  },
+  tbone: (d) => {
+    const steak = 'M8.6,15.6C7.4,10.6 12,8.2 17,8.6C22.4,9 27.4,10.6 27.6,14.4C27.8,18 22.6,20.6 16.8,20.2C12.2,19.8 9.4,18.4 8.6,15.6Z';
+    let s = seared(d, steak, [8, 8, 20, 12], 450);
+    // the bone: a little headstone on top
+    s += F('M15.6,10.4V18.6H18.2V10.4Z', BONE[0], 0.45) + F('M11.4,13.6H22.2V15.4H11.4Z', BONE[0], 0.45);
+    s += F('M17.2,7.4C17.2,4.6 21.4,4.6 21.4,7.4V10.6H17.2Z', '#A8A69C', 0.5) + L('M18.2,8.2h2.2M19.3,7.2v3', 0.45, '#5E5C54');
+    s += F(blob(24.2, 13.4, 1.8, 1, 451), '#7A2A22', 0, 'opacity="0.7"');
+    s += L('M10,19.6q3,1.4 6,0.6', 0.5, BLOOD, 'opacity="0.8"');
+    return s;
+  },
+  donuts: (d) => {
+    let s = '';
+    const nut = (x: number, y: number, seed: number, glaze: string, look: Pt) => {
+      const o = rell(x, y, 5, 3.2, 0, 22);
+      let t = cel(d, o, '#B8864A', '#7E5222', 0.5) + F(blob(x - 0.2, y - 0.4, 4.4, 2.6, seed, 9, 0.25), glaze, 0.3);
+      const r = rnd(seed);
+      for (let k = 0; k < 7; k++) t += L(`M${f(x - 3.6 + r() * 7)},${f(y - 2 + r() * 3.4)}l0.8,0.3`, 0.4, ['#B84A4A', '#5E8AA8', '#D8C84A', '#E6E0D0'][k % 4]);
+      t += eyeball(d, x + 0.1, y - 0.1, 1.3, look, '#7A4A2A', seed + 1);
+      return t;
+    };
+    s += nut(12.6, 13.4, 460, '#C88A9A', [0.5, 0.3]) + nut(23.4, 13, 462, '#E6DCC0', [-0.6, 0.2]) + nut(18, 18.2, 464, '#5A3A28', [0, 0.6]);
+    return s;
+  },
+  pizza: (d) => pizzaDisc(d, 18, 15.4, 11, 6.6, 470, () => pepperoni(13, 15) + pepperoni(19.6, 17.6) + pepperoni(22, 13.4) + eyeball(d, 15.6, 18.4, 1.3, [0.3, 0.4], '#4E6A86', 471) + eyeball(d, 18.4, 12.6, 1.2, [-0.4, 0.4], '#4F6A3A', 472) + F(rell(25, 16.6, 1.6, 0.6, 20, 8), LETTUCE[0], 0.2), true) + fly(28.6, 8, 1),
+  calzone: (d) => {
+    const c = 'M7.6,17.6C7.4,10.8 14,7 20.6,8C26.4,8.8 29.4,13 28.4,17.6C24.6,19.8 12.4,20.4 7.6,17.6Z';
+    let s = cel(d, c, BUN[0], BUN[1], 0.6, [-1, -1]);
+    const r = rnd(480);
+    for (let k = 0; k < 8; k++) s += dot(10 + r() * 16, 10 + r() * 6, 0.4, '#5A3410', 0.7);
+    s += gloss(14, 10.6, 3, 0.8, -15, 0.3);
+    // crimped seam with a hand reaching out, and sauce oozing
+    s += L('M8.4,17.4Q18,20.6 27.8,17.2', 0.9, BUN[1]);
+    for (let k = 0; k < 9; k++) s += L(`M${f(9.4 + k * 2.1)},${f(18 + Math.sin(k) * 0.3)}l0.4,1`, 0.4, '#704616');
+    s += smear(14, 19.6, 3, 1.1, 481, '#8E2A1A', 0.85) + smear(22, 19.6, 2.2, 0.9, 482, '#8E2A1A', 0.85);
+    for (const [a, b] of [[[19, 18.6], [21.6, 13]], [[20.4, 18.6], [23.6, 13.8]], [[21.8, 18.4], [25.4, 15]]] as [Pt, Pt][]) s += finger(d, a, b, 1.6, ZSKIN, true, false);
+    return s;
+  },
+  jerky: (d) => {
+    let s = '';
+    const strip = (pts: string, seed: number) => {
+      let o = cel(d, pts, '#5E2E1A', '#3A180C', 0.5, [-0.5, -0.5]);
+      const r = rnd(seed);
+      let t = '';
+      for (let k = 0; k < 6; k++) t += L(`M${f(8 + r() * 20)},${f(9 + r() * 11)}l${f(2 + r() * 2)},${f(-0.6 + r() * 1.2)}`, 0.35, '#8A4A2A', 'opacity="0.7"');
+      o += d.clip(pts, t);
+      return o;
+    };
+    s += strip('M8,12.4L22,9.6L23,11.8L9,14.8Z', 490) + strip('M11,17.4L26.6,13.4L27.4,15.8L11.8,19.8Z', 491);
+    // one strip is an ear
+    const ear = 'M23.6,17C25.6,14.8 29.6,15.6 29.4,19C29.2,21.4 26.6,22 25.6,20.6C27,20 27.2,18.2 25.6,18Z';
+    s += cel(d, ear, '#6A361E', '#3E1C0E', 0.5) + L('M25,16.6q2.4,0.2 2.6,2.6', 0.4, '#2A100A') + dot(24.6, 17.2, 0.6, '#B8963E');
+    s += smear(10, 20, 2, 0.7, 492, '#2A1A10', 0.5);
+    return s;
+  },
+  knots: () => {
+    let s = '';
+    const knot = (x: number, y: number, seed: number) => {
+      const loop = `M${f(x - 4)},${f(y + 1)}C${f(x - 5)},${f(y - 3)} ${f(x + 1)},${f(y - 4)} ${f(x + 1.6)},${f(y - 0.6)}C${f(x + 2)},${f(y + 2.4)} ${f(x - 2)},${f(y + 2.6)} ${f(x - 1)},${f(y)}C${f(x)},${f(y - 2.4)} ${f(x + 4.6)},${f(y - 2)} ${f(x + 4.2)},${f(y + 1.6)}`;
+      let o = L(loop, 3.6, INK) + L(loop, 2.6, '#B07E3E') + L(loop, 1, '#D8A860', 'transform="translate(-0.3 -0.5)"');
+      const r = rnd(seed);
+      for (let k = 0; k < 6; k++) o += dot(x - 4 + r() * 8, y - 3 + r() * 4, 0.35, k % 2 ? '#E8E2C8' : '#6E8A3A', 0.95);
+      return o;
+    };
+    s += knot(12.4, 14.2, 500) + knot(22.4, 13.6, 501) + knot(17.2, 19, 502);
+    // one knot is clearly a loop of gut
+    s += L('M24,18.4q2.6,-2.4 4.6,0q1.6,2.4 -1.2,3.2', 2.4, INK) + L('M24,18.4q2.6,-2.4 4.6,0q1.6,2.4 -1.2,3.2', 1.6, '#C48C88');
+    s += fly(9, 8, 1);
+    return s;
+  },
+  meatballs: (d) => {
+    let s = smear(18, 16, 9, 4, 510, '#8E2A1A', 0.85);
+    // spaghetti
+    for (let k = 0; k < 6; k++) s += L(`M${f(9 + k * 1.6)},${f(18 - k * 0.6)}q4,-3 8,0t8,-1`, 0.7, '#D8C07A');
+    const ball = (x: number, y: number, rr: number, seed: number) => {
+      const p = blob(x, y, rr, rr * 0.82, seed, 9, 0.2);
+      const r = rnd(seed);
+      let t = '';
+      for (let k = 0; k < 7; k++) t += dot(x + (r() - 0.5) * rr * 1.6, y + (r() - 0.5) * rr * 1.4, 0.3, k % 2 ? '#3A1A0E' : '#9A5A3A', 0.8);
+      return cel(d, p, '#7A4028', '#4E2414', 0.5, [-0.6, -0.7]) + d.clip(p, t) + gloss(x - rr * 0.35, y - rr * 0.4, rr * 0.3, rr * 0.15, -20, 0.45);
+    };
+    s += ball(13, 15.4, 3.2, 511) + ball(22.6, 15, 3, 512) + ball(17.6, 11.6, 3, 513) + ball(18, 18.2, 3.2, 514);
+    s += eyeball(d, 17.8, 18.2, 1.3, [0.2, 0.5], '#4E6A86', 515);
+    s += F(rell(16.4, 9.4, 1.2, 0.5, 0, 8), '#E6E0C8', 0.2) + F(rell(19, 9.6, 1, 0.4, 20, 8), '#E6E0C8', 0.2);
+    return s;
+  },
+  brats: (d) => {
+    let s = '';
+    for (const [a, b, seed] of [[[8.6, 13.6], [26.6, 11.2], 520], [[9.4, 18.2], [27.4, 16.8], 521]] as [Pt, Pt, number][]) {
+      s += link(d, a, b, 4, ['#9A5A36', '#6A3418']);
+      for (let k = 1; k < 5; k++) {
+        const u = k / 5;
+        const x = a[0] + (b[0] - a[0]) * u;
+        const y = a[1] + (b[1] - a[1]) * u;
+        s += L(`M${f(x - 0.6)},${f(y - 1.8)}l1.4,3.4`, 0.7, '#2A120A', 'opacity="0.8"');
+      }
+      // split casing, brain bulging out
+      const mx = (a[0] + b[0]) / 2 + 2;
+      const my = (a[1] + b[1]) / 2 - 0.8;
+      s += brain(d, mx, my, 2.6, 1.3, seed + 5, 0.35);
+    }
+    s += L('M10,15.8l1.6,-1l1.6,1l1.6,-1l1.6,1l1.6,-1l1.6,1l1.6,-1l1.6,1', 0.6, '#C9A43A');
+    return s;
+  },
+  swamp: (d) => {
+    const b = bowl(d, ['#6A7A3A', '#4A5A26', '#2A3414'], { col: ['#6A5A42', '#42382A'] });
+    let s = b.s;
+    let c = F(rell(b.x - 3.4, b.y + 0.6, 3, 1.6, 10, 16), '#5E8A3A', 0.35) + L(`M${f(b.x - 3.4)},${f(b.y + 0.6)}l2.4,-0.8`, 0.4, '#3E5A26');
+    c += dot(b.x + 3, b.y + 1.6, 0.6, '#A8B86A', 0.9) + dot(b.x + 5, b.y - 0.6, 0.4, '#A8B86A', 0.9);
+    s += d.clip(b.soup, c);
+    // a fish skeleton poking out
+    s += L(`M${f(b.x + 1)},${f(b.y)}L${f(b.x + 8)},${f(b.y - 5)}`, 0.7, BONE[0]);
+    for (let k = 0; k < 4; k++) s += L(`M${f(b.x + 2.4 + k * 1.6)},${f(b.y - 1 - k * 1.1)}l-0.6,-1.4M${f(b.x + 2.4 + k * 1.6)},${f(b.y - 1 - k * 1.1)}l1.2,0.8`, 0.4, BONE[0]);
+    s += F(`M${f(b.x + 8)},${f(b.y - 5)}l2,-1.8l0.6,2.6Z`, BONE[0], 0.35) + dot(b.x + 9.2, b.y - 5.6, 0.35, INK);
+    s += eyeball(d, b.x - 3.6, b.y - 0.6, 1.1, [0.3, -0.2], '#B8A23A', 531);
+    s += fly(10, 6, 1) + fly(25.4, 4.8, 0.9);
+    return s;
+  },
+  hog: (d) => {
+    let s = '';
+    const body = 'M6.8,16.4C6.4,11.6 11,8.2 17.6,8.4C24,8.6 29.2,11 29,15.6C28.8,19.4 23.6,21 17.6,20.8C11.6,20.6 7.2,19.6 6.8,16.4Z';
+    s += cel(d, body, '#B0663A', '#7A3A1C', 0.6, [-1.2, -1.2]);
+    s += d.clip(body, L('M10,12q8,-3 16,0M9,15.6q9,-3 19,0M10,18.6q8,-2 16,0', 0.5, '#5A2A12', 'opacity="0.6"') + gloss(14, 10.4, 4, 0.9, -8, 0.45));
+    // the head end (left) with the apple and X eyes, curly tail (right)
+    s += cel(d, 'M6.8,16.4C5,15.4 4.4,12.6 6.6,11.4C8,10.6 9.8,11.6 10,13.2Z', '#B0663A', '#7A3A1C', 0.5);
+    s += F(rell(4.6, 15.6, 2.2, 2, 0, 14), '#8A2A22', 0.5) + L('M4.6,13.8q0.4,-1.2 1.2,-1.6', 0.5, '#4A3A1E') + gloss(4, 15, 0.8, 0.4, -20, 0.6);
+    s += L('M7.6,12.4l1,1M8.6,12.4l-1,1', 0.45, INK);
+    s += F('M9,10.8l1.4,-2.4l1,2.6Z', '#9A5430', 0.4);
+    s += L('M28.6,13.4q2,-1 1.4,-2.4q-1,-0.8 -1.4,0.6', 0.7, '#7A3A1C');
+    // legs tied up
+    for (const x of [11.6, 23.4]) s += cel(d, capsule([x, 19.6], [x + 1.4, 22.4], 1.6, 1.3), '#A85E36', '#7A3A1C', 0.4);
+    s += L('M10.6,17.6q7,3 15,0', 0.5, '#C9B080');
+    return s;
+  },
+  deepdish: (d) => {
+    // a deep wedge, cut face toward us: layers of crust, cheese, sauce and graveyard dirt
+    let s = F('M7.6,18.6L18,9.4L28.8,13.4L21.6,21Z', '#140E08', 0, 'opacity="0.25" transform="translate(0.6 0.9)"');
+    s += cel(d, 'M7.6,14.6L18,6.6L28.8,10.4L28.8,13.6L21.6,21L7.6,18.4Z', BUN[0], BUN[1], 0.55);
+    const face = 'M7.6,14.6L21.6,17.2L21.6,21L7.6,18.4Z';
+    s += F(face, '#C8963E', 0.5);
+    s += d.clip(face, F('M7,15.6L22,18.2V19.4L7,16.8Z', '#E6CC7A') + F('M7,16.6L22,19.2V20.2L7,17.6Z', '#8E2A1A') + dot(12, 17.4, 0.5, '#5A4430') + dot(16, 18.4, 0.4, '#5A4430'));
+    const top = 'M7.6,14.6L18,7.4L28.8,10.6L21.6,17.2Z';
+    s += F(top, '#8E2A1A', 0.5);
+    s += d.clip(top, F(blob(17.4, 12, 5, 2.4, 541), '#D8B85A', 0) + pepperoni(14, 13.6, 1.3) + pepperoni(21.4, 12.4, 1.3));
+    // a worm wriggling out of the dirt layer
+    s += L('M14,18.2q-1.6,1.4 -0.4,2.4t-0.6,2', 1.2, INK) + L('M14,18.2q-1.6,1.4 -0.4,2.4t-0.6,2', 0.7, '#C48C88');
+    s += finger(d, [19, 12.6], [20.6, 7.4], 1.7, ZSKIN, true, false);
+    return s;
+  },
+  fishchips: (d) => {
+    let s = '';
+    const fish = 'M7.6,13.6C9,9.6 17,8.6 22,10.4L25.4,8.6L24.6,12.2L25.6,15.6L22,14C17,16 9.4,16.6 7.6,13.6Z';
+    s += fried(d, fish, 15, 12.4, 8, 3, 550);
+    s += eyeball(d, 9.8, 12.2, 1, [-0.6, 0], '#C8B04A', 551);
+    // chips with a pair of chipped teeth mixed in
+    for (const [a, b] of [[[14, 19.4], [22, 17.6]], [[16.6, 21], [25, 19]], [[21, 16.2], [28, 17.4]], [[12.6, 17.8], [19.4, 20.6]]] as [Pt, Pt][]) s += cel(d, capsule(a, b, 1.8, 1.8), '#D8B05A', '#A07A2A', 0.4);
+    s += tooth(26.6, 13.6, 2.2, 2.6, 160) + tooth(28.6, 14.2, 2, 2.4, 175, '#D8CCA0');
+    s += F(rell(10.4, 19.6, 2.6, 1.4, 0, 14), '#B8B2A0', 0.4) + F(rell(10.4, 19.4, 2, 1, 0, 12), '#B8C060', 0.2);
+    return s;
+  },
+  turducken: (d) => {
+    let s = '';
+    const bird = 'M8,16.6C7,11.4 11.6,7.6 18,7.8C24.6,8 29,11.6 28.4,16C27.8,19.8 22.6,21.2 17.6,21C12.6,20.8 8.6,19.6 8,16.6Z';
+    s += cel(d, bird, '#C08A44', '#8A5A22', 0.6, [-1.2, -1.2]);
+    s += gloss(14, 10.4, 4, 1, -10, 0.4);
+    // Frankenstein stitches across the middle, neck bolts
+    s += L('M10,14.4Q18,11 27.4,13.4', 0.7, '#3A2410');
+    for (let k = 0; k < 8; k++) s += L(`M${f(11 + k * 2.2)},${f(13.4 - Math.sin((k / 7) * Math.PI) * 1.6)}l0.4,1.6`, 0.5, INK);
+    for (const x of [8.6, 27.8]) s += F(`M${f(x - 1)},${f(15)}h2v2h-2Z`, '#8A8C86', 0.4) + L(`M${f(x - 1.6)},${f(16)}h3.2`, 0.5, '#5A5C56');
+    // three drumsticks of three birds
+    for (const [a, b] of [[[11, 19.4], [8, 22.4]], [[24.6, 19.2], [28, 22]], [[18, 20.4], [18.4, 23.6]]] as [Pt, Pt][]) s += bone(d, a, b, 0.8);
+    s += F('M14.6,8.6l1,-2.6l1.4,2.2Z', '#B83A2A', 0.35);
+    return s;
+  },
+  burntends: (d) => {
+    let s = '';
+    const r = rnd(560);
+    const cubes: Pt[] = [[11, 16], [16, 18.4], [21.4, 16.8], [25.4, 14.6], [14.4, 12.4], [19.6, 11.8], [24, 18.6], [9.6, 12.8]];
+    for (const [x, y] of cubes.sort((a, b) => a[1] - b[1])) {
+      const k = 2.4 + r() * 0.6;
+      const top = `M${f(x - k)},${f(y - k * 0.4)}L${f(x)},${f(y - k)}L${f(x + k)},${f(y - k * 0.4)}L${f(x)},${f(y + k * 0.2)}Z`;
+      const lf = `M${f(x - k)},${f(y - k * 0.4)}L${f(x)},${f(y + k * 0.2)}L${f(x)},${f(y + k * 0.9)}L${f(x - k)},${f(y + k * 0.3)}Z`;
+      const rt = `M${f(x)},${f(y + k * 0.2)}L${f(x + k)},${f(y - k * 0.4)}L${f(x + k)},${f(y + k * 0.3)}L${f(x)},${f(y + k * 0.9)}Z`;
+      s += F(lf, '#3A1C0E', 0.4) + F(rt, '#24100A', 0.4) + F(top, '#5A2A16', 0.4) + dot(x - k * 0.3, y - k * 0.6, 0.35, '#C86A3A', 0.8) + dot(x + k * 0.4, y - k * 0.3, 0.3, '#1A0A04');
+    }
+    s += F(blob(17, 6, 4, 2, 561), '#7A766E', 0, `opacity="0.5" filter="${d.blur(0.8)}"`);
+    s += smear(13.6, 21, 3, 0.8, 562, '#6A2416', 0.7);
+    return s;
+  },
+  fondue: (d) => {
+    const b = bowl(d, ['#F0D070', '#D8B040', '#A8822A'], { rx: 7.6, ry: 4.4, y: 14.4, col: ['#6E2A22', '#4A1A14'] });
+    let s = b.s + d.clip(b.soup, F(blob(b.x - 1, b.y - 0.6, 3, 1.2, 570), '#FFF0B0', 0, 'opacity="0.6"'));
+    // forks dunked in, each with a finger skewered
+    for (const [x, y, ax, ay, seed] of [[15.6, 14, 8.4, 4.6, 571], [20.6, 14, 28, 4.4, 572]] as number[][]) {
+      s += L(`M${f(x)},${f(y)}L${f(ax)},${f(ay)}`, 1.2, INK) + L(`M${f(x)},${f(y)}L${f(ax)},${f(ay)}`, 0.6, '#A8A8A0');
+      const mx = (x + ax) / 2;
+      const my = (y + ay) / 2;
+      s += finger(d, [mx - (ax - x) * 0.12, my + 1.6], [mx + (ax - x) * 0.12, my - 1.8], 2, SKIN, true, false);
+      s += F(blob(mx, my + 1.4, 1.4, 0.8, seed), '#E6C050', 0.2);
+    }
+    // the burner under it
+    s += F('M12,21.4h12l-1,1.6h-10Z', '#3A3833', 0.5) + F(rell(18, 20.8, 3, 1, 0, 10), '#4E7FA6', 0, 'opacity="0.7"');
+    return s;
+  },
+  coffinribs: (d) => {
+    // an open pine coffin full of ribs
+    const box = 'M10.4,10.4L16,7.8L28.4,11.6L26.6,16.6L19.6,21.2L9.6,17.6Z';
+    let s = cel(d, box, '#8E6436', '#6A4524', 0.6);
+    s += d.clip(box, L('M10,13l17,4M12,9.6l15,4.6', 0.4, '#4E321A', 'opacity="0.6"'));
+    const inner = 'M11.6,11.2L16.2,9.2L27,12.4L25.6,15.8L19.6,19.6L11,16.8Z';
+    s += F(inner, '#3A2410', 0.5);
+    let ribs = '';
+    for (let k = 0; k < 5; k++) {
+      const x = 13 + k * 2.6;
+      ribs += cel(d, capsule([x, 11 + k * 0.5], [x + 1.6, 17 + k * 0.4], 2, 1.8), '#7A3A22', '#4E2010', 0.4) + L(`M${f(x)},${f(10.4 + k * 0.5)}l0.4,-1.4`, 1.2, BONE[0]);
+    }
+    s += d.clip(inner, ribs + F(inner, d.linear(11, 10, 27, 19, [[0, '#000', 0.25], [1, '#000', 0]])));
+    s += smear(19, 14, 4, 1.2, 580, '#8E2A1A', 0.6);
+    // the lid propped beside it
+    s += F('M4.8,16.4L8.6,7.2L12.4,6.6L10.8,15.6Z', '#A07040', 0.55) + L('M7.6,10.2l3,-0.4M7,12.4l3,-0.4', 0.5, '#4E321A');
+    return s;
+  },
+  beans: (d) => {
+    // a battered tin can, lid peeled back, beans spilling
+    let s = '';
+    const can = 'M11,9.6V18.4C11,21 21,21 21,18.4V9.6Z';
+    s += cel(d, can, '#A8ACA8', '#6E726E', 0.6, [-1.4, 0]);
+    s += d.clip(can, F('M10,12.6H22V17H10Z', '#7A3A2A') + L('M11,12.6H21M11,17H21', 0.4, INK) + F(rell(16, 14.8, 2.4, 1.4, 0, 16), '#D8C890', 0.3) + dot(15.4, 14.6, 0.35, INK) + dot(16.6, 14.6, 0.35, INK) + L('M15.2,15.4h1.6', 0.3, INK));
+    s += F(rell(16, 9.6, 5, 2, 0, 20), '#C0C4C0', 0.6) + F(rell(16, 9.8, 4.2, 1.5, 0, 18), '#8E3A1E', 0.3);
+    for (let k = 0; k < 7; k++) s += F(rell(13.6 + (k % 4) * 1.6, 9.2 + Math.floor(k / 4) * 0.9, 0.7, 0.45, 20, 8), '#A84A26', 0.2);
+    s += F('M20,8.4C22.6,5.6 26.4,5.4 27,7.2L21.4,9.8Z', '#B8BCB8', 0.5);
+    // the spill
+    s += F(blob(25.4, 17.4, 4, 2, 590), '#8E3A1E', 0.4);
+    for (let k = 0; k < 6; k++) s += F(rell(23.4 + (k % 3) * 1.7, 16.8 + Math.floor(k / 3) * 1.1, 0.7, 0.45, 15, 8), '#B0522A', 0.2);
+    s += L('M22.4,18.4q1.2,1.6 3,0.6', 1, INK) + L('M22.4,18.4q1.2,1.6 3,0.6', 0.6, '#C48C88');
+    return s;
+  },
+  stromboli: (d) => {
+    let s = '';
+    const roll = 'M7.6,13C7.6,9.6 11,8.4 13,8.6L26,10.6C28.2,11 29,13.4 28.6,15.4C28.2,17.8 26,18.6 24,18.4L11.4,17.4C9,17.2 7.6,15.6 7.6,13Z';
+    s += cel(d, roll, BUN[0], BUN[1], 0.6, [-1, -1]);
+    s += d.clip(roll, L('M14,8.6l-1,9M18.4,9.2l-1,8.6M22.8,9.8l-1,8.4', 0.7, '#8E5E2A') + gloss(16, 10, 4, 0.7, 5, 0.3));
+    // the cut end: a spiral of meat and gut
+    s += F(rell(26.6, 14.4, 2.6, 3.8, 10, 20), '#E6CC8A', 0.5);
+    s += L('M26.6,14.4m-0.4,0a0.6,0.8 0 1 1 1,0.6a1.4,1.8 0 1 1 -2.2,-1.4a2,2.8 0 1 1 3.4,2.2', 0.7, '#8E2A1A');
+    s += smear(17, 19.6, 4, 1, 600, '#8E2A1A', 0.75);
+    s += fly(10, 6, 1);
+    return s;
+  },
+  mammoth: (d) => {
+    let s = '';
+    const meat = 'M6.6,15.4C5.6,10.2 10,6.6 15.4,7.2C19.6,7.6 22,9.6 22.6,12.6C23,15.2 21.4,18.8 16.8,19.8C11.6,20.8 7.4,19.4 6.6,15.4Z';
+    s += bone(d, [20, 14.6], [30, 17.6], 2.6);
+    s += cel(d, meat, '#8A4A2A', '#5A2A14', 0.6, [-1.2, -1.2]);
+    s += d.clip(meat, L('M9,10q4,-2 9,0M7.6,13.6q6,-2.4 12,0M8.6,17q5,-1.6 10,0', 0.6, '#4A200E', 'opacity="0.7"') + gloss(11, 9.4, 3, 0.9, -15, 0.45));
+    // tufts of shaggy fur still on it
+    for (const [x, y] of [[8, 9.6], [12.6, 7.2], [6.6, 13.8]] as Pt[]) s += L(`M${f(x)},${f(y)}l-1.2,-1.4M${f(x + 0.8)},${f(y - 0.2)}l-0.4,-1.8M${f(x + 1.6)},${f(y)}l0.4,-1.6`, 0.5, '#6A4A2A');
+    s += F('M15,11.6l1.6,-0.4l0.6,1.4l-1.6,0.6Z', '#C8D8E0', 0.3); // a chip of glacier ice
+    return s;
+  },
+  tomahawk: (d) => {
+    let s = bone(d, [17.6, 13.4], [31, 5.4], 1.6);
+    const steak = 'M6.4,16.2C5.8,12.2 10,9.6 14.6,10.2C19,10.8 21.4,13.2 21,16.4C20.6,19.6 16.6,21.2 12.4,20.8C8.8,20.4 6.8,18.8 6.4,16.2Z';
+    s += seared(d, steak, [6, 10, 15, 11], 620);
+    s += F(blob(15.6, 15.6, 2.4, 1.4, 621), '#E6D6B0', 0, 'opacity="0.55"'); // fat cap
+    s += L('M8,19.4q2.4,1.4 5,1', 0.6, BLOOD);
+    // the grudge: a little bandage on the bone
+    s += `<g transform="translate(25.2 9.2) rotate(-32)">${F('M-2,-1H2V1H-2Z', '#C9A27A', 0.35)}${dot(0, 0, 0.4, BLOOD, 0.7)}</g>`;
+    return s;
+  },
+  mummywrap: (d) => {
+    let s = '';
+    const wrap = (x: number, y: number, rot: number, seed: number) => {
+      const p = 'M-6,-2.8C-7,-2.8 -7,2.8 -6,2.8H6C7,2.8 7,-2.8 6,-2.8Z';
+      let o = cel(d, p, '#D8CCA8', '#A89A74', 0.55);
+      const r = rnd(seed);
+      let t = '';
+      for (let k = 0; k < 5; k++) t += L(`M${f(-6 + k * 3 + r())},-3l${f(-1.6 + r())},6`, 0.5, '#8A7A5A', 'opacity="0.8"');
+      t += F(blob(2, 1, 2, 1, seed + 1), '#8A6A3A', 0, 'opacity="0.35"');
+      o += d.clip(p, t);
+      return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})">${o}</g>`;
+    };
+    s += wrap(16, 12.4, -8, 630) + wrap(19.4, 17.6, 5, 632);
+    // an eye peeking out between the bandages, a loose end trailing
+    s += F(rell(17.6, 12, 2, 1, -8, 12), '#1A1410') + eyeball(d, 17.6, 12, 1, [0.4, 0.2], '#B8A23A', 633);
+    s += L('M25.4,18.6q2.4,0.6 3,3', 1.4, INK) + L('M25.4,18.6q2.4,0.6 3,3', 0.8, '#D8CCA8');
+    s += smear(10.4, 19, 2.4, 0.8, 634, '#8E6A2A', 0.7);
+    return s;
+  },
+  potpie: (d) => {
+    let s = cel(d, 'M7.8,13.4C7.8,19.6 28.2,19.6 28.2,13.4L27,18.2C24,21.6 12,21.6 9,18.2Z', '#9A9C96', '#6A6C66', 0.55);
+    const crust = rell(18, 13.4, 10.2, 5.4, 0, 30);
+    s += cel(d, crust, '#C89650', '#9A6A2A', 0.6, [-0.8, -0.8]);
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2;
+      s += F(rell(18 + Math.cos(a) * 9.6, 13.4 + Math.sin(a) * 5, 1.1, 0.7, (a * 180) / Math.PI, 8), '#B8843E', 0.3);
+    }
+    s += L('M15,11.6l2,1.2M19,11l2,1.4', 0.6, '#6A4416');
+    // something punching up through the crust
+    s += F('M17,14.6L15.4,12.4L17.6,12.8L18.6,11.2L19.6,13.2L21.4,12.6L20.2,14.8Z', '#4A2A10', 0.4);
+    s += fistUp(d, 18.4, 13.4);
+    s += F(blob(22.4, 15, 1.6, 0.8, 640), '#8E2A1A', 0.3);
+    return s;
+  },
+  tempura: (d) => {
+    let s = F(rell(25.8, 17.8, 3.2, 1.9, 0, 18), '#B8B2A0', 0.5) + F(rell(25.8, 17.7, 2.5, 1.35, 0, 16), '#5A3010', 0.3);
+    const toe = (x: number, y: number, rot: number, seed: number, big: boolean) => {
+      const w = big ? 3.6 : 2.6;
+      const p = blob(0, 0, w, w * 0.7, seed, 9, 0.5);
+      let o = fried(d, p, 0, 0, w, w * 0.7, seed, ['#E0C07A', '#B08A40']);
+      o += F(rell(-w * 0.6, -0.2, w * 0.35, w * 0.28, 0, 10), '#DCD2B4', 0.3);
+      return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})">${o}</g>`;
+    };
+    s += toe(11.4, 14.2, -20, 650, true) + toe(17, 12.4, 10, 651, false) + toe(13, 18.4, 5, 652, false) + toe(19.4, 17.4, -10, 653, false) + toe(22.6, 12.8, 25, 654, false);
+    s += F('M7,9.6l3,1l-0.4,1l-3,-1Z', '#3A6A3A', 0.3);
+    return s;
+  },
+  hash: (d) => {
+    let s = '';
+    // a slab of fried hash cut into a headstone, crumbs all round
+    const stone = 'M10.6,18.6V11.6C10.6,6.4 21.4,6.4 21.4,11.6V18.6Z';
+    s += fried(d, stone, 16, 13, 6, 6, 660, ['#B8843E', '#7E5420']);
+    s += F('M21.4,11.6l2.2,1v6.4l-2.2,-0.4Z', '#7E5420', 0.5);
+    // a skull branded into it
+    s += F('M14.2,13C14.2,10.4 17.8,10.4 17.8,13L17,14.4H15Z', '#5A3410') + dot(15.3, 12.6, 0.5, '#B8843E') + dot(16.7, 12.6, 0.5, '#B8843E');
+    const r = rnd(661);
+    for (let k = 0; k < 12; k++) s += F(rell(8 + r() * 20, 18 + r() * 4, 0.8, 0.6, r() * 90, 8), k % 3 ? '#B8843E' : '#6A2A1A', 0.25);
+    s += F(rell(24.8, 16.6, 2.4, 1.6, 0, 14), '#F0E8C0', 0.4) + F(rell(25, 16.4, 1.2, 0.8, 0, 10), '#E0A030', 0.2); // fried egg
+    return s;
+  },
+  elixir: (d) => {
+    const b = bowl(d, ['#C8F070', '#86C030', '#4A7A1A'], { col: ['#4A3E5A', '#2E2438'] });
+    let s = F(rell(b.x, b.y, b.rx + 2, b.ry + 2, 0, 24), '#9BD62E', 0, `opacity="0.35" filter="${d.blur(1.2)}"`) + b.s;
+    // a beating heart floating in it, bubbles
+    s += cel(d, `M${f(b.x - 1)},${f(b.y + 1.6)}C${f(b.x - 4)},${f(b.y - 0.6)} ${f(b.x - 2.6)},${f(b.y - 3)} ${f(b.x - 0.6)},${f(b.y - 1.4)}C${f(b.x + 0.6)},${f(b.y - 3.4)} ${f(b.x + 3)},${f(b.y - 1.6)} ${f(b.x - 1)},${f(b.y + 1.6)}Z`, '#A84A4A', '#7A2A2A', 0.45);
+    s += L(`M${f(b.x - 0.4)},${f(b.y - 2.2)}q0.4,-1.4 1.6,-1.6`, 0.6, '#5E7A9A');
+    for (const [x, y, rr] of [[4, 0.6, 0.9], [-5, 1, 0.7], [5.6, -1.6, 0.5]] as [number, number, number][]) s += L(rell(b.x + x, b.y + y, rr, rr * 0.7, 0, 10), 0.4, '#E6FA9A');
+    s += F('M26,8.6h2.4v2.6l1.6,3.4h-5.6l1.6,-3.4Z', '#86A8A0', 0.5) + F('M25.8,13l3.8,0l0.4,1.6h-4.6Z', '#9BD62E', 0) + F('M26,7.4h2.4v1.2h-2.4Z', '#8E6A3E', 0.4);
+    return s;
+  },
+  kraken: () => {
+    let s = L('M5,15.4L31,11.4', 1.6, INK) + L('M5,15.4L31,11.4', 0.9, '#8E6A40');
+    const t1 = 'M8,16C8,11 12,8.6 16,9.4C20.4,10.2 22,14 20,16.4C18.6,18 16,17.6 16,15.8C16,14.2 18,14 18,15';
+    s += L(t1, 4.4, INK) + L(t1, 3.4, '#9A4A5A') + L(t1, 1.4, '#C07A88', 'transform="translate(-0.3 -0.5)"');
+    for (const [x, y] of [[9.4, 13], [11.6, 10.4], [14.6, 9.4], [18.4, 10.4], [20.6, 13.4]] as Pt[]) s += F(rell(x, y + 1.6, 0.8, 0.55, 0, 10), '#E6C4C8', 0.3) + dot(x, y + 1.6, 0.3, '#7A3A44');
+    // a second tentacle curling up off the plate, waving
+    const t2 = 'M22,15C24.6,15 26,12 25.4,9C25,7 26.4,5.4 28,6.2';
+    s += L(t2, 3.4, INK) + L(t2, 2.4, '#9A4A5A') + L(t2, 0.8, '#C07A88', 'transform="translate(-0.3 -0.4)"');
+    for (let k = 0; k < 4; k++) s += L(`M${f(12 + k * 2.4)},${f(18.6)}l0.8,-1.6`, 0.8, '#2A120A', 'opacity="0.7"'); // grill marks
+    s += F(rell(10, 20, 1.6, 0.8, 0, 10), '#D8C04A', 0.3); // lemon
+    return s;
+  },
+  pizzaface: (d) =>
+    pizzaDisc(d, 18, 15.4, 11, 6.6, 680, () => {
+      let o = pepperoni(13.6, 14, 1.9) + pepperoni(22.4, 13.6, 1.9);
+      o += dot(13.8, 14.2, 0.6, INK) + dot(22.2, 13.8, 0.6, INK);
+      o += L('M11.6,11.6l3.6,1.2M24.4,11.4l-3.6,1.2', 0.9, '#3E5A26'); // pepper eyebrows, furious
+      o += L('M13.4,19q4.6,-2.6 9.2,0', 1.2, '#3E5A26'); // frowning pepper mouth
+      o += F(rell(18, 16.2, 1.2, 0.8, 0, 10), '#7A4A2A', 0.3); // mushroom nose
+      return o;
+    }) + fly(28, 8, 1),
+  damned: (d) => {
+    let s = '';
+    const slab = 'M6.6,14.6L19,8.6L29.4,12.4L17.2,19.4Z';
+    const side = 'M6.6,14.6L17.2,19.4L17.2,21.6L6.6,16.8Z';
+    const side2 = 'M17.2,19.4L29.4,12.4L29.4,14.6L17.2,21.6Z';
+    s += F(side, '#7A3020', 0.5) + F(side2, '#5A2014', 0.5);
+    s += d.clip(side, L('M6.6,15.2L17.2,20M6.6,15.8L17.2,20.6', 0.5, '#C04A3A')) + d.clip(side2, L('M17.2,20L29.4,13M17.2,20.6L29.4,13.6', 0.5, '#A03A2A')); // smoke ring
+    s += seared(d, slab, [6, 8, 24, 12], 690, '#8A3A2A', ['#3A2014', '#1E0E08'], false);
+    const r = rnd(691);
+    for (let k = 0; k < 10; k++) s += dot(9 + r() * 18, 10 + r() * 8, 0.4, '#0E0804', 0.9);
+    // a tiny devil's pitchfork stuck in it
+    s += L('M20,12.4L23.6,3.6', 0.9, INK) + L('M20,12.4L23.6,3.6', 0.5, '#B83A2A');
+    s += L('M22,3.4L23.6,3.6L25.2,4.4M22.4,2.4l-0.4,1M23.8,2.4L23.6,3.6M25.4,3.2l-0.2,1.2', 0.6, '#B83A2A');
+    s += F(blob(15, 6, 3, 1.6, 692), '#5A5650', 0, `opacity="0.4" filter="${d.blur(0.8)}"`);
+    return s;
+  },
+  apocalypse: (d) => {
+    let s = '';
+    // everything at once: ribs, a drumstick, a slider, eyeballs, a finger, a brain
+    for (let k = 0; k < 4; k++) s += cel(d, capsule([8 + k * 2.2, 11.6 + k * 0.3], [9.6 + k * 2.2, 17 + k * 0.4], 1.9, 1.7), '#7A3A22', '#4E2010', 0.4) + L(`M${f(8 + k * 2.2)},${f(11 + k * 0.3)}l0.3,-1.2`, 1.1, BONE[0]);
+    s += brain(d, 22.6, 10.6, 4, 2.6, 701, 0.5);
+    s += bone(d, [24, 19], [29.6, 21.4], 1.1) + cel(d, blob(21.6, 17.6, 4, 2.8, 702, 8, 0.25), '#B88038', '#7A4E1C', 0.5);
+    s += slider(d, 15.6, 18.6, 0.75, 703);
+    s += eyeball(d, 27, 13.4, 1.4, [-0.5, 0.3], '#4E6A86', 704) + eyeball(d, 11.6, 19.6, 1.2, [0.4, -0.3], '#4F6A3A', 705);
+    s += finger(d, [16.6, 12], [19.6, 6.6], 1.8, ZSKIN, true, true);
+    s += F('M6,9l1.6,-3.4l1.2,3.6Z', '#B83A2A', 0.3) + fly(29, 7, 1) + fly(6.4, 20.6, 0.9);
+    return s;
+  },
+  toadstew: (d) => {
+    const b = bowl(d, ['#8A7A3A', '#6A5A26', '#3E3414'], { col: ['#4E6A7A', '#2E4250'], speck: true, seed: 710 });
+    let s = b.s;
+    // a whole toad floating belly-up, legs in the air
+    const belly = rell(b.x, b.y + 0.2, 4.4, 2.4, -5, 20);
+    s += cel(d, belly, '#C8C08A', '#9A9060', 0.5);
+    s += d.clip(belly, F(blob(b.x + 1, b.y + 0.6, 2, 1, 711), '#A8A070', 0, 'opacity="0.6"'));
+    for (const [x0, y0, x1, y1] of [[-3.4, -0.8, -6, -5.6], [3, -1, 5.6, -6], [-2, 1.6, -4.6, 3.4], [2.6, 1.4, 5, 3]] as number[][]) s += L(`M${f(b.x + x0)},${f(b.y + y0)}L${f(b.x + x1)},${f(b.y + y1)}`, 1.8, INK) + L(`M${f(b.x + x0)},${f(b.y + y0)}L${f(b.x + x1)},${f(b.y + y1)}`, 1.1, '#7E9A4A');
+    s += L(`M${f(b.x - 1.6)},${f(b.y - 1.4)}l0.8,0.8M${f(b.x - 0.8)},${f(b.y - 1.4)}l-0.8,0.8`, 0.4, INK);
+    return s;
+  },
+  ratpizza: (d) =>
+    pizzaDisc(d, 18, 15.4, 11, 6.6, 720, () => pepperoni(12.6, 16.4) + pepperoni(23.4, 17) + F(rell(14, 12.4, 1.2, 0.6, 30, 8), '#3E5A26', 0.2)) +
+    // the rat: curled up on top, tail draped over the crust
+    cel(d, 'M14.4,15C14,11.6 18.4,10.4 21.4,11.4C24,12.2 24.4,15 22.4,16.2C20.4,17.2 15,17 14.4,15Z', '#6E6660', '#4A4440', 0.5) +
+    cel(d, 'M21.4,11.4C22.4,9.8 25,9.6 25.8,11C26.4,12 25.4,13 24,13Z', '#7A726C', '#4A4440', 0.45) +
+    dot(24.8, 10.8, 0.4, INK) + F(rell(22.8, 10.2, 0.9, 0.7, 0, 8), '#B08A86', 0.3) + L('M14.6,15.4C11,17 9.4,19.6 6.6,19.2', 0.7, '#B08A86') + fly(9, 8, 1),
+  luau: (d) => {
+    let s = F('M5,17.4C8,10 26,8.6 31,13.6C26,19.4 10,21.6 5,17.4Z', '#4E7A2A', 0.6) + L('M6,17L30,13.6', 0.4, '#2E4A16');
+    for (let k = 0; k < 6; k++) s += L(`M${f(8 + k * 4)},${f(16.6 - k * 0.55)}l-1.2,2.4M${f(8 + k * 4)},${f(16.6 - k * 0.55)}l0.8,-2.6`, 0.35, '#2E4A16');
+    // the roast lizard
+    const body = 'M9,15C11,11.6 19,10.6 24,12C26,12.6 26.4,14.6 24.4,15.4C19,17.4 11.6,17.6 9,15Z';
+    s += cel(d, body, '#A8742E', '#6E4A1A', 0.55);
+    s += d.clip(body, L('M12,13.6l1,2.6M15,12.8l1,3M18,12.4l1,3M21,12.6l0.8,2.8', 0.5, '#5A3410', 'opacity="0.6"'));
+    s += cel(d, 'M24,12C26,10.6 29.4,11 29.4,12.8C29.4,14.2 26.8,14.6 24.6,14.2Z', '#A8742E', '#6E4A1A', 0.5) + dot(27.6, 12, 0.45, INK) + L('M28.4,13.6l1.6,0.4', 0.5, '#B84A4A');
+    s += L('M9,15C6.6,15.4 5,17.6 6.4,19', 1.4, INK) + L('M9,15C6.6,15.4 5,17.6 6.4,19', 0.8, '#A8742E');
+    for (const [x, y] of [[13, 16.6], [20.6, 16.2], [14, 11.8], [21, 11.6]] as Pt[]) s += L(`M${f(x)},${f(y)}l-1,${y > 14 ? 2 : -2}`, 1, '#6E4A1A');
+    // tiny grass skirt + a hibiscus
+    for (let k = 0; k < 6; k++) s += L(`M${f(15.6 + k * 0.9)},${f(13.4)}l-0.2,3`, 0.5, '#C8B060');
+    s += F(rell(20, 10.6, 1.2, 0.9, 0, 10), '#C84A5A', 0.3) + dot(20, 10.6, 0.35, '#E8D040');
+    return s;
+  },
+  tenders: (d) => {
+    let s = F(rell(25.6, 18, 3, 1.8, 0, 18), '#B8B2A0', 0.5) + F(rell(25.6, 17.9, 2.3, 1.25, 0, 16), '#86AC34', 0.3);
+    // golden tenders cut into little headstones
+    const ts = (x: number, y: number, rot: number, seed: number) => {
+      const p = 'M-2.6,3V-1C-2.6,-4.2 2.6,-4.2 2.6,-1V3Z';
+      return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(rot)})">${fried(d, p, 0, 0, 2.6, 3.4, seed)}${L('M-1,-0.6h2M0,-1.6v2.6', 0.4, '#7A5222')}</g>`;
+    };
+    s += ts(10.6, 15.4, -12, 730) + ts(15.4, 13.4, 4, 731) + ts(20.4, 13, 14, 732) + ts(14.4, 19.2, -4, 733) + ts(19.6, 18.6, 8, 734);
+    s += finger(d, [7.6, 19.4], [9.4, 22.2], 1.4, BONE, false, false);
+    return s;
+  },
+};
+
+/** A fist punching up out of a pie crust. */
+function fistUp(d: Doc, x: number, y: number): string {
+  let s = cel(d, capsule([x, y], [x + 0.6, y - 5], 2.4, 2.2), ZSKIN[0], ZSKIN[1], 0.5);
+  s += cel(d, rell(x + 0.7, y - 6.4, 2.4, 2, 0, 16), ZSKIN[0], ZSKIN[1], 0.5);
+  s += L(`M${f(x - 0.8)},${f(y - 7.2)}v1.6M${f(x + 0.6)},${f(y - 7.6)}v1.8M${f(x + 2)},${f(y - 7.2)}v1.6`, 0.35, '#2E4E26');
+  return s;
+}
+/** Two little steam curls rising from (x, y). */
+function glossSteam(d: Doc, x: number, y: number): string {
+  return `<g filter="${d.blur(0.5)}" opacity="0.6">${L(`M${f(x - 3)},${f(y)}q-1.2,-1.6 0,-3t0,-3M${f(x + 2)},${f(y - 0.4)}q-1.2,-1.6 0,-3t0,-3`, 0.7, '#E8E4D8')}</g>`;
+}
+
+const BASE_DISHES: Partial<Record<Dish3Id, Body>> = {
   // ---- basic
   sliders: (d) => {
     let s = slider(d, 12.4, 14.4, 0.95, 11) + slider(d, 23.6, 14.4, 0.95, 12) + slider(d, 18, 18.4, 1.05, 13);
@@ -926,6 +1526,8 @@ const DISHES: Record<Dish3Id, Body> = {
     return s;
   },
 };
+
+const DISHES = { ...BASE_DISHES, ...LATE } as Record<Dish3Id, Body>;
 
 // ---------------------------------------------------------------- assets
 

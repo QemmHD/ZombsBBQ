@@ -578,3 +578,55 @@
 .fridge-row.variant {
   box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.35), inset 3px 0 0 var(--gold-deep);
 }
+
+/* Very variant tiers (x2) */
+.v-very_spicy {
+  background: #7a1a10;
+}
+.v-very_fancy {
+  background: #7a5a12;
+}
+.v-very_quick {
+  background: #24485a;
+}
+/* chef rank at the top of the cookbook */
+.chef-rank {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(232, 223, 196, 0.35);
+  background: rgba(0, 0, 0, 0.18);
+}
+.chef-rank b {
+  color: var(--gold);
+}
+.chef-rank .bar i {
+  background: var(--gold);
+}
+/* Frequent Fryer streak pips */
+.fryer-days {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  margin: 6px 0;
+}
+.fryer-days i {
+  font: 900 11px/20px var(--font);
+  font-style: normal;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  border: 1px solid var(--ink);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(232, 223, 196, 0.6);
+}
+.fryer-days i.on {
+  background: var(--gold);
+  color: var(--ink);
+}
+/* dish blurbs in the picker and cookbook */
+.dish small.blurb {
+  display: block;
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.75;
+}

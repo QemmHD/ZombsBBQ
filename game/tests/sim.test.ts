@@ -90,7 +90,7 @@ describe('cooking (the cook must stay at the stove; food burns after waiting as 
     expect(plateDish(s, stove(s).id)).toBeNull();
     run(s, 15);
     expect(stove(s).status).toBe('empty');
-    expect(servings(s)).toBe(12);
+    expect(servings(s)).toBe(DISH_BY_ID.sliders.servings);
   });
 
   it('pauses when the cook walks away, and resumes when someone comes back', () => {
@@ -323,7 +323,7 @@ describe('stove, counter and door controls', () => {
     const s = cooking();
     const cash = s.cash;
     expect(cancelCooking(s, stove(s).id)).toBeNull();
-    expect(s.cash).toBe(cash + Math.floor(30 * TUNING.sellBack));
+    expect(s.cash).toBe(cash + Math.floor(DISH_BY_ID.hobodog.cost * TUNING.sellBack));
     expect(stove(s).status).toBe('empty');
     expect(you(s).state).toBe('idle');
   });

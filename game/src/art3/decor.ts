@@ -876,6 +876,266 @@ function cauldron(): ArtAsset {
   });
 }
 
+// ---------------------------------------------------------------- late-game decor
+const IRON = '#3A3833';
+/** Rotated ellipse (screen space). */
+function rotEll(x: number, y: number, rx: number, ry: number, deg: number, fill: string, sw = LW): string {
+  return grp(F(ell(0, 0, rx, ry), fill, sw), `translate(${f(x)} ${f(y)}) rotate(${f(deg)})`);
+}
+/** A bone between two screen points with knobbly ends. */
+function boneD(a: Pt, b: Pt, w: number, col = '#D6CDAE'): string {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const nx = (-(b[1] - a[1]) / len) * w * 0.5;
+  const ny = ((b[0] - a[0]) / len) * w * 0.5;
+  let s = F(capsule(a, b, w, w), col, 0.8);
+  for (const p of [a, b]) s += F(ell(p[0] + nx, p[1] + ny, w * 0.62, w * 0.62), col, 0.7) + F(ell(p[0] - nx, p[1] - ny, w * 0.62, w * 0.62), col, 0.7);
+  return s + L(`M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}`, w * 0.3, '#A89C78', 'opacity="0.6"');
+}
+
+function pigSpit(): ArtAsset {
+  return objAsset('pig_spit', 108, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.46, 0.3);
+    // a ring of stones round glowing embers
+    s += glow(d, F(t.ell(0, 0, 0.3, 0.2), '#E07A2A'), 3, 0.5);
+    s += F(t.ell(0, 0, 0.26, 0.17), '#2A1A10', 0.8);
+    const r = rnd(81);
+    for (let k = 0; k < 9; k++) s += dot(X + (r() - 0.5) * 30, Y + (r() - 0.5) * 9, 1 + r() * 1.2, k % 2 ? '#E08A3A' : '#B2502A', 0.95);
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const [x, y] = t.p(Math.cos(a) * 0.32, Math.sin(a) * 0.22, 0);
+      s += F(blob(x, y - 1.5, 4, 2.6, 820 + k, 7, 0.35), k % 2 ? '#8A847A' : '#6E6860', 0.6);
+    }
+    // the far Y-post
+    const post = (i: number) => {
+      const b = t.p(i, 0, 0);
+      const top = t.p(i, 0, 36);
+      return L(`M${f(b[0])},${f(b[1])}L${f(top[0])},${f(top[1])}`, 3.6, INK) + L(`M${f(b[0])},${f(b[1])}L${f(top[0])},${f(top[1])}`, 2.4, IRON) + L(`M${f(top[0] - 4)},${f(top[1] - 5)}L${f(top[0])},${f(top[1])}L${f(top[0] + 4)},${f(top[1] - 5)}`, 2.6, INK) + L(`M${f(top[0] - 4)},${f(top[1] - 5)}L${f(top[0])},${f(top[1])}L${f(top[0] + 4)},${f(top[1] - 5)}`, 1.6, IRON);
+    };
+    s += post(-0.42);
+    // the spit and the pig roasting on it (lying along i: 32 degrees on screen)
+    const a = t.p(-0.46, 0, 34);
+    const b = t.p(0.5, 0, 34);
+    s += L(`M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}`, 2.2, INK) + L(`M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}`, 1.2, '#8E8A80');
+    const [px, py] = t.p(0.02, 0, 36);
+    s += rotEll(px, py, 22, 11, 32, '#B0663A');
+    s += grp(F(ell(-4, -4, 16, 5), '#D08A50', 0) + F(ell(4, 4, 18, 5), '#7A3A1C', 0, 'opacity="0.6"') + L('M-12,-6q8,4 0,10M-2,-9q8,4 0,14M8,-9q8,4 0,14', 0.6, '#5A2A12', 'opacity="0.6"'), `translate(${f(px)} ${f(py)}) rotate(32)`);
+    s += rotEll(px, py, 22, 11, 32, 'none');
+    // the head (screen-left, far end) with one eye that blinks open, the curly tail at the other
+    const [hx, hy] = t.p(-0.3, 0, 38);
+    s += F(ell(hx, hy, 8, 7), '#B0663A', LW) + F(ell(hx - 5, hy + 2, 3.6, 2.8), '#C07A50', 0.8) + dot(hx - 6, hy + 1.6, 0.6, INK) + dot(hx - 4.2, hy + 2.4, 0.6, INK);
+    s += F(`M${f(hx + 1)},${f(hy - 6)}l4,-5l1,6Z`, '#9A5430', 0.7) + F(ell(hx - 3, hy + 5.6, 2.4, 2.2), '#8A2A22', 0.7);
+    s += F(ell(hx - 1, hy - 2, 1.8, 1.4), '#E8E2CC', 0.5) + dot(hx - 0.6, hy - 1.8, 0.8, EYE_Z) + L(`M${f(hx + 2)},${f(hy - 3)}l1.6,1`, 0.5, INK);
+    const [tx, ty] = t.p(0.32, 0, 34);
+    s += L(`M${f(tx)},${f(ty)}q5,-2 4,-6q-2,-2 -3,1`, 1.6, INK) + L(`M${f(tx)},${f(ty)}q5,-2 4,-6q-2,-2 -3,1`, 0.9, '#B0663A');
+    s += post(0.42);
+    // the crank handle
+    s += L(`M${f(b[0])},${f(b[1])}l0,7l4,0`, 2.4, INK) + L(`M${f(b[0])},${f(b[1])}l0,7l4,0`, 1.2, '#8E6A40');
+    s += fly(X + 6, Y - 62, 1);
+    return s;
+  });
+}
+
+function brainJar(): ArtAsset {
+  return objAsset('brain_jar', 124, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.36, 0.28);
+    // a little wooden lab stand
+    const b = box(t, -0.26, 0.26, -0.26, 0.26, 0, 22, '#8E6436', '#7A5230', '#5A3A20');
+    s += b.fills + grain(d, b.left, [X - 30, Y - 30, 40, 30], 10, 83) + boxShade(d, t, b, -0.26, 0.26, 0.26, 0, 22) + b.lines;
+    // the jar: green fluid, a brain, bubbles, then the glass
+    const jar = cyl(d, X, Y - 2, 15, 15, 24, 62, '#9AB86A', '#5E7A3A', '#B8D08A');
+    s += F(jar.body, d.linear(X - 15, 0, X + 15, 0, [[0, '#7AA040'], [0.6, '#5E8A2A'], [1, '#3E5A1A']]));
+    s += glow(d, F(ell(X, Y - 44, 10, 8), '#B6E050'), 3, 0.5);
+    s += F(blob(X, Y - 42, 10, 8, 84, 11, 0.2), '#C48C88', 0.8);
+    s += L(`M${f(X - 1)},${f(Y - 50)}q2,6 -1,14`, 0.8, '#6E3A3C');
+    const r = rnd(85);
+    for (let k = 0; k < 9; k++) {
+      const x = X - 7 + r() * 14;
+      const y = Y - 30 - r() * 20;
+      s += L(`M${f(x)},${f(y)}q${f(2 + r())},${f(-2)} ${f(4)},0`, 0.6, '#6E383C');
+    }
+    // the brainstem dangling, an eyeball tethered to it
+    s += L(`M${f(X + 2)},${f(Y - 35)}q2,4 0,8`, 1.6, '#B07A78') + eyeball(X + 2, Y - 26, 2.6, '#4E6A86', -0.2, 0.3);
+    for (let k = 0; k < 6; k++) s += F(ell(X - 9 + r() * 18, Y - 30 - r() * 26, 0.8, 0.8), 'none', 0.4);
+    s += F(jar.body, d.linear(X - 15, 0, X + 15, 0, [[0, '#FFFFFF', 0.25], [0.25, '#FFFFFF', 0.05], [0.8, '#000', 0.1], [1, '#000', 0.25]])) + sheen(d, jar.body, X - 12, Y - 64, 10, 40, 2, 0.35, 86);
+    s += L(jar.body, LW) + F(jar.top, '#B8D08A', 0.8, 'opacity="0.6"');
+    // brass lid with two electrodes and a frayed cable to the stand
+    s += cyl(d, X, Y - 2, 16, 16, 62, 66, '#A8822A', '#6E5418', '#C8A04A').s;
+    for (const dx of [-6, 6]) s += L(`M${f(X + dx)},${f(Y - 68)}v-6`, 2.2, INK) + L(`M${f(X + dx)},${f(Y - 68)}v-6`, 1.2, '#9A9C94') + dot(X + dx, Y - 75, 1.2, '#B8963E');
+    s += L(`M${f(X + 6)},${f(Y - 75)}C${f(X + 22)},${f(Y - 80)} ${f(X + 26)},${f(Y - 40)} ${f(X + 18)},${f(Y - 20)}`, 1.2, '#2A2826');
+    s += glow(d, L(`M${f(X - 6)},${f(Y - 76)}l-2,-4l3,1l-1,-4`, 0.8, '#E6E07A'), 1, 0.9);
+    return s;
+  });
+}
+
+function chainsawStump(): ArtAsset {
+  return objAsset('chainsaw_stump', 96, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.44, 0.34);
+    // roots splaying out, then the stump
+    for (const a of [0.3, 1.9, 3.3, 4.6]) {
+      const [x, y] = t.p(Math.cos(a) * 0.34, Math.sin(a) * 0.34, 0);
+      s += F(capsule([X, Y - 4], [x, y], 7, 3), '#5A4028', 0.8);
+    }
+    const st = cyl(d, X, Y, 22, 20, 0, 24, '#6A4A2E', '#45301C', '#C8A876');
+    s += st.s;
+    let bark = '';
+    for (let k = 0; k < 14; k++) bark += L(`M${f(X - 21 + k * 3.2)},${f(Y - 22 + (k % 3))}q-1,10 0.4,${f(18 + (k % 4) * 2)}`, 0.6, '#2E1E10', 'opacity="0.7"');
+    s += d.clip(st.body, bark);
+    // growth rings and a cut groove
+    for (const k of [0.3, 0.55, 0.8]) s += L(ell(X, Y - 24, 20 * k, 20 * k * K), 0.5, '#8E6A40');
+    s += F(`M${f(X - 12)},${f(Y - 26)}L${f(X + 6)},${f(Y - 18)}L${f(X + 7)},${f(Y - 21)}Z`, '#2A1A0E', 0.5);
+    // the chainsaw, bar buried in the stump
+    s += F(`M${f(X - 12)},${f(Y - 26)}L${f(X - 30)},${f(Y - 35)}C${f(X - 34)},${f(Y - 37)} ${f(X - 35)},${f(Y - 33)} ${f(X - 31)},${f(Y - 31)}L${f(X - 9)},${f(Y - 21)}Z`, '#5A5C58', 0.9);
+    for (let k = 0; k < 7; k++) s += L(`M${f(X - 13 - k * 2.6)},${f(Y - 26.6 - k * 1.3)}l-0.6,-1.2`, 0.8, '#C8CAC4');
+    const body = `M${f(X - 4)},${f(Y - 34)}L${f(X + 14)},${f(Y - 28)}L${f(X + 16)},${f(Y - 16)}L${f(X - 4)},${f(Y - 22)}Z`;
+    s += F(body, celH(d, X - 4, X + 16, '#C8652A', '#8A3E14'), LW);
+    s += F(`M${f(X + 2)},${f(Y - 33)}C${f(X + 2)},${f(Y - 42)} ${f(X + 12)},${f(Y - 40)} ${f(X + 12)},${f(Y - 30)}`, 'none', 0) + L(`M${f(X + 2)},${f(Y - 33)}C${f(X + 2)},${f(Y - 42)} ${f(X + 12)},${f(Y - 40)} ${f(X + 12)},${f(Y - 30)}`, 3, INK) + L(`M${f(X + 2)},${f(Y - 33)}C${f(X + 2)},${f(Y - 42)} ${f(X + 12)},${f(Y - 40)} ${f(X + 12)},${f(Y - 30)}`, 1.8, '#2A2826');
+    s += L(`M${f(X + 3)},${f(Y - 26)}l8,2.6M${f(X + 3)},${f(Y - 24)}l8,2.6`, 0.6, '#5A2A0A');
+    // the starter cord flopping out, sawdust and a severed glove
+    s += L(`M${f(X + 15)},${f(Y - 22)}q8,2 6,12`, 0.7, '#D8D2BC') + F(ell(X + 21, Y - 9, 1.6, 1), '#2A2826', 0.4);
+    const r = rnd(87);
+    for (let k = 0; k < 14; k++) s += dot(X - 26 + r() * 52, Y + 2 + r() * 9, 0.6, '#D8B880', 0.9);
+    s += F(blob(X - 22, Y + 6, 5, 3, 88), '#8E6A3A', 0.6) + finger(X - 18, Y + 7, 0.5, 5, 2.2, '#B3B294');
+    return s;
+  });
+}
+
+function trophySpatula(): ArtAsset {
+  return objAsset('trophy_spatula', 150, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.32, 0.26);
+    const b = box(t, -0.22, 0.22, -0.22, 0.22, 0, 20, '#3A2A1E', '#4E3424', '#2E1E14');
+    s += b.fills + grain(d, b.left, [X - 30, Y - 30, 40, 30], 8, 89, '#2A1A0E', '#7A5434') + b.lines;
+    // brass plaque on the plinth
+    s += grp(F('M4,-15h14v8h-14Z', '#B8963E', 0.6) + L('M6,-12.6h10M6,-10h7', 0.5, '#6E5418'), swFace(t, -0.22, 0.22, 0));
+    // the cup on a stem
+    const gold = '#C8A040';
+    const goldD = '#7A5A18';
+    s += cyl(d, X, Y - 2, 7, 5, 20, 24, gold, goldD, '#E0C060').s;
+    s += F(`M${f(X - 2)},${f(Y - 26)}h4v12h-4Z`, celH(d, X - 2, X + 2, gold, goldD), 0.8);
+    const cup = `M${f(X - 14)},${f(Y - 54)}C${f(X - 14)},${f(Y - 34)} ${f(X - 6)},${f(Y - 30)} ${f(X)},${f(Y - 30)}C${f(X + 6)},${f(Y - 30)} ${f(X + 14)},${f(Y - 34)} ${f(X + 14)},${f(Y - 54)}Z`;
+    s += F(cup, celH(d, X - 14, X + 14, gold, goldD), LW) + sheen(d, cup, X - 12, Y - 54, 10, 22, 2, 0.4, 90);
+    s += L(`M${f(X - 14)},${f(Y - 48)}q-8,0 -6,8q2,4 7,2`, 2.4, INK) + L(`M${f(X - 14)},${f(Y - 48)}q-8,0 -6,8q2,4 7,2`, 1.4, gold);
+    s += L(`M${f(X + 14)},${f(Y - 48)}q8,0 6,8q-2,4 -7,2`, 2.4, INK) + L(`M${f(X + 14)},${f(Y - 48)}q8,0 6,8q-2,4 -7,2`, 1.4, goldD);
+    s += F(ell(X, Y - 54, 14, 14 * K), '#5A4010', LW);
+    // the golden spatula planted in the cup, crusted with something
+    s += L(`M${f(X + 2)},${f(Y - 54)}L${f(X + 8)},${f(Y - 82)}`, 3.6, INK) + L(`M${f(X + 2)},${f(Y - 54)}L${f(X + 8)},${f(Y - 82)}`, 2.4, gold);
+    const blade = `M${f(X + 2)},${f(Y - 80)}L${f(X + 15)},${f(Y - 78)}L${f(X + 18)},${f(Y - 98)}L${f(X + 4)},${f(Y - 101)}Z`;
+    s += F(blade, celH(d, X + 2, X + 18, '#E0C060', '#9A7A22'), LW);
+    for (let k = 0; k < 3; k++) s += L(`M${f(X + 7 + k * 3.4)},${f(Y - 83)}l1.2,-12`, 0.8, '#6E5418');
+    s += F(blob(X + 12, Y - 90, 3, 2, 91), '#5A2A14', 0, 'opacity="0.7"');
+    s += glow(d, dot(X - 6, Y - 48, 2, '#FFF0B0') + dot(X + 9, Y - 96, 1.6, '#FFF0B0'), 1.2, 0.8);
+    return s;
+  });
+}
+
+function mummyCase(): ArtAsset {
+  return objAsset('mummy_case', 156, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, -0.02, 0.36, 0.24);
+    const shape = 'M6,0L26,0L30,-58L28,-84C28,-102 4,-102 4,-84L2,-58Z';
+    const i0 = -0.32;
+    const jf = 0.12;
+    s += extrudeStack(t, shape, i0, jf, 0, 0.22, '#B8963E', '#6E5418');
+    let face = F(shape, celH(d, 0, 32, '#C8A048', '#8A6A22', 0.7));
+    // painted bands, the death mask (a zombie, naturally), crossed arms
+    face += d.clip(shape, F('M0,-58H32V-50H0Z', '#2C6985') + F('M0,-40H32V-34H0Z', '#2C6985') + F('M0,-20H32V-14H0Z', '#2C6985') + L('M0,-54H32M0,-37H32M0,-17H32', 0.6, '#C8A048', 'stroke-dasharray="2 2"'));
+    face += F('M8,-86C8,-98 24,-98 24,-86L23,-72C21,-66 11,-66 9,-72Z', SKIN_Z, 0.8);
+    face += F('M4,-86C2,-96 10,-100 16,-100C22,-100 30,-96 28,-86L25,-86C24,-94 8,-94 7,-86Z', '#2C6985', 0.7) + L('M6,-88L5,-70M26,-88L27,-70', 2, '#2C6985');
+    face += F(ell(12.4, -84, 2, 1.4), EYE_Z, 0.5) + F(ell(19.6, -84, 2, 1.4), EYE_Z, 0.5) + L('M10.6,-86.6l3.6,0.6M21.4,-86.6l-3.6,0.6', 0.7, INK);
+    face += L('M12,-74q4,2 8,0', 0.8, INK) + dot(14, -73.6, 0.5, '#E8E2CC') + dot(18, -73.6, 0.5, '#E8E2CC');
+    face += L('M7,-62L25,-50M25,-62L7,-50', 2.6, INK) + L('M7,-62L25,-50M25,-62L7,-50', 1.6, '#C8A048');
+    face += d.clip(shape, scratches(d, shape, [0, -100, 32, 100], 16, '#5A4010', 92, 0.6) + F(blob(22, -24, 6, 8, 93), '#3A2A10', 0, 'opacity="0.3"'));
+    face += L(shape, LW);
+    s += grp(face, swFace(t, i0, jf, 0));
+    // a bandaged hand poking out of the lid seam, bandage unravelling to the floor
+    const [hx, hy] = t.p(i0 + 0.6, jf, 46);
+    s += F(capsule([hx - 2, hy], [hx + 6, hy + 2], 4, 3.4), '#D8CCA8', 0.8) + L(`M${f(hx)},${f(hy - 1.6)}l1,3.4M${f(hx + 2.6)},${f(hy - 1.2)}l1,3.4`, 0.5, '#8A7A5A');
+    for (let k = 0; k < 3; k++) s += F(capsule([hx + 6, hy + 1 + k * 1.6], [hx + 9, hy + 2 + k * 1.8], 1.4, 1.2), '#D8CCA8', 0.6);
+    s += L(`M${f(hx + 2)},${f(hy + 3)}C${f(hx + 6)},${f(hy + 18)} ${f(hx - 4)},${f(hy + 26)} ${f(hx + 4)},${f(hy + 40)}`, 2.6, INK) + L(`M${f(hx + 2)},${f(hy + 3)}C${f(hx + 6)},${f(hy + 18)} ${f(hx - 4)},${f(hy + 26)} ${f(hx + 4)},${f(hy + 40)}`, 1.8, '#D8CCA8');
+    s += fly(X - 20, Y - 104, 1);
+    return s;
+  });
+}
+
+function hogSkeleton(): ArtAsset {
+  return objAsset('hog_skeleton', 104, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.46, 0.3);
+    // a low plank plinth
+    const b = box(t, -0.42, 0.42, -0.24, 0.24, 0, 8, '#7A5230', '#6A4528', '#4A2E18');
+    s += b.fills + grain(d, b.left, [X - 50, Y - 20, 80, 20], 10, 94) + b.lines;
+    const P = (i: number, z: number): Pt => t.p(i, 0, z);
+    // far legs, spine, ribs, near legs, skull
+    for (const i of [-0.25, 0.25]) s += boneD(P(i + 0.03, 32), t.p(i, -0.1, 8), 2.2, '#C8BE9E');
+    const spine: Pt[] = [];
+    for (let k = 0; k <= 10; k++) spine.push(P(-0.32 + k * 0.064, 34 + Math.sin((k / 10) * Math.PI) * 5));
+    for (let k = 0; k < spine.length; k++) s += F(ell(spine[k][0], spine[k][1], 2.6, 2.2), '#D6CDAE', 0.7) + L(`M${f(spine[k][0])},${f(spine[k][1] - 2)}l0.6,-3`, 1.4, '#D6CDAE');
+    for (let k = 2; k < 9; k++) {
+      const [x, y] = spine[k];
+      const rib = `M${f(x)},${f(y)}C${f(x - 10)},${f(y + 2)} ${f(x - 10)},${f(y + 14)} ${f(x - 2)},${f(y + 16)}`;
+      s += L(rib, 2.6, INK) + L(rib, 1.6, k % 2 ? '#D6CDAE' : '#C8BE9E');
+    }
+    for (const i of [-0.25, 0.25]) s += boneD(P(i, 30), t.p(i - 0.02, 0.1, 8), 2.6);
+    // the skull with tusks, an apple still jammed in its jaws
+    const [sx, sy] = P(-0.42, 36);
+    s += F(`M${f(sx + 8)},${f(sy - 6)}C${f(sx + 4)},${f(sy - 12)} ${f(sx - 8)},${f(sy - 8)} ${f(sx - 12)},${f(sy + 2)}L${f(sx - 10)},${f(sy + 6)}C${f(sx - 2)},${f(sy + 6)} ${f(sx + 6)},${f(sy + 4)} ${f(sx + 8)},${f(sy - 6)}Z`, '#D6CDAE', LW);
+    s += F(ell(sx, sy - 3, 2.2, 1.8), '#1E1810') + dot(sx - 0.4, sy - 3.2, 0.6, EYE_Z);
+    s += F(ell(sx - 11, sy + 4, 3.6, 3.2), '#8A2A22', 0.8) + L(`M${f(sx - 11)},${f(sy + 1)}l0.6,-2`, 0.6, '#4A3A1E');
+    s += L(`M${f(sx - 6)},${f(sy + 5)}q-2,-5 1,-8`, 1.8, INK) + L(`M${f(sx - 6)},${f(sy + 5)}q-2,-5 1,-8`, 1, '#E8E2CC');
+    s += L(`M${f(spine[10][0])},${f(spine[10][1])}q6,2 5,-5`, 1.4, '#D6CDAE');
+    s += fly(X + 18, Y - 56, 1);
+    return s;
+  });
+}
+
+function grillShrine(): ArtAsset {
+  return objAsset('grill_shrine', 166, (d, t) => {
+    const X = t.cx;
+    const Y = t.cy;
+    let s = shadow(d, t, 0, 0, 0.48, 0.42);
+    // stepped stone altar
+    for (const [r, z0, z1, col] of [[0.46, 0, 8, '#8A887E'], [0.38, 8, 16, '#9A988E'], [0.3, 16, 40, '#7E7C72']] as [number, number, number, string][]) {
+      const bx = box(t, -r, r, -r, r, z0, z1, col, '#7A786E', '#5A584E');
+      s += bx.fills + boxShade(d, t, bx, -r, r, r, z0, z1, 0.3) + bx.lines;
+    }
+    s += grp(F('M6,-20C6,-32 22,-32 22,-20Z', '#5A584E', 0.6) + L('M14,-28v-6M11,-31h6', 1, '#C8A040'), swFace(t, -0.3, 0.3, 0));
+    s += d.clip(poly([t.p(-0.3, 0.3, 16), t.p(0.3, 0.3, 16), t.p(0.3, 0.3, 40), t.p(-0.3, 0.3, 40)]), F(blob(...t.p(-0.1, 0.3, 22), 10, 6, 95), '#5E7A2A', 0, 'opacity="0.5"'));
+    // crossed golden spatulas behind the fire
+    for (const sgn of [-1, 1]) {
+      const a: Pt = [X + sgn * 16, Y - 40];
+      const b: Pt = [X - sgn * 10, Y - 94];
+      s += L(`M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}`, 3, INK) + L(`M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}`, 1.8, '#C8A040');
+      s += F(`M${f(b[0] - 5)},${f(b[1] + 2)}L${f(b[0] + 5)},${f(b[1] + 2)}L${f(b[0] + 6)},${f(b[1] - 12)}L${f(b[0] - 6)},${f(b[1] - 12)}Z`, '#D8B850', 0.9);
+    }
+    const [kx, ky] = t.p(-0.22, -0.22, 40);
+    s += F(`M${f(kx - 4)},${f(ky)}C${f(kx - 4.6)},${f(ky - 8)} ${f(kx + 4.6)},${f(ky - 8)} ${f(kx + 4)},${f(ky)}L${f(kx + 2.4)},${f(ky + 2.6)}H${f(kx - 2.4)}Z`, '#D6CDAE', 0.8) + F(ell(kx - 1.6, ky - 2.4, 1.2, 1.4), '#1E1810') + F(ell(kx + 1.6, ky - 2.4, 1.2, 1.4), '#1E1810');
+    // the eternal grill: a black kettle bowl full of fire
+    const bowl = `M${f(X - 22)},${f(Y - 44)}C${f(X - 22)},${f(Y - 30)} ${f(X + 22)},${f(Y - 30)} ${f(X + 22)},${f(Y - 44)}Z`;
+    s += F(bowl, celH(d, X - 22, X + 22, '#3A3833', '#1A1816'), LW);
+    s += F(ell(X, Y - 44, 22, 22 * K), '#2A1A10', LW);
+    s += glow(d, F(ell(X, Y - 50, 18, 10), '#E07A2A'), 4, 0.7);
+    const fl = (x: number, y: number, h: number, w: number, lean: number) => F(`M${f(x - w)},${f(y)}C${f(x - w)},${f(y - h * 0.5)} ${f(x + lean)},${f(y - h * 0.6)} ${f(x + lean)},${f(y - h)}C${f(x + w * 0.6)},${f(y - h * 0.5)} ${f(x + w)},${f(y - h * 0.4)} ${f(x + w)},${f(y)}Z`, '#C2552A', 0.6) + F(`M${f(x - w * 0.5)},${f(y)}C${f(x - w * 0.5)},${f(y - h * 0.4)} ${f(x + lean * 0.5)},${f(y - h * 0.4)} ${f(x + lean * 0.5)},${f(y - h * 0.65)}C${f(x + w * 0.3)},${f(y - h * 0.3)} ${f(x + w * 0.5)},${f(y - h * 0.3)} ${f(x + w * 0.5)},${f(y)}Z`, '#EBC452', 0);
+    s += fl(X - 10, Y - 44, 20, 5, -3) + fl(X + 9, Y - 44, 22, 5, 3) + fl(X, Y - 42, 34, 6, 0);
+    for (let k = -3; k <= 3; k++) s += L(`M${f(X - 20)},${f(Y - 46 + k * 2.6)}L${f(X + 20)},${f(Y - 46 + k * 2.6)}`, 0.6, '#1A1814', 'opacity="0.7"');
+    // candles and skulls round the rim of the altar
+    for (const [i, j, h] of [[-0.24, 0.22, 10], [0.22, 0.24, 7], [0.24, -0.2, 9]] as number[][]) {
+      const [x, y] = t.p(i, j, 40);
+      s += F(`M${f(x - 1.6)},${f(y)}V${f(y - h)}H${f(x + 1.6)}V${f(y)}Z`, '#D8D2BC', 0.6) + F(`M${f(x - 1.6)},${f(y - h)}q0.6,3 0.4,5q-0.4,-2 -0.4,-5Z`, '#D8D2BC', 0.3);
+      s += glow(d, F(ell(x, y - h - 2.6, 2.6, 3.4), '#FFB040'), 1.2, 0.7) + F(ell(x, y - h - 2.4, 1, 2), '#EBC452', 0.3);
+    }
+    return s;
+  });
+}
+
 // ---------------------------------------------------------------- export
 export function buildDecor(): ArtAsset[] {
   return [
@@ -897,6 +1157,13 @@ export function buildDecor(): ArtAsset[] {
     lampFloor(),
     aquarium(),
     cauldron(),
+    pigSpit(),
+    brainJar(),
+    chainsawStump(),
+    trophySpatula(),
+    mummyCase(),
+    hogSkeleton(),
+    grillShrine(),
   ];
 }
 

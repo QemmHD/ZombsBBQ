@@ -148,6 +148,7 @@ describe('rare dish variants: raids, the fridge, the stove', () => {
     const xpOf = (id: string) => {
       const s = joint();
       s.level = 3;
+      s.chefRank = 10; // keep chef-rank milestone bonuses out of the count
       s.recipes.push(id);
       startCooking(s, s.workers[0].id, s.stoves[0].id, id);
       const xp0 = s.xp;

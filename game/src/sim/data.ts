@@ -6,7 +6,19 @@
  */
 
 /** Which cookbook a dish belongs to; 'stove' dishes cook on any stove, the rest need that station. */
-export type StationKind = 'stove' | 'grill' | 'smoker' | 'fryer';
+export type StationKind = 'stove' | 'grill' | 'smoker' | 'fryer' | 'cauldron' | 'kiln' | 'pit' | 'tomb';
+
+/** Every cookbook, in menu order: the station that cooks it and the cookbook's name. */
+export const STATIONS: { kind: StationKind; name: string; book: string }[] = [
+  { kind: 'stove', name: 'Stove', book: 'the house menu' },
+  { kind: 'grill', name: 'BBQ Grill', book: 'Backyard Basics' },
+  { kind: 'smoker', name: 'Smoker', book: 'Smokehouse' },
+  { kind: 'fryer', name: 'Deep Fryer', book: 'Fry Shack' },
+  { kind: 'cauldron', name: "Witch's Cauldron", book: 'Mad Sauces' },
+  { kind: 'kiln', name: 'Brick Kiln', book: 'Wood-Fired Rot' },
+  { kind: 'pit', name: 'Pit Oven', book: 'Feast of the Dead' },
+  { kind: 'tomb', name: 'Tomb Smoker', book: 'Graveyard Grill' },
+];
 
 export interface DishDef {
   id: string;
@@ -50,31 +62,71 @@ const D = (id: string, name: string, station: StationKind, source: 'level' | 'ra
 
 export const DISHES: DishDef[] = [
   // the house cookbook: cooks on any stove
-  D('sliders', 'Mystery Sliders', 'stove', 'level', 1, 2 * M, 10, 12, 5, 2, "Three tiny burgers. Don't count the eyes."),
-  D('hobodog', 'Hobo Hot Dog', 'stove', 'level', 1, 5 * M, 30, 20, 6, 4, 'Found it. Grilled it. Band-aid optional.'),
-  D('gumbo', 'Gutter Gumbo', 'stove', 'level', 2, 15 * M, 100, 45, 7, 8, 'Fished fresh from the storm drain.'),
-  D('tacos', 'Toe-tally Tacos', 'stove', 'level', 3, 60 * M, 250, 150, 7, 15, 'Ten little piggies, extra crunchy.'),
-  D('lasagut', 'Leftover Lasagut', 'stove', 'level', 3, 8 * H, 500, 300, 9, 65, 'Layers of pasta. Layers of… other things.'),
-  D('broth', 'Bone Broth Bucket', 'stove', 'level', 4, 90 * M, 250, 120, 8, 20, 'Simmered from 206 locally sourced bones.'),
-  D('meatloaf', 'Meatloaf of the Dead', 'stove', 'level', 5, 30 * M, 200, 80, 8, 12, 'It twitches. That means it’s fresh.'),
-  D('goulash', 'Ghoul-ash', 'stove', 'level', 6, 24 * H, 1200, 650, 12, 95, 'Grandma’s recipe. Grandma’s in it.'),
+  D('sliders', 'Mystery Sliders', 'stove', 'level', 1, 2 * M, 10, 8, 4, 1, "Three tiny burgers. Don't count the eyes."),
+  D('hobodog', 'Hobo Hot Dog', 'stove', 'level', 1, 5 * M, 20, 18, 4, 3, 'Found it. Grilled it. Band-aid optional.'),
+  D('gumbo', 'Gutter Gumbo', 'stove', 'level', 2, 15 * M, 55, 45, 5, 7, 'Fished fresh from the storm drain.'),
+  D('tacos', 'Toe-tally Tacos', 'stove', 'level', 3, 60 * M, 340, 150, 9, 20, 'Ten little piggies, extra crunchy.'),
+  D('lasagut', 'Leftover Lasagut', 'stove', 'level', 3, 8 * H, 740, 425, 7, 57, 'Layers of pasta. Layers of… other things.'),
+  D('broth', 'Bone Broth Bucket', 'stove', 'level', 4, 90 * M, 280, 185, 6, 27, 'Simmered from 206 locally sourced bones.'),
+  D('meatloaf', 'Meatloaf of the Dead', 'stove', 'level', 5, 30 * M, 150, 85, 7, 15, 'It twitches. That means it’s fresh.'),
+  D('goulash', 'Ghoul-ash', 'stove', 'level', 6, 24 * H, 1850, 735, 10, 130, 'Grandma’s recipe. Grandma’s in it.'),
   // the grill cookbook
-  D('burger', 'Brain Burger', 'grill', 'level', 2, 20 * M, 150, 70, 9, 12, 'Medium-rare. Medium-brain.'),
-  D('wings', "Finger-Lickin' Wings", 'grill', 'level', 5, 40 * M, 220, 100, 9, 15, 'Count your fingers after.'),
-  D('kebab', 'Ke-blob Kebab', 'grill', 'level', 7, 2 * H, 400, 150, 11, 30, 'Meat on a stick. Stick also meat.'),
-  D('smash', 'Smash Burger', 'grill', 'raid', 1, 45 * M, 250, 100, 11, 25, 'Big Hank smashed. You stole.'),
-  D('chili', 'Chili Con Carnage', 'grill', 'raid', 1, 3 * H, 400, 200, 11, 65, "Chuck Wagon's secret. Now yours."),
-  D('salad', 'Kale-ing Spree Salad', 'grill', 'raid', 1, 6 * H, 600, 320, 12, 100, 'Vegan Vera wept.'),
+  D('burger', 'Brain Burger', 'grill', 'level', 2, 20 * M, 75, 60, 5, 8, 'Medium-rare. Medium-brain.'),
+  D('wings', "Finger-Lickin' Wings", 'grill', 'level', 5, 40 * M, 180, 105, 7, 18, 'Count your fingers after.'),
+  D('kebab', 'Ke-blob Kebab', 'grill', 'level', 7, 2 * H, 470, 210, 9, 41, 'Meat on a stick. Stick also meat.'),
+  D('smash', 'Smash Burger', 'grill', 'raid', 1, 45 * M, 230, 115, 8, 23, 'Big Hank smashed. You stole.'),
+  D('chili', 'Chili Con Carnage', 'grill', 'raid', 1, 3 * H, 720, 260, 11, 57, "Chuck Wagon's secret. Now yours."),
+  D('salad', 'Kale-ing Spree Salad', 'grill', 'raid', 1, 6 * H, 1350, 365, 15, 93, 'Vegan Vera wept.'),
   // the smoker cookbook
-  D('pork', 'Pulled Pork(ish)', 'smoker', 'level', 4, 2 * H, 350, 160, 11, 50, "Don't ask what the 'ish' is."),
-  D('ribs', 'Rib Rack of Doom', 'smoker', 'level', 6, 5 * H, 500, 260, 12, 45, 'Fall-off-the-bone. Bone not included.'),
-  D('brisket', '24-Hour Brisket', 'smoker', 'level', 8, 12 * H, 700, 420, 14, 60, 'Takes 12 hours. The name is aspirational.'),
-  D('foie', 'Foie Gross', 'smoker', 'raid', 1, 14 * H, 800, 420, 16, 80, 'Très gross. Très délicieux.'),
+  D('pork', 'Pulled Pork(ish)', 'smoker', 'level', 4, 2 * H, 600, 200, 12, 60, "Don't ask what the 'ish' is."),
+  D('ribs', 'Rib Rack of Doom', 'smoker', 'level', 6, 5 * H, 750, 335, 9, 59, 'Fall-off-the-bone. Bone not included.'),
+  D('brisket', '24-Hour Brisket', 'smoker', 'level', 8, 12 * H, 2400, 600, 16, 107, 'Takes 12 hours. The name is aspirational.'),
+  D('foie', 'Foie Gross', 'smoker', 'raid', 1, 14 * H, 2250, 560, 16, 142, 'Très gross. Très délicieux.'),
   // the fryer cookbook
-  D('rings', 'Onion Rings of Fire', 'fryer', 'level', 6, 15 * M, 100, 50, 8, 6, 'They bite back.'),
-  D('nuggets', 'Brain Nuggets', 'fryer', 'level', 7, 45 * M, 250, 110, 10, 14, 'Smart food.'),
-  D('fries', 'Finger Fries', 'fryer', 'level', 9, 150 * M, 300, 190, 10, 40, 'Hand-cut. Literally.'),
-  D('chicken', 'Crunchy Coop Bucket', 'fryer', 'raid', 1, 4 * H, 450, 240, 12, 40, "The Colonel's 11 secret spleens."),
+  D('rings', 'Onion Rings of Fire', 'fryer', 'level', 6, 15 * M, 80, 45, 7, 10, 'They bite back.'),
+  D('nuggets', 'Brain Nuggets', 'fryer', 'level', 7, 45 * M, 260, 115, 9, 23, 'Smart food.'),
+  D('fries', 'Finger Fries', 'fryer', 'level', 9, 150 * M, 700, 235, 12, 52, 'Hand-cut. Literally.'),
+  D('chicken', 'Crunchy Coop Bucket', 'fryer', 'raid', 1, 4 * H, 980, 300, 13, 71, "The Colonel's 11 secret spleens."),
+  // ---- the late game: a new dish at every level from 10 to 40 (long timers, thin margins, lots of XP)
+  D('chowder', 'Calamity Chowder', 'stove', 'level', 10, 45 * M, 340, 115, 12, 29, 'Clams, corn and one unclaimed sock.'),
+  D('corndog', 'Corn-Dead Dog', 'grill', 'level', 10, 90 * M, 600, 185, 13, 43, 'Dipped, fried, impaled. Like its last owner.'),
+  D('eyesoup', 'Eyeball Soup', 'cauldron', 'level', 11, 30 * M, 260, 85, 12, 23, "It's looking at you. Eat it anyway."),
+  D('stew', "Witch's Brew Stew", 'cauldron', 'level', 12, 3 * H, 980, 260, 15, 68, 'Double, double, gristle and bubble.'),
+  D('links', 'Smoky Finger Links', 'smoker', 'level', 12, 90 * M, 650, 185, 14, 48, 'Ten links. Ten little knuckles.'),
+  D('tbone', 'Tombstone T-Bone', 'grill', 'level', 13, 150 * M, 880, 235, 15, 65, 'Rare. Like, still-mooing rare.'),
+  D('donuts', 'Glazed Eyeball Donuts', 'fryer', 'level', 14, 60 * M, 560, 150, 15, 43, 'The sprinkles are probably sprinkles.'),
+  D('pizza', 'Pepper-groany Pizza', 'kiln', 'level', 15, 40 * M, 390, 105, 15, 34, 'Extra cheese. Extra eyes.'),
+  D('calzone', 'Cal-zombie', 'kiln', 'level', 15, 2 * H, 840, 210, 16, 64, 'A pizza that ate another pizza.'),
+  D('jerky', 'Jerky of the Living Dead', 'smoker', 'level', 16, 6 * H, 1750, 365, 19, 117, 'Chewy and tough. Like Uncle Ned.'),
+  D('knots', 'Gut-Knot Garlic Rolls', 'kiln', 'level', 17, 75 * M, 720, 170, 17, 56, 'Twisted, like the chef.'),
+  D('meatballs', 'Meatballs of Unknown Origin', 'stove', 'level', 18, 4 * H, 1500, 300, 20, 104, 'Please stop asking where the eyes went.'),
+  D('brats', 'Brain-wurst Brats', 'grill', 'level', 19, 3 * H, 1350, 260, 21, 93, 'Snappy casing. Smart filling.'),
+  D('swamp', 'Swamp Slop Soup', 'cauldron', 'level', 20, 6 * H, 2100, 365, 23, 137, 'Locally foraged from the bog behind the bus stop.'),
+  D('hog', 'Whole Hog of Horror', 'pit', 'level', 21, 12 * H, 3400, 520, 26, 201, 'Apple in mouth. Hog in denial.'),
+  D('deepdish', 'Deep-Grave Dish Pizza', 'kiln', 'level', 22, 5 * H, 2100, 335, 25, 135, 'Six feet deep, like a good grave.'),
+  D('fishchips', 'Fish & Chipped Teeth', 'fryer', 'level', 23, 2 * H, 1250, 210, 24, 88, 'Mind the dentures.'),
+  D('turducken', 'Turducken-stein', 'pit', 'level', 24, 16 * H, 4650, 600, 31, 258, 'A turkey in a duck in a chicken, stitched up in a lab.'),
+  D('burntends', 'Burnt Ends of the Earth', 'smoker', 'level', 25, 8 * H, 3200, 425, 30, 188, 'The apocalypse, cubed.'),
+  D('fondue', 'Finger Fondue', 'cauldron', 'level', 26, 2 * H, 1450, 210, 28, 97, 'Double-dipping is mandatory.'),
+  D('coffinribs', 'Coffin Ribs', 'tomb', 'level', 27, 10 * H, 4050, 475, 34, 224, 'Slow-smoked in a pine box.'),
+  D('beans', 'Grave-Baked Beans', 'tomb', 'level', 28, 4 * H, 2500, 300, 33, 146, 'Buried six feet under. Dug up for you.'),
+  D('stromboli', 'Strom-bowel-i', 'kiln', 'level', 29, 7 * H, 3550, 395, 36, 198, 'Rolled, stuffed, regretted.'),
+  D('mammoth', 'Mammoth Drumstick', 'pit', 'level', 30, 20 * H, 7050, 670, 42, 344, 'Thawed out of a glacier. Mostly.'),
+  D('tomahawk', 'Tomahawk Chop-Chop', 'grill', 'level', 31, 6 * H, 3650, 365, 40, 194, 'A steak with a handle and a grudge.'),
+  D('mummywrap', 'Mummy Wraps', 'tomb', 'level', 32, 5 * H, 3450, 335, 41, 182, 'The bandages are edible. Probably.'),
+  D('potpie', 'Pot Pie of Peril', 'stove', 'level', 33, 9 * H, 5050, 450, 45, 250, 'Something under the crust is knocking.'),
+  D('tempura', 'Toe-mpura', 'fryer', 'level', 34, 3 * H, 2800, 260, 43, 148, 'Ten little piggies, flash-fried.'),
+  D('hash', 'Headstone Hash', 'tomb', 'level', 35, 8 * H, 5200, 425, 49, 247, "Engraved with the last cook's initials."),
+  D('elixir', 'Undying Elixir Stew', 'cauldron', 'level', 36, 14 * H, 7700, 560, 55, 335, 'Sip it and live forever. Sort of.'),
+  D('kraken', 'Kraken on a Spit', 'pit', 'level', 37, 18 * H, 9350, 635, 59, 389, "It's still waving. Wave back."),
+  D('pizzaface', 'The Pizza Face', 'kiln', 'level', 38, 10 * H, 7000, 475, 59, 297, 'A pizza with a face. It has opinions.'),
+  D('damned', 'Brisket of the Damned', 'tomb', 'level', 39, 24 * H, 12300, 735, 67, 470, 'Smoked for a day. Damned for eternity.'),
+  D('apocalypse', 'Apocalypse Platter', 'pit', 'level', 40, 24 * H, 12850, 735, 70, 480, 'Everything, on one plate. Run.'),
+  // secret recipes for the new stations (raid-only)
+  D('toadstew', 'Toad-ally Stew', 'cauldron', 'raid', 1, 4 * H, 1350, 300, 18, 95, 'Ribbit. Gulp. Ribbit.'),
+  D('ratpizza', 'Sewer Rat Pizza', 'kiln', 'raid', 1, 3 * H, 1350, 260, 21, 95, 'Hand-tossed by an actual rat.'),
+  D('luau', 'Luau Lizard', 'pit', 'raid', 1, 14 * H, 4500, 560, 32, 259, 'Pit-roasted with a tiny grass skirt.'),
+  D('tenders', 'Tombstone Tenders', 'tomb', 'raid', 1, 6 * H, 3550, 365, 39, 205, 'Rest in pieces.'),
 ];
 
 /**
@@ -88,7 +140,13 @@ export const DISHES: DishDef[] = [
  *   Fresh   each happy diner counts as 1.5 verdicts toward the star rating
  * Ingredient cost is the same as the plain dish. Ids are `${variant}_${dish}`, e.g. 'spicy_sliders'.
  */
-export type VariantId = 'bulk' | 'quick' | 'spicy' | 'fancy' | 'frozen' | 'fresh';
+export type VariantId = 'bulk' | 'quick' | 'spicy' | 'fancy' | 'frozen' | 'fresh' | VeryId;
+/**
+ * "Very" tiers (x2 instead of x1.5) of the three numbers players chase: Very Spicy (price), Very Fancy (XP)
+ * and Very Quick (cook time). They never drop from raids: master the plain variant (cook it
+ * VERY_MASTERY times) or get lucky on the Frequent Fryer streak. Ids are `very_spicy_${dish}`.
+ */
+export type VeryId = 'very_spicy' | 'very_fancy' | 'very_quick';
 
 export interface VariantDef {
   id: VariantId;
@@ -111,7 +169,18 @@ export const VARIANTS: VariantDef[] = [
   { id: 'fresh', name: 'Fresh', effect: 'happy diners boost the rating 1.5x' },
 ];
 
-export const VARIANT_BY_ID: Record<VariantId, VariantDef> = Object.fromEntries(VARIANTS.map((v) => [v.id, v])) as Record<VariantId, VariantDef>;
+export const VERY_MULT = 2;
+/** cook a learned Spicy / Fancy / Quick dish this many times to master its Very tier */
+export const VERY_MASTERY = 10;
+export const VERY_VARIANTS: VariantDef[] = [
+  { id: 'very_spicy', name: 'Very Spicy', effect: 'x2 cash per serving' },
+  { id: 'very_fancy', name: 'Very Fancy', effect: 'x2 XP' },
+  { id: 'very_quick', name: 'Very Quick', effect: 'cooks 2x faster' },
+];
+/** The plain variant each Very tier is mastered from. */
+export const VERY_FROM: Record<VeryId, VariantId> = { very_spicy: 'spicy', very_fancy: 'fancy', very_quick: 'quick' };
+
+export const VARIANT_BY_ID: Record<VariantId, VariantDef> = Object.fromEntries([...VARIANTS, ...VERY_VARIANTS].map((v) => [v.id, v])) as Record<VariantId, VariantDef>;
 
 export const variantId = (dish: string, v: VariantId) => `${v}_${dish}`;
 
@@ -136,8 +205,33 @@ function makeVariant(d: DishDef, v: VariantDef): DishDef {
 /** Every variant of every dish (not in DISHES, so menus and unlock lists stay as they were). */
 export const VARIANT_DISHES: DishDef[] = DISHES.flatMap((d) => VARIANTS.map((v) => makeVariant(d, v)));
 
+function makeVery(d: DishDef, v: VariantDef): DishDef {
+  const m = VERY_MULT;
+  return {
+    ...d,
+    id: variantId(d.id, v.id),
+    name: `${v.name} ${d.name}`,
+    source: 'raid',
+    variant: v.id,
+    base: d.id,
+    cookSec: v.id === 'very_quick' ? Math.round(d.cookSec / m) : d.cookSec,
+    price: v.id === 'very_spicy' ? Math.max(d.price + 2, Math.round(d.price * m)) : d.price,
+    xp: v.id === 'very_fancy' ? Math.max(d.xp + 2, Math.round(d.xp * m)) : d.xp,
+  };
+}
+
+/** The Very tiers of every dish (x2 on one stat). */
+export const VERY_DISHES: DishDef[] = DISHES.flatMap((d) => VERY_VARIANTS.map((v) => makeVery(d, v)));
+
 /** Plain dishes and their variants: icons, names and stats for any dish id the sim can hold. */
-export const DISH_BY_ID: Record<string, DishDef> = Object.fromEntries([...DISHES, ...VARIANT_DISHES].map((d) => [d.id, d]));
+export const DISH_BY_ID: Record<string, DishDef> = Object.fromEntries([...DISHES, ...VARIANT_DISHES, ...VERY_DISHES].map((d) => [d.id, d]));
+
+/** The Very tier a learned plain variant masters into ('spicy_ribs' → 'very_spicy_ribs'), if it has one. */
+export function veryOf(dishId: string): string | null {
+  const d = DISH_BY_ID[dishId];
+  const very = d?.variant && (Object.keys(VERY_FROM) as VeryId[]).find((k) => VERY_FROM[k] === d.variant);
+  return very ? variantId(d.base!, very) : null;
+}
 
 /** The plain dish a (possibly variant) dish id is made from. */
 export const baseDishId = (id: string) => DISH_BY_ID[id]?.base ?? id;
@@ -220,7 +314,16 @@ export const CUSTOMERS: CustomerDef[] = [
   C('sumo', 'Sumo Wrestler', 'Zombie Sumo', 'epic', 11, 3.5, 1.5, 1.4, { sauce: 30 }, [220, 2, 10, 3, 2, 7, 7], 'One belly-bump, three waiters down.'),
   C('influencer', 'Influencer', 'Zombie Influencer', 'epic', 12, 4, 1.5, 1.5, { sauce: 20 }, [90, 7, 3, 9, 6, 3, 3], '#BrainFood. 0 followers alive.'),
   C('celebrity', 'Celebrity', 'Zombie Celebrity', 'epic', 13, 4, 1, 2.2, { sauce: 40 }, [120, 7, 4, 10, 4, 5, 5], 'Velvet rope included.'),
-  C('champ', 'The Champ', 'Zombie Champ', 'legendary', 15, 4.5, 0.6, 1.8, { sauce: 80 }, [250, 8, 10, 6, 6, 8, 8], 'Undefeated. Also undead.'),
+  C('champ', 'The Champ', 'Zombie Champ', 'legendary', 15, 4.5, 0.6, 1.8, { sauce: 60 }, [250, 8, 10, 6, 6, 8, 8], 'Undefeated. Also undead.'),
+  // ---- the late crowd (levels 16-40): rarer every few levels, and they want the stars to match
+  C('trucker', 'Trucker', 'Long-Haul Corpse', 'uncommon', 16, 2.5, 3, 1.3, { cash: 9000 }, [180, 3, 6, 3, 4, 8, 7], 'Hour nine thousand of his shift. Still hasn’t stopped for a nap.'),
+  C('biker', 'Biker', 'Road-Kill Rider', 'rare', 18, 3, 2.5, 1.3, { sauce: 12 }, [160, 6, 9, 2, 4, 5, 3], 'Rides with the pack. Eats the pack.'),
+  C('firefighter', 'Firefighter', 'Smokey the Zombie', 'rare', 20, 3, 2.5, 1.4, { cash: 22000 }, [190, 6, 8, 4, 6, 7, 8], 'Puts out grill fires. Then eats the griller.'),
+  C('bride', 'Bride', 'Bride-zilla', 'rare', 23, 3.5, 2, 2.0, { cash: 30000 }, [110, 5, 3, 10, 4, 4, 6], 'Said “till death do us part.” Death disagreed.'),
+  C('headbanger', 'Headbanger', 'Head-Banged', 'epic', 26, 4, 1.5, 1.4, { sauce: 25 }, [130, 9, 6, 3, 8, 2, 3], 'Banged his head until it came off. Put it back on. Kept going.'),
+  C('surgeon', 'Surgeon', 'Dr. Scalpel', 'epic', 29, 4, 1.2, 1.9, { sauce: 35 }, [120, 7, 4, 7, 5, 10, 9], 'Steady hands. Takes a kidney home in a doggy bag.'),
+  C('tycoon', 'Oil Tycoon', 'Crude Baron', 'epic', 33, 4.5, 1, 2.6, { sauce: 50 }, [110, 3, 3, 10, 3, 6, 7], 'Tips in gold teeth. Some of them are his.'),
+  C('pitmaster', 'Pitmaster', 'The Smoke Lord', 'legendary', 38, 4.5, 0.5, 2.0, { sauce: 100 }, [260, 7, 9, 8, 7, 9, 9], 'Forty years at the pit. The pit won.'),
 ];
 
 export const CUSTOMER_BY_ID: Record<string, CustomerDef> = Object.fromEntries(CUSTOMERS.map((c) => [c.id, c]));
@@ -312,10 +415,11 @@ export function rechargeMult(recharge: number): number {
 
 export const LEVEL_CAP = 40;
 
-const XP_TABLE = [10, 30, 60, 110, 180, 270, 380, 520, 700, 950];
+const XP_TABLE = [10, 30, 50, 80, 120, 270, 380, 520, 700, 950];
+/** XP to the next level: a hand-made ramp to 10, then +10% a level (level 40 in about three months of check-ins). */
 export function xpToNext(level: number): number {
   if (level <= XP_TABLE.length) return XP_TABLE[level - 1];
-  return Math.round(950 * Math.pow(1.22, level - 10));
+  return Math.round(950 * Math.pow(1.1, level - 10));
 }
 
 /** Crew slots: one zombie at the start, about ten by level 20, thirteen late (original). */

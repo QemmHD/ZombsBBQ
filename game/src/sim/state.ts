@@ -16,6 +16,8 @@ export interface Furniture {
   bank?: number;
   /** stoves: heat-lamp upgrade widens the burn window */
   keepWarm?: boolean;
+  /** stoves: upgrade tier 0..STOVE_TIERS.length (faster cooking, wider burn window) */
+  tier?: number;
   /** raid tombstones: uses left today, refilled 24 h after the first use */
   uses?: number;
   usesResetAt?: number;
@@ -192,7 +194,9 @@ export type GameEvent =
   | { t: 'goal'; goalId: string }
   | { t: 'purple'; stars: number; gained: boolean }
   | { t: 'daydream'; workerId: string }
-  | { t: 'toast'; text: string };
+  | { t: 'toast'; text: string }
+  /** the Frequent Fryer streak ticked over (first dish of the day): what it paid */
+  | { t: 'fryer'; streak: number; reward: string; rare?: string };
 
 export interface GameState {
   version: number;
@@ -239,6 +243,12 @@ export interface GameState {
   todo?: TodoList;
   /** purple bonus stars (max 3) and the sim time they all drop */
   purple?: { stars: number; until: number };
+  /** chef ranks already paid out (recipe-collection milestones, cookbook.ts) */
+  chefRank?: number;
+  /** the calendar day the Magic Fridge last handed out a dish */
+  magicDay?: string;
+  /** Frequent Fryer: the last calendar day a dish was cooked, and the run of days in a row */
+  fryer?: { day: string; streak: number; best: number };
   stats: {
     served: number;
     earned: number;

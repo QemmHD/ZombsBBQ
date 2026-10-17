@@ -15,6 +15,9 @@ import {
   todoText,
   withLearnedVariants,
   PURPLE,
+  STATIONS,
+  chefRank,
+  FRYER_REWARDS,
   TUNING,
   VARIANT_BY_ID,
   grimeCount,
@@ -81,8 +84,12 @@ export function openCookbook(hud: Hud) {
   const section = (title: string, ids: string[]) => `<h4>${title}</h4>${ids.map((id) => dishRow(id, s, false)).join('')}`;
   // learned rare variants sit right under the dish they're made from
   const by = (st: string) => withLearnedVariants(s, DISHES.filter((d) => d.station === st)).map((d) => d.id);
+  const rk = chefRank(s);
+  const rank = `<div class="chef-rank"><b>${esc(rk.title)}</b> <span class="sub">Chef rank ${rk.rank}/10 · ${rk.known} recipes known</span>${
+    rk.next ? `<div class="bar"><i style="width:${Math.min(100, (rk.known / rk.next.at) * 100)}%"></i></div><span class="sub">Next: ${esc(rk.next.title)} at ${rk.next.at} recipes (+${rk.next.xp} XP)</span>` : ''
+  }</div>`;
   hud.openModal(
-    `<h2>${icon('ui_menu', 'h-ico')} Cookbook</h2><div class="list">${section('Stove (the house menu)', by('stove'))}${section('BBQ Grill', by('grill'))}${section('Smoker', by('smoker'))}${section('Deep Fryer', by('fryer'))}</div>
+    `<h2>${icon('ui_menu', 'h-ico')} Cookbook</h2>${rank}<div class="list">${STATIONS.map((st) => section(`${st.name} (${st.book})`, by(st.kind))).join('')}</div>
     <p class="small">Tap a cook, then a stove, to cook. Stolen recipes come from raids: study them in the Fridge. Swiped food sometimes comes home as a rare Bulk, Quick, Spicy, Fancy, Frozen or Fresh variant: UNLOCK it in the Fridge.</p>`,
   );
 }
@@ -256,6 +263,17 @@ function collectUnlocks(level: number, unlocks: string[]) {
   for (const e of EXPANSIONS) if (e.level === level && level > 1) unlocks.push(`${icon('ui_expand', 'ico')} Expand to ${e.w}×${e.h}`);
   for (const r of RIVALS) if (r.level === level) unlocks.push(`${icon('ui_raid', 'ico')} Raid ${r.name}`);
   if (level === 2) unlocks.push(`${icon('ui_raid', 'ico')} The raid map!`);
+}
+
+/** The Frequent Fryer: the first dish of the day keeps the cooking streak alive. */
+export function openFryer(hud: Hud, e: { streak: number; reward: string; rare?: string }) {
+  const day = ((e.streak - 1) % FRYER_REWARDS.length) + 1;
+  const pips = FRYER_REWARDS.map((_, i) => `<i class="${i < day ? 'on' : ''}">${i + 1}</i>`).join('');
+  const rare = e.rare ? `<p><b>RARE!</b> ${esc(DISH_BY_ID[e.rare].name)} is in the Fridge: study it!</p>` : '';
+  hud.openModal(
+    `<h2>Frequent Fryer</h2><p>Day ${e.streak} in a row at the stove!</p><div class="fryer-days">${pips}</div><p class="big-num">${esc(e.reward)}</p>${rare}<p class="small">Cook something every day to keep the streak. Ten days pays the most Brain Sauce, then it starts over.</p><div class="actions"><button class="btn green" data-close>Keep frying</button></div>`,
+    { cls: 'narrow' },
+  );
 }
 
 export function openOffline(hud: Hud, r: { sec: number; cash: number }) {
