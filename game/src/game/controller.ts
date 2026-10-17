@@ -1,12 +1,21 @@
 import {
+  BACKUP_EVERY_MS,
+  BACKUP_SLOTS,
   DISH_BY_ID,
   ITEM_BY_ID,
   SAVE_KEY,
+  TUNING,
+  backupKey,
   buyAndPlace,
   buyWall,
   canPlace,
-  catchUp,
+  catchUpReport,
+  cookAt,
   deserialize,
+  nextBackupSlot,
+  orderEat,
+  restTired,
+  saveSummary,
   finishRaid,
   moveFurniture,
   moveWall,
@@ -27,6 +36,7 @@ import {
   setClosed,
   FLOOR_BY_ID,
   WALL_BY_ID,
+  type AwayReport,
   type Dir,
   type GameEvent,
   type GameState,
@@ -42,7 +52,10 @@ export type Selection =
   | { kind: 'stove'; id: string }
   | { kind: 'furniture'; id: string }
   | { kind: 'counter'; id: string }
-  | { kind: 'dishPicker'; workerId: string; stoveId: string }
+  /** an empty stove was tapped: pick a dish (workerId: the cook picked first, else the nearest free one goes) */
+  | { kind: 'dishPicker'; workerId?: string; stoveId: string }
+  /** the Eat! order: the zombie is picked, now tap a customer */
+  | { kind: 'eatPick'; workerId: string }
   | null;
 
 export type Mode = 'play' | 'edit' | 'raid';
@@ -68,19 +81,26 @@ export interface Painting {
 
 type Listener = (ev: GameEvent) => void;
 
-function storageGet(): string | null {
+function storageGet(key = SAVE_KEY): string | null {
   try {
-    return localStorage.getItem(SAVE_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
-function storageSet(v: string) {
+/** Write and read back: false if the browser wouldn't keep it (storage full, private mode…). */
+function storageSet(key: string, v: string): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, v);
+    localStorage.setItem(key, v);
+    return localStorage.getItem(key) === v;
   } catch {
-    /* private mode / blocked storage: play on without saving */
+    return false;
   }
+}
+
+/** A save that wouldn't load, waiting for the player to pick a backup or start fresh. */
+export interface LoadProblem {
+  backups: { slot: number; savedAt: number; level: number; cash: number; crew: number }[];
 }
 
 /** Glue between the sim, the Phaser scenes and the DOM HUD. */
@@ -95,7 +115,13 @@ export class Controller {
   raidResult: RaidResult | null = null;
   /** the zombie picked in a raid (tap a zombie, then a target or ATTACK) */
   raidSel: string | null = null;
-  offlineReport: { sec: number; cash: number } | null = null;
+  offlineReport: AwayReport | null = null;
+  /** the save couldn't be read: autosave is off until the player picks a backup or starts fresh */
+  loadProblem: LoadProblem | null = null;
+  private saveBlocked = false;
+  private saveWarned = false;
+  private lastBackupAt = 0;
+  private frameErrorShown = false;
   private listeners: Listener[] = [];
   private selListeners: (() => void)[] = [];
   private modeListeners: ((m: Mode) => void)[] = [];
@@ -105,9 +131,17 @@ export class Controller {
   private raidAcc = 0;
 
   constructor() {
-    const loaded = deserialize(storageGet(), Date.now());
+    const raw = storageGet();
+    const loaded = deserialize(raw, Date.now());
     this.state = loaded.state;
-    if (loaded.offlineSec > 60) this.offlineReport = { sec: loaded.offlineSec, cash: loaded.offlineCash };
+    if (loaded.failed && raw) {
+      // keep the unreadable save, never write over it, and let the player choose what to do
+      storageSet(`${SAVE_KEY}.corrupt.${Date.now()}`, raw);
+      this.saveBlocked = true;
+      this.loadProblem = { backups: this.backupList() };
+    }
+    if (loaded.catchUpFailed) setTimeout(() => this.info('Welcome back! (The time you were away couldn’t be counted this once.)'), 1500);
+    if (loaded.report && loaded.offlineSec > 60) this.offlineReport = loaded.report;
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         this.hiddenAt = Date.now();
@@ -115,16 +149,68 @@ export class Controller {
       } else if (this.hiddenAt) {
         const sec = (Date.now() - this.hiddenAt) / 1000;
         this.hiddenAt = 0;
-        if (sec > 2 && this.mode !== 'raid') {
-          const cash = catchUp(this.state, sec);
-          if (sec > 60) {
-            this.offlineReport = { sec, cash };
-            this.emitSel();
-          }
-        }
+        if (sec > 2 && this.mode !== 'raid') this.resume(sec);
       }
     });
     window.addEventListener('pagehide', () => this.save());
+    // a crash anywhere: keep what we have (a save that can't be written just isn't)
+    window.addEventListener('error', () => this.safeSave());
+    window.addEventListener('unhandledrejection', () => this.safeSave());
+  }
+
+  /** Back from the background: the same fast-forward (and timers) as a cold start. */
+  resume(sec: number) {
+    try {
+      const r = catchUpReport(this.state, sec);
+      if (sec > 60) {
+        this.offlineReport = r;
+        this.emitSel();
+      }
+    } catch (e) {
+      console.warn('catch-up failed', e);
+    }
+  }
+
+  private safeSave() {
+    try {
+      this.save();
+    } catch {
+      /* nothing more we can do */
+    }
+  }
+
+  /** The backups that can be loaded, newest first. */
+  backupList(): LoadProblem['backups'] {
+    const out: LoadProblem['backups'] = [];
+    for (let i = 0; i < BACKUP_SLOTS; i++) {
+      const sum = saveSummary(storageGet(backupKey(i)));
+      if (sum) out.push({ slot: i, ...sum });
+    }
+    return out.sort((a, b) => b.savedAt - a.savedAt);
+  }
+
+  /** Load a backup slot over the broken save (from the "Load backup" card). */
+  loadBackup(slot: number): string | null {
+    const got = deserialize(storageGet(backupKey(slot)), Date.now());
+    if (got.failed) return 'That backup won’t load either.';
+    this.replaceState(got.state);
+    if (got.report && got.offlineSec > 60) this.offlineReport = got.report;
+    return null;
+  }
+
+  /** Give up on the broken save and start a new joint (the broken one stays stored as .corrupt). */
+  startFresh() {
+    this.replaceState(deserialize(null, Date.now()).state);
+  }
+
+  private replaceState(st: GameState) {
+    this.state = st;
+    this.loadProblem = null;
+    this.saveBlocked = false;
+    this.raid = null;
+    this.setMode('play');
+    this.select(null);
+    this.save();
   }
 
   // ----- subscriptions -----
@@ -168,6 +254,19 @@ export class Controller {
 
   // ----- loop -----
   update(dtSec: number) {
+    try {
+      this.step(dtSec);
+    } catch (e) {
+      // one bad frame must not freeze the game for good: report it once and keep going
+      if (!this.frameErrorShown) {
+        this.frameErrorShown = true;
+        console.warn('frame error', e);
+        this.safeSave();
+      }
+    }
+  }
+
+  private step(dtSec: number) {
     tick(this.state, Math.min(dtSec, 0.1));
     if (this.raid && this.raid.phase === 'fight') {
       // fixed-step raid for determinism
@@ -188,7 +287,25 @@ export class Controller {
 
   save() {
     if (this.raid) return; // never save mid-raid: raiders would be stuck "out"
-    storageSet(serialize(this.state, Date.now()));
+    if (this.saveBlocked) return; // the old save is broken: don't touch it until the player decides
+    const now = Date.now();
+    const data = serialize(this.state, now);
+    const ok = storageSet(SAVE_KEY, data);
+    if (!ok && !this.saveWarned) {
+      this.saveWarned = true;
+      this.info('Heads up: your progress can’t be saved on this device right now (storage full or private browsing).');
+    }
+    // a rotating backup every few minutes, verified like the main save
+    if (ok && now - this.lastBackupAt >= BACKUP_EVERY_MS) {
+      const slots = [...Array(BACKUP_SLOTS)].map((_, i) => storageGet(backupKey(i)));
+      if (storageSet(backupKey(nextBackupSlot(slots)), data)) this.lastBackupAt = now;
+    }
+  }
+
+  /** The "union break" toggle in Settings (on unless turned off). */
+  setUnionBreak(on: boolean) {
+    this.state.unionBreak = on;
+    this.save();
   }
 
   reset() {
@@ -197,10 +314,7 @@ export class Controller {
     } catch {
       /* ignore */
     }
-    this.state = deserialize(null, Date.now()).state;
-    this.raid = null;
-    this.setMode('play');
-    this.select(null);
+    this.replaceState(deserialize(null, Date.now()).state);
   }
 
   // ----- play-mode taps -----
@@ -212,12 +326,43 @@ export class Controller {
       wake(this.state, id);
       this.info(`${w.name} snaps out of it!`);
     }
+    if (w.state === 'asleep') {
+      wake(this.state, id);
+      this.info(`${w.name} jolts awake. Still running on empty: rest or refill them!`);
+    }
     this.select({ kind: 'worker', id });
   }
 
   tapCustomer(id: string) {
+    const sel = this.selection;
+    if (sel?.kind === 'eatPick') {
+      // the Eat! order: this one's lunch
+      const err = orderEat(this.state, sel.workerId, id);
+      if (err) this.toast(err);
+      else {
+        sfx('groan', { pitch: 0.7 });
+        this.info('Dinner time!');
+      }
+      this.select(null);
+      return;
+    }
     sfx('tap');
     this.select({ kind: 'customer', id });
+  }
+
+  /** The Eat! button: pick the zombie, then tap a customer. */
+  beginEat(workerId: string) {
+    sfx('open');
+    this.select({ kind: 'eatPick', workerId });
+  }
+
+  /** Crew list: everyone under half energy goes out for a nap. */
+  restAllTired(): number {
+    const n = restTired(this.state);
+    if (n) sfx('snore', { volume: 0.6 });
+    this.info(n ? `${n} tired zombie${n > 1 ? 's' : ''} shuffle${n > 1 ? '' : 's'} out for a nap.` : 'Nobody’s tired right now.');
+    this.emitSel();
+    return n;
   }
 
   tapStove(stoveId: string) {
@@ -255,20 +400,16 @@ export class Controller {
       this.select({ kind: 'stove', id: stoveId });
       return;
     }
+    // an empty stove: pick a dish (the selected cook goes, or else the nearest free one)
     const sel = this.selection;
-    if (sel?.kind === 'worker') {
-      sfx('open');
-      this.select({ kind: 'dishPicker', workerId: sel.id, stoveId });
-    } else {
-      this.toast(`Tap a cook first (YOU or a zombie), then the ${st.kind}.`, false);
-      this.select({ kind: 'stove', id: stoveId });
-    }
+    sfx('open');
+    this.select({ kind: 'dishPicker', workerId: sel?.kind === 'worker' ? sel.id : undefined, stoveId });
   }
 
   chooseDish(dishId: string) {
     const sel = this.selection;
     if (sel?.kind !== 'dishPicker') return;
-    const err = startCooking(this.state, sel.workerId, sel.stoveId, dishId);
+    const err = cookAt(this.state, sel.stoveId, dishId, sel.workerId);
     if (err) this.toast(err);
     else {
       sfx('purchase');
@@ -461,9 +602,11 @@ export class Controller {
 
   // ----- raids -----
   beginRaid(rivalId: RivalId, workerIds: string[], petIds: string[]): string | null {
+    // save first: a save written after the squad has left would strand them "out on a raid"
+    this.save();
     const r = startRaid(this.state, rivalId, workerIds, petIds);
     if (typeof r === 'string') return r;
-    this.save();
+    if (this.state.fridge.length >= TUNING.fridgeMax) this.info(`The fridge is full (${TUNING.fridgeMax}/${TUNING.fridgeMax}): stolen food will push out the oldest dishes. Bin or serve some first!`);
     this.raid = r;
     this.raidResult = null;
     this.raidSel = null;
@@ -479,8 +622,12 @@ export class Controller {
 
   endRaid(): RaidResult | null {
     if (!this.raid) return null;
+    const before = this.state.fridge.length;
     const res = finishRaid(this.state, this.raid);
     this.raidResult = res;
+    // the fridge only holds so much: say what didn't fit
+    const lost = before + res.dishes.length - this.state.fridge.length;
+    if (lost > 0) this.info(`The fridge was full: ${lost} dish${lost > 1 ? 'es' : ''} got pushed out. Bin or serve food to make room.`);
     return res;
   }
 
