@@ -15,7 +15,7 @@ import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, RIVAL_BY_ID, feastOn, focusTarget, isBo
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
 import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps } from './assets';
-import { FrontDoor, WALLS, depthOf, drawLot, furnArt, iso, moverDepth, propImage, scenery, wallAnchor } from './lot';
+import { FrontDoor, WALLS, depthOf, drawLot, furnArt, iso, moverDepth, propImage, scenery, surfaceKeys, wallAnchor } from './lot';
 import { Puppet } from './puppet';
 
 interface UnitView {
@@ -89,6 +89,9 @@ export class RaidScene extends Phaser.Scene {
     for (const w of r.wallItems) keys.add(`${ITEM_BY_ID[w.item].art}_${w.wall}`);
     for (const c of r.counter) keys.add(DISH_BY_ID[c.dish].icon);
     for (const [k, , , flip] of scenery(r.room.w, r.room.h, true)) keys.add(flip && hasProp(`${k}_se`) ? `${k}_se` : k);
+    // the rival's wall and floor finishes (only the café's own are loaded up front)
+    const def = RIVAL_BY_ID[r.rival];
+    for (const k of surfaceKeys({ w: r.room.w, h: r.room.h, wallKey: (side) => `wall_${side}_${def.wall}`, floorKeys: (x, y) => [`floor_${def.floor}_${(x + y) % 2 ? 'a' : 'b'}`] })) keys.add(k);
     const chars = new Set(r.units.map((u) => artFor(u.art)));
     let dead = false;
     void Promise.all([loadProps(this).then(() => ensureProps(this, keys)), ...[...chars].map((id) => loadChar(this, id))]).then(() => {

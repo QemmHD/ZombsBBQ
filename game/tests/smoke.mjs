@@ -35,6 +35,8 @@ const ctx = await browser.newContext({
   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
 });
 const page = await ctx.newPage();
+// a busy machine renders SwiftShader frames slowly: give screenshots and waits room
+page.setDefaultTimeout(120000);
 const errors = [];
 const log = {};
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -43,7 +45,10 @@ const check = (ok, msg) => {
   if (!ok) errors.push(`STEP FAILED: ${msg}`);
 };
 let shotN = 0;
-const shot = (name) => page.screenshot({ path: join(out, `${String(++shotN).padStart(2, '0')}-${name}.png`) });
+// CSS-pixel screenshots by default (3x PNGs are slow to read back and encode under SwiftShader);
+// SMOKE_HIRES=1 for full device-resolution shots when reviewing art
+const shotScale = process.env.SMOKE_HIRES ? 'device' : 'css';
+const shot = (name) => page.screenshot({ path: join(out, `${String(++shotN).padStart(2, '0')}-${name}.png`), scale: shotScale });
 const wait = (ms) => page.waitForTimeout(ms);
 const ff = (sec) =>
   page.evaluate((n) => {
@@ -60,10 +65,9 @@ const closeModal = async () => {
   if (await modalOpen()) await tapSel('.modal .x', 'modal close');
 };
 
-await page.goto(`http://localhost:${port}/index.html`);
+await page.goto(`http://localhost:${port}/index.html?debug`);
 await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
-await wait(1500);
-check(await page.evaluate(() => document.getElementById('boot')?.classList.contains('done')), 'boot screen hides');
+check(!!(await page.waitForFunction(() => document.getElementById('boot')?.classList.contains('done'), null, { timeout: 5000 }).catch(() => null)), 'boot screen hides');
 await shot('start');
 
 // screen position of a world point (CSS px)
@@ -449,6 +453,13 @@ check((await page.evaluate(() => window.zbbq.ctl.state.level)) > lvBefore, 'raid
 check(await modalOpen(), 'queued level-up popup shows once home');
 while (await modalOpen()) await closeModal();
 await shot('home-after-raid');
+// the rival's café, sign and cast are freed once the raid is over (the joint's own art stays)
+check(
+  !!(await page
+    .waitForFunction(() => !Object.keys(window.zbbq.game.textures.list).some((k) => /^rsign_|^char_(boss|staff)_/.test(k)), null, { timeout: 15000 })
+    .catch(() => null)),
+  'raid-only textures freed after the raid',
+);
 
 // ---------- 7. reload: save/load keeps everything ----------
 await page.evaluate(() => window.zbbq.ctl.save());
@@ -462,9 +473,29 @@ await page.reload();
 await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
 const snap2 = await snapOf();
 check(JSON.stringify(snap) === JSON.stringify(snap2), `save round-trip ${JSON.stringify(snap)} vs ${JSON.stringify(snap2)}`);
-await wait(1000);
+await page.waitForFunction(() => document.getElementById('boot')?.classList.contains('done'), null, { timeout: 10000 }).catch(() => null);
 while (await modalOpen()) await closeModal();
 await shot('reloaded');
+
+// WebGL context loss (iOS drops it when backgrounded under memory pressure): every texture comes back
+const before = await page.screenshot({ scale: 'css' });
+const lost = await page.evaluate(async () => {
+  const gl = window.zbbq.game.renderer.gl;
+  const ext = gl?.getExtension('WEBGL_lose_context');
+  if (!ext) return false;
+  ext.loseContext();
+  await new Promise((r) => setTimeout(r, 300));
+  ext.restoreContext();
+  return true;
+});
+if (lost) {
+  await page.waitForFunction(() => !window.zbbq.game.renderer.contextLost && window.zbbq.textures.stats().restoring === 0, null, { timeout: 60000 }).catch(() => check(false, 'textures restored after context loss'));
+  await wait(500);
+  const after = await page.screenshot({ scale: 'css' });
+  // blank (lost) textures would leave a nearly flat frame that compresses to a fraction of the size
+  check(after.length > before.length * 0.75, `scene redrawn after context loss (${after.length} vs ${before.length} bytes)`);
+  await shot('context-restored');
+}
 
 // texture memory: iPhones get unhappy well before ~300 MB of GPU textures
 log.textures = await page.evaluate(() => {
@@ -535,7 +566,7 @@ await page.evaluate(() => {
 });
 await page.reload();
 await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
-await wait(1000);
+await page.waitForFunction(() => /Welcome back/.test(document.querySelector('.modal h2')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => null);
 log.offline = await page.evaluate(() => document.querySelector('.modal h2')?.textContent);
 check(/Welcome back/.test(log.offline ?? ''), 'welcome-back popup after time away');
 await shot('welcome-back');

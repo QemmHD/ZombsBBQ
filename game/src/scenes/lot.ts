@@ -5,8 +5,8 @@
  */
 import Phaser from 'phaser';
 import { HW, TILE_H, TILE_W, WALL_H } from '../art3/kit';
-import { DOOR_X, ITEM_BY_ID, isInside, isRoad, isSidewalk, isoToWorld, key, type Dir, type GameState } from '../sim';
-import { TEX_S, hasProp, propMeta } from './assets';
+import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, dishAvailable, isInside, isRoad, isSidewalk, isoToWorld, key, type Dir, type GameState } from '../sim';
+import { TEX_S, hasProp, propMeta, texScale } from './assets';
 
 export const iso = (x: number, y: number) => isoToWorld(x, y, TILE_W, TILE_H);
 
@@ -119,10 +119,32 @@ export interface LotViews {
   doorSign?: Phaser.GameObjects.Image;
 }
 
+/** The wall and floor textures a lot needs (they're rasterized as the layout asks, not all up front). */
+export function surfaceKeys(o: Pick<LotOpts, 'w' | 'h' | 'wallKey' | 'floorKeys'>): Set<string> {
+  const out = new Set<string>();
+  for (let x = 0; x < o.w; x++) {
+    const base = o.wallKey('r', x);
+    out.add(base);
+    if (x === DOOR_X) out.add(`${base}_door`);
+  }
+  for (let y = 0; y < o.h; y++) out.add(o.wallKey('l', y));
+  for (let y = 0; y < o.h; y++) for (let x = 0; x < o.w; x++) if (isInside(x, y, { w: o.w, h: o.h }) && !isRoad(x, y) && !isSidewalk(x, y)) for (const k of o.floorKeys(x, y)) out.add(k);
+  return out;
+}
+
+/** Dish icons the café can show: what it can cook, plus whatever's on the counters and in the fridge. */
+export function dishIcons(s: GameState): Set<string> {
+  const out = new Set<string>();
+  for (const d of Object.values(DISH_BY_ID)) if (dishAvailable(s, d.id)) out.add(d.icon);
+  for (const c of s.counter) if (c.dish && DISH_BY_ID[c.dish]) out.add(DISH_BY_ID[c.dish].icon);
+  for (const f of s.fridge) if (DISH_BY_ID[f.dish]) out.add(DISH_BY_ID[f.dish].icon);
+  return out;
+}
+
 /** A prop image at world (x, y), anchored the way its art says; `flip` mirrors sw art to se. */
 export function propImage(scene: Phaser.Scene, k: string, x: number, y: number, flip = false) {
   const m = propMeta(k);
-  const i = scene.add.image(x, y, scene.textures.exists(k) ? k : '__MISSING').setScale(1 / TEX_S);
+  const i = scene.add.image(x, y, scene.textures.exists(k) ? k : '__MISSING').setScale(1 / texScale(k));
   if (m) i.setOrigin(flip ? 1 - m.ox : m.ox, m.oy);
   if (flip) i.setFlipX(true);
   return i;
@@ -246,6 +268,9 @@ export function drawLot(scene: Phaser.Scene, o: LotOpts): LotViews {
   return out;
 }
 
+/** Is someone standing in (or right outside) the doorway? */
+export const nearDoor = (m: { x: number; y: number }) => Math.abs(m.x - DOOR_X) < 0.75 && m.y > -1.35 && m.y < 0.85;
+
 /**
  * The front door: shut in its frame with the OPEN / CLOSED board on it, it swings open into the room
  * whenever someone comes through (from either side) and falls shut again behind them.
@@ -262,9 +287,9 @@ export class FrontDoor {
     open.setAlpha(0);
   }
 
-  /** Call every frame with everyone who might be walking through. */
-  update(dt: number, t: number, movers: { x: number; y: number }[], closed: boolean) {
-    const near = movers.some((m) => Math.abs(m.x - DOOR_X) < 0.75 && m.y > -1.35 && m.y < 0.85);
+  /** Call every frame with everyone who might be walking through (or whether anyone is in the doorway). */
+  update(dt: number, t: number, movers: { x: number; y: number }[] | boolean, closed: boolean) {
+    const near = typeof movers === 'boolean' ? movers : movers.some(nearDoor);
     this.hold = near ? 0.5 : Math.max(0, this.hold - dt);
     const want = near || this.hold > 0;
     if (want !== this.isOpen) {

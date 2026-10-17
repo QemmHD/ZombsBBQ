@@ -3,7 +3,7 @@
  * One Puppet = one character: front + back views, expression faces, biped or four-legged rig.
  */
 import Phaser from 'phaser';
-import type { CharArt, FaceName } from '../art';
+import type { CharArt, FaceName } from '../art/types';
 import { TEX_S } from './assets';
 
 export type Pose = 'idle' | 'walk' | 'run' | 'cook' | 'eat' | 'feast' | 'sit' | 'shiver' | 'lie' | 'attack' | 'punch' | 'hit' | 'serve' | 'cheer' | 'dance';
@@ -12,7 +12,18 @@ interface View {
   box: Phaser.GameObjects.Container;
   parts: Record<string, Phaser.GameObjects.Image>;
   base: Record<string, { x: number; y: number }>;
+  /** the same parts as a list, with their rest positions (posing walks this every frame) */
+  list: { img: Phaser.GameObjects.Image; base: { x: number; y: number } }[];
 }
+
+// part names posing touches, hoisted so a frame doesn't allocate them per puppet
+const BOB_PARTS = ['torso', 'armL', 'armR', 'head', 'armL2', 'armR2', 'legL', 'legR', 'legL2', 'legR2'];
+const LIMBS = ['legL', 'legR', 'armL', 'armR'] as const;
+const LIMB_LOWER = { legL: 'legL2', legR: 'legR2', armL: 'armL2', armR: 'armR2' } as const;
+const UPPER_BODY = ['torso', 'head', 'armL', 'armR', 'armL2', 'armR2'];
+const LOWER_LEGS = ['legL', 'legR', 'legL2', 'legR2'];
+const QUAD_BOB = ['body', 'head', 'tail'];
+const QUAD_LEGS = ['legFL', 'legFR', 'legBL', 'legBR'];
 
 
 export class Puppet {
@@ -52,7 +63,7 @@ export class Puppet {
   private makeView(scene: Phaser.Scene, parts: CharArt['parts']): View {
     const box = scene.add.container(0, 0);
     this.body.add(box);
-    const v: View = { box, parts: {}, base: {} };
+    const v: View = { box, parts: {}, base: {}, list: [] };
     for (const p of parts) {
       const name = p.key.split('_').pop()!;
       const img = scene.add
@@ -62,6 +73,7 @@ export class Puppet {
       box.add(img);
       v.parts[name] = img;
       v.base[name] = { x: p.x, y: p.y };
+      v.list.push({ img, base: v.base[name] });
     }
     return v;
   }
@@ -87,11 +99,11 @@ export class Puppet {
   }
 
   setTint(color: number) {
-    for (const v of [this.front, this.back]) if (v) for (const p of Object.values(v.parts)) p.setTint(color);
+    for (const v of [this.front, this.back]) if (v) for (const p of v.list) p.img.setTint(color);
   }
 
   clearTint() {
-    for (const v of [this.front, this.back]) if (v) for (const p of Object.values(v.parts)) p.clearTint();
+    for (const v of [this.front, this.back]) if (v) for (const p of v.list) p.img.clearTint();
   }
 
   destroy() {
@@ -131,11 +143,11 @@ export class Puppet {
     if (this.rig === 'quad') return this.poseQuad(view, pose);
     const P = view.parts;
     const B = view.base;
-    for (const k of Object.keys(P)) {
-      P[k].x = B[k].x;
-      P[k].y = B[k].y;
-      P[k].rotation = 0;
-      P[k].visible = true;
+    for (const { img, base } of view.list) {
+      img.x = base.x;
+      img.y = base.y;
+      img.rotation = 0;
+      img.visible = true;
     }
     const D = Math.PI / 180;
     const s = Math.sin(this.phase);
@@ -287,17 +299,17 @@ export class Puppet {
     }
     // walking bobs the hips and head (not the torso, in the original, but a tiny ride reads better here)
     const bob = moving ? -Math.abs(Math.sin(this.phase)) * (pose === 'run' ? 1.2 : 2) : pose === 'dance' ? -Math.abs(s) * 4 : 0;
-    for (const k of ['torso', 'armL', 'armR', 'head', 'armL2', 'armR2', 'legL', 'legR', 'legL2', 'legR2']) if (P[k]) P[k].y = B[k].y + bob;
-    for (const limb of ['legL', 'legR', 'armL', 'armR'] as const) {
+    for (const k of BOB_PARTS) if (P[k]) P[k].y = B[k].y + bob;
+    for (const limb of LIMBS) {
       const up = P[limb];
       if (!up) continue;
       const [a, bend] = J[limb];
       up.rotation = a;
-      const lo = P[`${limb}2`];
+      const lo = P[LIMB_LOWER[limb]];
       if (!lo) continue;
       // the knee / elbow is carried round by the upper segment
       const bu = B[limb];
-      const bl = B[`${limb}2`];
+      const bl = B[LIMB_LOWER[limb]];
       const dx = bl.x - bu.x;
       const dy = bl.y - bu.y;
       const cs = Math.cos(a);
@@ -321,7 +333,7 @@ export class Puppet {
       const hy = -this.hipY;
       const cs = Math.cos(lean);
       const sn = Math.sin(lean);
-      for (const k of ['torso', 'head', 'armL', 'armR', 'armL2', 'armR2']) {
+      for (const k of UPPER_BODY) {
         const q = P[k];
         if (!q) continue;
         const dx = q.x - hx;
@@ -332,7 +344,7 @@ export class Puppet {
       }
     }
     // seen from behind, a sitter's legs are tucked under the table, out of sight behind the body
-    if (seated && this.showingBack) for (const k of ['legL', 'legR', 'legL2', 'legR2']) if (P[k]) P[k].visible = false;
+    if (seated && this.showingBack) for (const k of LOWER_LEGS) if (P[k]) P[k].visible = false;
     if (pose === 'lie') {
       // original death: falls flat on the back
       this.body.rotation = -1.5 * Math.sign(this.body.scaleX || 1);
@@ -358,10 +370,10 @@ export class Puppet {
   private poseQuad(view: View, pose: Pose) {
     const P = view.parts;
     const B = view.base;
-    for (const k of Object.keys(P)) {
-      P[k].x = B[k].x;
-      P[k].y = B[k].y;
-      P[k].rotation = 0;
+    for (const { img, base } of view.list) {
+      img.x = base.x;
+      img.y = base.y;
+      img.rotation = 0;
     }
     const s = Math.sin(this.phase);
     const moving = pose === 'walk' || pose === 'run' || pose === 'attack';
@@ -373,11 +385,11 @@ export class Puppet {
     if (P.legBL) P.legBL.rotation = -s * swing;
     if (P.tail) P.tail.rotation = Math.sin(this.phase * 2.5) * 0.5;
     const bob = moving ? -Math.abs(s) * 1.6 : Math.sin(this.phase) * 0.4;
-    for (const k of ['body', 'head', 'tail']) if (P[k]) P[k].y = B[k].y + bob;
+    for (const k of QUAD_BOB) if (P[k]) P[k].y = B[k].y + bob;
     if (P.head) P.head.rotation = pose === 'attack' ? -0.2 + Math.abs(s) * 0.35 : Math.sin(this.phase * 0.6) * 0.08;
     if (pose === 'lie') {
       this.body.rotation = 0;
-      for (const k of ['legFL', 'legFR', 'legBL', 'legBR']) if (P[k]) P[k].rotation = 1.2;
+      for (const k of QUAD_LEGS) if (P[k]) P[k].rotation = 1.2;
       this.body.y = 4;
     } else {
       this.body.rotation = 0;

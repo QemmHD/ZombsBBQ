@@ -18,6 +18,7 @@ import {
   maxEnergy,
   onLawn,
   payoutState,
+  layoutVersion,
   worldToIso,
   type Customer,
   type Furniture,
@@ -29,8 +30,9 @@ import {
 } from '../sim';
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
-import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps, propMeta, propsReady } from './assets';
-import { GROUND, charIdFor, depthOf, drawLot, floorKeys, furnArt, iso, moverDepth, scenery, wallAnchor, wallKey } from './lot';
+import { haptic } from '../game/haptics';
+import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps, propMeta, propsReady, texScale } from './assets';
+import { GROUND, charIdFor, depthOf, dishIcons, drawLot, floorKeys, furnArt, iso, moverDepth, nearDoor, scenery, surfaceKeys, wallAnchor, wallKey } from './lot';
 import type { FrontDoor } from './lot';
 import { Puppet } from './puppet';
 
@@ -83,7 +85,9 @@ export class JointScene extends Phaser.Scene {
   private door?: FrontDoor;
   private grid?: Phaser.GameObjects.Graphics;
   private ghost: Phaser.GameObjects.Image[] = [];
-  private layoutSig = '';
+  private layoutSig = -1;
+  /** ids seen this frame (reused, not reallocated every frame) */
+  private alive = new Set<string>();
   private sizeSig = '';
   private loadingSig = '';
   private userZoom = 1;
@@ -127,20 +131,6 @@ export class JointScene extends Phaser.Scene {
 
   // ---------- static world (rebuilt when the layout changes) ----------
 
-  private sig(s: GameState): string {
-    return [
-      s.roomW,
-      s.roomH,
-      s.walls.l.join(','),
-      s.walls.r.join(','),
-      Object.entries(s.floors)
-        .map(([k, v]) => `${k}${v}`)
-        .join(';'),
-      s.furniture.map((f) => `${f.id}${f.x},${f.y}${f.dir ?? ''}${f.keepWarm ? 'k' : ''}`).join(';'),
-      s.wallItems.map((w) => `${w.id}${w.wall}${w.index}`).join(';'),
-    ].join('|');
-  }
-
   /** Every prop key the current layout needs (furniture is rasterized lazily, as it's placed). */
   private neededKeys(s: GameState): Set<string> {
     const k = new Set<string>();
@@ -151,14 +141,16 @@ export class JointScene extends Phaser.Scene {
     }
     for (const w of s.wallItems) k.add(`${ITEM_BY_ID[w.item].art}_${w.wall}`);
     for (const [sk] of scenery(s.roomW, s.roomH)) k.add(sk);
-    for (const d of Object.values(DISH_BY_ID)) k.add(d.icon);
+    // the walls and floors it's painted with, and the dishes it can show
+    for (const sk of surfaceKeys({ w: s.roomW, h: s.roomH, wallKey: (side, i) => wallKey(s, side, i), floorKeys: (x, y) => floorKeys(s, x, y) })) k.add(sk);
+    for (const d of dishIcons(s)) k.add(d);
     for (const st of ['fx_steam_1', 'fx_steam_2', 'fx_steam_3', 'grill_flames', 'fryer_bubbles', 'pot_burnt']) k.add(st);
     return k;
   }
 
   private img(key: string, x: number, y: number, flip = false) {
     const m = propMeta(key);
-    const i = this.add.image(x, y, this.textures.exists(key) ? key : '__MISSING').setScale(1 / TEX_S);
+    const i = this.add.image(x, y, this.textures.exists(key) ? key : '__MISSING').setScale(1 / texScale(key));
     if (m) i.setOrigin(flip ? 1 - m.ox : m.ox, m.oy);
     if (flip) i.setFlipX(true);
     return i;
@@ -172,7 +164,7 @@ export class JointScene extends Phaser.Scene {
       const sig = [...need].join(',');
       if (this.loadingSig !== sig) {
         this.loadingSig = sig;
-        void ensureProps(this, need).then(() => (this.layoutSig = ''));
+        void ensureProps(this, need).then(() => (this.layoutSig = -1));
       }
     }
     for (const o of this.staticLayer) o.destroy();
@@ -605,7 +597,7 @@ export class JointScene extends Phaser.Scene {
       if (!g) g = this.ghost[i] = this.add.image(0, 0, '__MISSING');
       const m = propMeta(p.key);
       if (this.textures.exists(p.key)) g.setTexture(p.key);
-      g.setScale(1 / TEX_S)
+      g.setScale(1 / texScale(p.key))
         .setFlipX(p.flip)
         .setOrigin(m ? (p.flip ? 1 - m.ox : m.ox) : 0.5, m?.oy ?? 1)
         .setPosition(p.x, p.y)
@@ -886,7 +878,8 @@ export class JointScene extends Phaser.Scene {
     this.t += dt;
     this.ctl.update(dt);
     const s = this.ctl.state;
-    const sig = this.sig(s);
+    // layoutVersion is an allocation-free fingerprint of the room, walls, floors and furniture
+    const sig = layoutVersion(s);
     if (sig !== this.layoutSig) {
       this.layoutSig = sig;
       this.rebuild();
@@ -894,9 +887,14 @@ export class JointScene extends Phaser.Scene {
     // the front door swings open for whoever comes through, and the board flips when the café closes
     if (this.door) {
       this.door.setSign(s.closed ? 'ui_closed' : 'ui_open');
-      this.door.update(dt, this.t, [...s.workers.filter((w) => w.state !== 'raiding'), ...s.customers.filter((c) => c.x > -999), ...s.pets], !!s.closed);
+      let near = false;
+      for (const w of s.workers) if (w.state !== 'raiding' && nearDoor(w)) near = true;
+      if (!near) for (const c of s.customers) if (c.x > -999 && nearDoor(c)) near = true;
+      if (!near) for (const p of s.pets) if (nearDoor(p)) near = true;
+      this.door.update(dt, this.t, near, !!s.closed);
     }
-    const alive = new Set<string>();
+    const alive = this.alive;
+    alive.clear();
     for (const w of s.workers) {
       alive.add(w.id);
       this.syncWorker(w, dt);
@@ -1169,7 +1167,7 @@ export class JointScene extends Phaser.Scene {
         }
         sfx('chomp');
         setTimeout(() => sfx('scream', { pitch: 0.9 + Math.random() * 0.3 }), 150);
-        navigator.vibrate?.(60);
+        haptic('heavy');
         break;
       }
       case 'infected': {
