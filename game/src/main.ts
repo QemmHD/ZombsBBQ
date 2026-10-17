@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import './fonts';
 import './ui/style.css';
 import './ui/theme3.css';
+import './ui/rebuild.css';
 import { Controller } from './game/controller';
 import { music, unlockAudio } from './game/sfx';
 import { setHaptics } from './game/haptics';
@@ -87,6 +88,7 @@ window.addEventListener('resize', fit);
 window.addEventListener('orientationchange', () => setTimeout(fit, 250));
 
 const hud = new Hud(ctl);
+hud.game = game as unknown as NonNullable<Hud["game"]>;
 
 // iOS only allows audio after a user gesture: unlock on the first tap, then start the music
 const unlock = () => {

@@ -31,6 +31,23 @@ import {
   crewCapForLevel,
   WALL_FINISHES,
   FLOOR_FINISHES,
+  CHEFS,
+  LOCKER,
+  NAME_MAX,
+  binFridge,
+  buyHooks,
+  chefOf,
+  chefStats,
+  criticReview,
+  jointName,
+  lockerOf,
+  renameJoint,
+  setChef,
+  skipTodo,
+  takeFromLocker,
+  upcomingAlerts,
+  zombieLevel,
+  type AwayReport,
   type WorkerState,
 } from '../sim';
 import { audio, sfx } from '../game/sfx';
@@ -49,7 +66,9 @@ export function openSettings(hud: Hud) {
       `<h2>${icon('ui_settings', 'h-ico')} Settings</h2>
       <div class="set-row"><span>Sound effects</span><input type="range" min="0" max="1" step="0.05" value="${audio.sfxVolume}" data-k="sfx" aria-label="Sound effects volume"/></div>
       <div class="set-row"><span>Music</span><input type="range" min="0" max="1" step="0.05" value="${audio.musicVolume}" data-k="music" aria-label="Music volume"/></div>
-      <div class="actions"><button class="btn ${audio.muted ? 'green' : 'blue'}" data-a="mute">${icon(audio.muted ? 'ui_sound_off' : 'ui_sound_on', 'ico-s')} ${audio.muted ? 'Unmute' : 'Mute all'}</button></div>
+      <div class="actions"><button class="btn ${audio.muted ? 'green' : 'blue'}" data-a="mute">${icon(audio.muted ? 'ui_sound_off' : 'ui_sound_on', 'ico-s')} ${audio.muted ? 'Unmute' : 'Mute all'}</button><button class="btn" data-a="chef">Chef: ${esc(chefOf(hud.ctl.state).name)}</button><button class="btn" data-a="rename">Rename joint</button></div>
+      <div class="set-row"><span>Union break<br/><small class="sub">While you’re away, tired zombies nap instead of biting</small></span><input type="checkbox" data-k="union" ${hud.ctl.state.unionBreak === false ? '' : 'checked'} aria-label="Union break"/></div>
+      ${alertsHtml(hud)}
       <div class="actions"><button class="btn red" data-a="reset">Start a new joint</button></div>
       <p class="small">Your progress saves on this device automatically. Zombs BBQ · build ${__BUILD__}</p>`,
       { cls: 'narrow' },
@@ -59,11 +78,17 @@ export function openSettings(hud: Hud) {
       sfx('coin');
     };
     m.querySelector<HTMLInputElement>('[data-k="music"]')!.oninput = (e) => audio.setMusicVolume(Number((e.target as HTMLInputElement).value));
+    m.querySelector<HTMLInputElement>('[data-k="union"]')!.onchange = (e) => {
+      hud.ctl.setUnionBreak((e.target as HTMLInputElement).checked);
+      sfx('tap');
+    };
     bindActions(m, (a, el) => {
       if (a === 'mute') {
         audio.setMuted(!audio.muted);
         render();
       }
+      if (a === 'chef') return openChefPicker(hud);
+      if (a === 'rename') return openRename(hud);
       if (a === 'reset') {
         if (el.dataset.armed) {
           hud.ctl.reset();
@@ -121,15 +146,26 @@ export function openCrew(hud: Hud) {
     .map((w) => {
       const f = w.energy / maxEnergy(w);
       const status = w.state === 'down' ? `KO · back in ${fmtTime((w.downUntil ?? 0) - s.now)}` : STATUS[w.state];
-      return `<div class="crew-row" data-id="${w.id}"><img src="${headUrl(charIdFor(w), w.state === 'down' ? 'dazed' : undefined)}" alt=""/><b>${esc(w.name)}<br/><span class="sub">${esc(status)}</span></b><div class="bar"><i style="width:${f * 100}%;background:${energyColor(f)}"></i></div><span class="chip">PWR ${w.stats.power}</span></div>`;
+      const lv = w.kind === 'zombie' ? `<span class="chip">LV ${zombieLevel(w.xp)}</span>` : '';
+      return `<div class="crew-row" data-id="${w.id}"><img src="${headUrl(charIdFor(w), w.state === 'down' ? 'dazed' : undefined)}" alt=""/><b>${esc(w.name)}<br/><span class="sub">${esc(status)}</span></b><div class="bar"><i style="width:${f * 100}%;background:${energyColor(f)}"></i></div>${lv}<span class="chip">PWR ${w.stats.power}</span></div>`;
     })
     .join('');
-  const m = hud.openModal(`<h2>${icon('ui_crew', 'h-ico')} Crew ${zombies(s).length}/${s.crewCap}</h2><div class="list">${rows}</div><p class="small">Infect customers to grow the crew. Level up for more slots. Tap someone to see their card (and fire them if you need the space).</p>`);
+  const tired = zombies(s).filter((w) => w.energy < maxEnergy(w) * 0.5 && w.state !== 'resting' && w.state !== 'toRest' && w.state !== 'raiding' && w.state !== 'down').length;
+  const m = hud.openModal(
+    `<h2>${icon('ui_crew', 'h-ico')} Crew ${zombies(s).length}/${s.crewCap}</h2><div class="actions"><button class="btn blue" data-a="restall" ${tired ? '' : 'disabled'}>Rest the tired ones${tired ? ` (${tired})` : ''}</button>${s.locker?.zombies.length ? `<button class="btn" data-a="locker">Meat Locker (${s.locker.zombies.length})</button>` : ''}</div><div class="list">${rows}</div><p class="small">Infect customers to grow the crew. Level up for more slots. Tap someone to give orders.</p>`,
+  );
   m.querySelectorAll<HTMLElement>('.crew-row').forEach((r) => {
     r.onclick = () => {
       hud.closeModal();
       hud.ctl.tapWorker(r.dataset.id!);
     };
+  });
+  bindActions(m, (a) => {
+    if (a === 'restall') {
+      hud.ctl.restAllTired();
+      openCrew(hud);
+    }
+    if (a === 'locker') openLocker(hud);
   });
 }
 
@@ -147,11 +183,11 @@ function todoHtml(s: Parameters<typeof purpleStars>[0]): string {
       const done = todoDone(s, t);
       const prog = todoProgress(s, t);
       return `<div class="goal todo ${done ? 'done' : ''}"><span class="check">${done ? icon('ui_check', 'ico') : ''}</span><b>${esc(todoText(t))}<br/><span class="sub">${t.bribed ? 'Reviewer bribed' : `${prog.toLocaleString('en-US')}/${t.target.toLocaleString('en-US')}`}</span></b>
-        ${done ? '' : `<button class="btn sauce" data-a="bribe" data-i="${i}">Bribe ${priceHtml({ sauce: PURPLE.bribeSauce })}</button>`}</div>`;
+        ${done ? '' : `${s.todo!.skipped ? '' : `<button class="btn" data-a="skip" data-i="${i}">Skip</button>`}<button class="btn sauce" data-a="bribe" data-i="${i}">Bribe ${priceHtml({ sauce: PURPLE.bribeSauce })}</button>`}</div>`;
     })
     .join('');
   const boost = Math.round(TUNING.purpleArrivalBoost * 100);
-  return `${head}${rows}<p class="small">Finish all ${PURPLE.tasks} for a purple star (max ${PURPLE.max}). Each one: +${boost}% customers, +${Math.round(TUNING.purpleTipBoost * 100)}% tips, rarer visitors. The first lasts ${PURPLE.hours[0]} h, the next add ${PURPLE.hours[1]} h and ${PURPLE.hours[2]} h. Short on time? Bribe the reviewer.</p>`;
+  return `${head}${rows}<p class="small">Finish all ${PURPLE.tasks} for a purple star (max ${PURPLE.max}). Each one: +${boost}% customers, +${Math.round(TUNING.purpleTipBoost * 100)}% tips, rarer visitors. The first lasts ${PURPLE.hours[0]} h, the next add ${PURPLE.hours[1]} h and ${PURPLE.hours[2]} h. Short on time? Bribe the reviewer, or Skip one job (once per list).</p>`;
 }
 
 export function openGoals(hud: Hud) {
@@ -177,6 +213,15 @@ export function openGoals(hud: Hud) {
         sfx('page');
         goalsTab = el.dataset.id === 'todo' ? 'todo' : 'goals';
         render();
+        return;
+      }
+      if (a === 'skip') {
+        const err = skipTodo(s, Number(el.dataset.i));
+        if (err) hud.ctl.toast(err);
+        else {
+          sfx('page');
+          render();
+        }
         return;
       }
       if (a === 'bribe') {
@@ -212,20 +257,20 @@ export function openFridge(hud: Hud) {
             const study = canStudy(s, d.id);
             const sub = v ? `RARE · ${v.effect}` : d.source === 'raid' ? 'STOLEN' : '';
             return `<div class="fridge-row ${v ? 'variant' : ''}"><span class="dish-ico"><img src="${artUrl(d.icon)}" alt=""/>${v ? `<i class="var-dot v-${v.id}">${v.name[0]}</i>` : ''}</span><b>${esc(d.name)}<br/><span class="sub">${it.servings} servings${sub ? ` · ${sub}` : ''}</span></b>
-              <button class="btn" data-a="serve" data-i="${i}">Serve</button>${study ? `<button class="btn green" data-a="study" data-i="${i}">${v ? 'UNLOCK' : 'Study'}</button>` : ''}</div>`;
+              <button class="btn" data-a="serve" data-i="${i}">Serve</button>${study ? `<button class="btn green" data-a="study" data-i="${i}">${v ? 'UNLOCK' : 'Study'}</button>` : ''}<button class="btn red tiny" data-a="bin" data-i="${i}">Bin</button></div>`;
           })
           .join('')
       : `<p>Empty. Raid rival joints and swipe their food: it lands in here.</p>`;
     const m = hud.openModal(
-      `<h2>${icon('ui_fridge', 'h-ico')} The Fridge</h2><div class="list">${rows}</div><p class="small">Serve puts the food on your counter. Study a stolen dish to learn its secret recipe for good. UNLOCK a rare variant to cook it yourself.</p>`,
+      `<h2>${icon('ui_fridge', 'h-ico')} The Fridge</h2><div class="list">${rows}</div><p class="small">${s.fridge.length}/${TUNING.fridgeMax} · Serve puts the food on your counter. Study a stolen dish to learn its secret recipe for good. UNLOCK a rare variant to cook it yourself. Bin makes room for raid loot.</p>`,
     );
     bindActions(m, (a, el) => {
       const i = Number(el.dataset.i);
       const name = DISH_BY_ID[s.fridge[i]?.dish]?.name ?? 'it';
-      const err = a === 'serve' ? serveFromFridge(s, i) : studyFromFridge(s, i);
+      const err = a === 'serve' ? serveFromFridge(s, i) : a === 'bin' ? binFridge(s, i) : studyFromFridge(s, i);
       if (err) hud.ctl.toast(err);
       else {
-        sfx(a === 'study' ? 'levelUp' : 'plate');
+        sfx(a === 'study' ? 'levelUp' : a === 'bin' ? 'burn' : 'plate');
         if (a === 'study') hud.ctl.info(`Learned ${name}! Check the Cookbook.`);
         render();
       }
@@ -279,9 +324,17 @@ export function openFryer(hud: Hud, e: { streak: number; reward: string; rare?: 
   );
 }
 
-export function openOffline(hud: Hud, r: { sec: number; cash: number }) {
+export function openOffline(hud: Hud, r: AwayReport | { sec: number; cash: number }) {
+  const full = 'served' in r ? r : null;
+  const line = (n: number, txt: string) => (n ? `<div class="away-row"><b>${n}</b> ${txt}</div>` : '');
+  const delta = full ? (full.rating1 - full.rating0) * 5 : 0;
+  const counts = full
+    ? `<div class="away">${line(full.served, `customer${full.served === 1 ? '' : 's'} served`)}${line(full.angry, 'left unhappy')}${line(full.bitten, 'got bitten')}${line(full.burnt, `dish${full.burnt === 1 ? '' : 'es'} burnt`)}${
+        Math.abs(delta) >= 0.05 ? `<div class="away-row"><b>${delta > 0 ? '+' : ''}${delta.toFixed(1)}★</b> rating</div>` : ''
+      }</div>`
+    : '';
   hud.openModal(
-    `<h2>Welcome back, Boss!</h2><p>The crew kept the joint running for ${fmtTime(r.sec)}${r.sec >= 8 * 3600 ? ' (8h max)' : ''}.</p><p class="big-num">${priceHtml({ cash: Math.max(0, r.cash) })}</p>${r.cash <= 0 ? '<p class="small">Tip: stack the counter with food before you go. The crew serves whatever’s there while you’re away.</p>' : ''}<div class="actions"><button class="btn green" data-close>Let’s cook</button></div>`,
+    `<h2>Welcome back, Boss!</h2><p>The crew kept the joint running for ${fmtTime(r.sec)}${r.sec >= 8 * 3600 ? ' (8h max)' : ''}.</p><p class="big-num">${priceHtml({ cash: Math.max(0, r.cash) })}</p>${counts}${r.cash <= 0 ? '<p class="small">Tip: stack the counter with food before you go. The crew serves whatever’s there while you’re away.</p>' : ''}<div class="actions"><button class="btn green" data-close>Let’s cook</button></div>`,
     { cls: 'narrow' },
   );
 }
@@ -305,4 +358,126 @@ export function openRating(hud: Hud) {
     <p class="small">More stars bring more customers, and rarer ones.</p>`,
     { cls: 'narrow' },
   );
+}
+
+/** Settings: what's going to happen while you're away (the check-in alerts the app would send). */
+function alertsHtml(hud: Hud): string {
+  const list = upcomingAlerts(hud.ctl.state).slice(0, 4);
+  if (!list.length) return '<p class="small">Check-in alerts: nothing coming up.</p>';
+  return `<h4>Coming up</h4><div class="list alerts">${list.map((a) => `<div class="alert-row"><b>${esc(a.title)}</b><span class="sub">in ${fmtTime(a.in)} · ${esc(a.body)}</span></div>`).join('')}</div>`;
+}
+
+/** Tap the joint's name on the awning: give it a new one. */
+export function openRename(hud: Hud) {
+  const cur = jointName(hud.ctl.state);
+  const m = hud.openModal(
+    `<h2>Name your joint</h2><input class="name-in" data-k="name" maxlength="${NAME_MAX}" value="${esc(cur === 'YOUR JOINT' ? '' : cur)}" placeholder="YOUR JOINT" aria-label="Joint name"/><div class="actions"><button class="btn green" data-a="ok">Paint it on</button></div>`,
+    { cls: 'narrow' },
+  );
+  const inp = m.querySelector<HTMLInputElement>('[data-k="name"]')!;
+  setTimeout(() => inp.focus(), 50);
+  const go = () => {
+    const err = renameJoint(hud.ctl.state, inp.value);
+    if (err) return hud.ctl.toast(err);
+    sfx('purchase');
+    hud.closeModal();
+  };
+  inp.onkeydown = (e) => {
+    if (e.key === 'Enter') go();
+  };
+  bindActions(m, go);
+}
+
+/** The chef picker: 9 avatars, four stats each, change any time (TRANSFORM or Settings → Chef). */
+export function openChefPicker(hud: Hud) {
+  const render = () => {
+    const s = hud.ctl.state;
+    const cur = chefOf(s).id;
+    const bar = (label: string, v: number, max: number) => `<span class="cstat"><i>${label}</i><span class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></span><b>${v}</b></span>`;
+    const cards = CHEFS.map((c) => {
+      const st = chefStats(c.id);
+      return `<button class="chef-card ${c.id === cur ? 'on' : ''}" data-a="pick" data-id="${c.id}"><img src="${headUrl(c.id)}" alt=""/><b>${esc(c.name)}</b>
+        ${bar('TIPS', st.tips, 10)}${bar('ATK SPD', st.speed, 10)}${bar('ATK STR', st.power, 10)}${bar('ENERGY', st.energy, 120)}<small>${esc(c.blurb)}</small></button>`;
+    }).join('');
+    const m = hud.openModal(`<h2>Pick your chef</h2><div class="chefs">${cards}</div><p class="small">Tip Rating, Attack Speed, Attack Strength and Energy come with the look. Change any time, free.</p>`, { cls: 'wide chefs-modal' });
+    bindActions(m, (a, el) => {
+      if (a !== 'pick') return;
+      const err = setChef(s, el.dataset.id!);
+      if (err) return hud.ctl.toast(err);
+      sfx('purchase');
+      hud.ctl.info(`Looking sharp, ${chefOf(s).name}.`);
+      hud.ctl.emitSel();
+      render();
+    });
+  };
+  render();
+}
+
+/** The food critic's write-up, when a purple star lands. */
+export function openCritic(hud: Hud) {
+  const r = criticReview(hud.ctl.state);
+  hud.openModal(
+    `<div class="paper"><div class="masthead">${esc(r.paper)}</div><h2>${esc(r.headline)}</h2><div class="byline">by ${esc(r.critic)}</div><p>${esc(r.body)}</p><p class="verdict">${esc(r.verdict)}</p><div class="purple-row">${purpleStarsHtml(r.stars)}</div></div><div class="actions"><button class="btn green" data-close>Frame it</button></div>`,
+    { cls: 'narrow critic' },
+  );
+}
+
+/** The Meat Locker: zombies on hooks, off the crew. */
+export function openLocker(hud: Hud) {
+  const render = () => {
+    const s = hud.ctl.state;
+    const l = lockerOf(s);
+    const full = zombies(s).length >= s.crewCap;
+    const rows = l.zombies.length
+      ? l.zombies
+          .map(
+            (w, i) =>
+              `<div class="crew-row"><img src="${headUrl(charIdFor(w))}" alt=""/><b>${esc(w.name)}<br/><span class="sub">Level ${zombieLevel(w.xp)} · PWR ${w.stats.power} · TIPS ${w.stats.tips}</span></b><button class="btn green" data-a="take" data-i="${i}" ${full ? 'disabled' : ''}>Take down</button></div>`,
+          )
+          .join('')
+      : '<p>Nobody’s hanging around. Tap a zombie, then MEAT LOCKER, to hang them up and free a crew slot.</p>';
+    const more = l.hooks < LOCKER.maxHooks ? `<button class="btn sauce" data-a="hooks">+${LOCKER.addHooks} hooks · ${priceHtml({ sauce: LOCKER.addSauce })}</button>` : '';
+    const m = hud.openModal(
+      `<h2>Meat Locker <span class="sub">${l.zombies.length}/${l.hooks} hooks</span></h2><div class="list">${rows}</div><div class="actions">${more}</div><p class="small">${full ? `The crew is full (${s.crewCap}/${s.crewCap}): hang someone up before taking another down.` : 'Hung zombies keep their level and energy and don’t count toward the crew.'}</p>`,
+    );
+    bindActions(m, (a, el) => {
+      const err = a === 'take' ? takeFromLocker(s, Number(el.dataset.i)) : a === 'hooks' ? buyHooks(s) : null;
+      if (err) return hud.ctl.toast(err);
+      sfx(a === 'take' ? 'groan' : 'purchase');
+      render();
+    });
+  };
+  render();
+}
+
+/** The save wouldn't load: pick a backup or start fresh (the broken save is kept aside either way). */
+export function openBackups(hud: Hud) {
+  const p = hud.ctl.loadProblem;
+  if (!p) return;
+  const when = (t: number) => new Date(t).toLocaleString();
+  const rows = p.backups.length
+    ? p.backups.map((b) => `<div class="crew-row backup"><b>Backup from ${esc(when(b.savedAt))}<br/><span class="sub">Level ${b.level} · $${b.cash.toLocaleString('en-US')} · crew ${b.crew}</span></b><button class="btn green" data-a="load" data-slot="${b.slot}">Load</button></div>`).join('')
+    : '<p>No backups were found on this device.</p>';
+  const m = hud.openModal(
+    `<h2>Your save won’t load</h2><p>Something scrambled it. It’s been kept aside, untouched. Load a backup, or start a new joint.</p><div class="list">${rows}</div><div class="actions"><button class="btn red" data-a="fresh">Start fresh</button></div>`,
+    { cls: 'narrow', noClose: true },
+  );
+  bindActions(m, (a, el) => {
+    if (a === 'load') {
+      const err = hud.ctl.loadBackup(Number(el.dataset.slot));
+      if (err) return hud.ctl.toast(err);
+      sfx('levelUp');
+      hud.closeModal();
+      hud.ctl.info('Backup loaded. Welcome back!');
+    }
+    if (a === 'fresh') {
+      if (!el.dataset.armed) {
+        el.dataset.armed = '1';
+        el.textContent = 'Tap again: new joint';
+        return;
+      }
+      hud.ctl.startFresh();
+      hud.closeModal();
+    }
+  });
 }

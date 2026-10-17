@@ -47,11 +47,15 @@ export class EditBar {
         <button class="eb-btn" data-a="paintall">${icon('ui_expand', 'eb-ico')}<label>Do them all</label></button>
         <button class="eb-btn ok" data-a="paintdone">${icon('ui_check', 'eb-ico')}<label>Done</label></button>`;
     } else if (p) {
+      // the original's purchase panel: flavour, "drag it", TOTAL COST and the XP it gives, PURCHASE
       const def = ITEM_BY_ID[p.itemId];
       const rot = dirsFor(def).length > 1;
-      html = `<div class="eb-info"><b>${esc(def.name)}</b><span>${p.source === 'buy' ? priceHtml(def) : p.source === 'storage' ? 'From storage' : 'Moving'}</span><span class="problem" data-k="problem"></span></div>
-        ${rot ? `<button class="eb-btn" data-a="rot">${icon('ui_rotate', 'eb-ico')}<label>Rotate</label></button>` : ''}
-        <button class="eb-btn ok" data-a="ok">${icon('ui_check', 'eb-ico')}<label>${p.source === 'buy' ? 'Buy' : 'Place'}</label></button>
+      const buying = p.source === 'buy';
+      const cost = buying ? `<div class="eb-cost"><span>TOTAL COST: ${priceHtml(def)}</span>${def.xp ? `<span class="xp">+${def.xp} XP</span>` : ''}</div>` : '';
+      html = `<div class="eb-info"><b>${esc(def.name)}</b><span>${esc(def.blurb)}</span><span>${p.wall ? 'Tap a spot on a wall.' : `Drag the ${buying ? 'new ' : ''}item to place it.`}</span><span class="problem" data-k="problem"></span></div>
+        ${cost}
+        ${rot ? `<button class="eb-btn rot" data-a="rot">${icon('ui_rotate', 'eb-ico')}<label>Rotate</label></button>` : ''}
+        <button class="eb-btn ok purchase" data-a="ok">${icon('ui_check', 'eb-ico')}<label>${buying ? 'PURCHASE' : 'PLACE'}</label></button>
         <button class="eb-btn" data-a="cancel">${icon('ui_cancel', 'eb-ico')}<label>Cancel</label></button>`;
     } else if (sel) {
       const item = sel.kind === 'furn' ? s.furniture.find((f) => f.id === sel.id)?.item : s.wallItems.find((w) => w.id === sel.id)?.item;

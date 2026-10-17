@@ -28,7 +28,8 @@ import {
   type Worker,
   TUNING,
 } from '../sim';
-import type { Controller } from '../game/controller';
+import type { Controller, FocusTarget } from '../game/controller';
+import { targetKey, tutorialTarget, type TutTarget } from '../game/tutorial';
 import { sfx } from '../game/sfx';
 import { haptic } from '../game/haptics';
 import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps, propMeta, propsReady, texScale } from './assets';
@@ -39,6 +40,9 @@ import { FloatTexts, type FloatOpts } from './floattext';
 import { FONT_DISPLAY, fontsReady } from '../fonts';
 
 export { iso, furnArt, wallKey, floorKeys, wallAnchor, charIdFor } from './lot';
+
+/** Height of the HUD's bottom command strip, CSS px (keep in step with .strip in style.css). */
+export const STRIP_PX = 70;
 
 interface Actor {
   puppet: Puppet | null;
@@ -112,6 +116,12 @@ export class JointScene extends Phaser.Scene {
   /** next time (scene seconds) a seated diner may chew / an idle zombie may mutter, per actor id */
   private readonly nextChatter = new Map<string, number>();
   private floats?: FloatTexts;
+  /** the tutorial's bouncing red arrow (world targets; the HUD draws its own over buttons) */
+  private arrow?: Phaser.GameObjects.Graphics;
+  private tutKey = '';
+  /** valid tiles for the piece being placed (recomputed when the placement changes) */
+  private okTiles: { x: number; y: number }[] = [];
+  private okTilesKey = '';
 
   constructor() {
     super('joint');
@@ -135,6 +145,8 @@ export class JointScene extends Phaser.Scene {
         this.setupCamera(true);
         this.setupInput();
         this.ctl.onEvent((e) => this.fx(e));
+        this.ctl.onFocus((t) => this.focusOn(t));
+        this.ctl.onSelection(() => this.keepSelectionInView());
         this.ctl.onMode(() => this.onModeChange());
         this.scale.on('resize', () => this.applyZoom(true));
         this.game.events.emit('joint-ready');
@@ -328,20 +340,117 @@ export class JointScene extends Phaser.Scene {
     const right = iso(s.roomW + 5, -6).x;
     const bottom = iso(s.roomW + 5, s.roomH + 5).y;
     const top = Math.min(this.wallTop() - (this.awningPx() + 6) * u, bottom - cam.height / cam.zoom);
-    // sideways slack so any part of the room can be dragged out from under an open card
-    const slack = (cam.width / cam.zoom) * 0.4;
-    cam.setBounds(left - slack, top, right - left + slack * 2, bottom - top);
+    // a little room below, so the front row can be scrolled clear of the command strip
+    const below = (STRIP_PX * (window.devicePixelRatio || 1)) / cam.zoom;
+    cam.setBounds(left, top, right - left, bottom - top + below);
   }
 
-  /** Close in, like the original: the room fills the screen and you pan around the lot. */
+  /**
+   * Close in, like the original: the room's floor spans the screen and you pan around the lot. A
+   * floor tile is kept between 10% and 16% of the screen width (the original's tutorial framing put a
+   * tile at ~17% and a character at ~1/3 of the screen height), so big rooms stay a pan, not a speck.
+   */
   private baseZoom() {
     const dpr = window.devicePixelRatio || 1;
     const s = this.ctl.state;
     const cssW = this.scale.width / dpr;
     const cssH = this.scale.height / dpr;
-    const roomW = (s.roomW + s.roomH) * HW;
-    const roomH = (s.roomW + s.roomH) * HH + WALL_H;
-    return Math.min((cssW * 0.92) / roomW, (cssH * 1.18) / roomH);
+    const floorW = (s.roomW + s.roomH) * HW;
+    const fill = Math.max(cssW / floorW, (cssH - 60) / ((s.roomW + s.roomH) * HH + WALL_H * 0.5));
+    return Phaser.Math.Clamp(fill, (cssW * 0.1) / TILE_W, (cssW * 0.16) / TILE_W);
+  }
+
+  // ---------- camera moves: the tutorial's pans, and keeping a selection clear of the strip ----------
+
+  /** World point of something in the café (its body, not its feet), or null if it isn't drawn. */
+  private thingPoint(t: TutTarget): { x: number; y: number; top: number } | null {
+    const s = this.ctl.state;
+    if (t.t === 'worker' || t.t === 'customer') {
+      const a = this.actors.get(t.id);
+      if (!a?.holder.visible) return null;
+      const h = a.puppet?.height ?? 100;
+      return { x: a.holder.x, y: a.holder.y - h * 0.45, top: a.holder.y - h - 6 };
+    }
+    if (t.t === 'stove' || t.t === 'furniture') {
+      const fid = t.t === 'stove' ? s.stoves.find((x) => x.id === t.id)?.furnitureId : t.id;
+      const f = s.furniture.find((x) => x.id === fid);
+      if (!f) return null;
+      const p = iso(f.x, f.y);
+      const it = ITEM_BY_ID[f.item];
+      const lift = it.kind === "stove" ? (KITCHEN_META.stoveTopZ[it.art] ?? 36) + 12 : it.kind === "counter" ? (KITCHEN_META.counterTopZ[it.art] ?? 36) + 14 : 56;
+      return { x: p.x, y: p.y - 30, top: p.y - lift };
+    }
+    if (t.t === 'door') {
+      const a = wallAnchor('r', DOOR_X);
+      return { x: a.x, y: a.y - WALL_H * 0.4, top: a.y - WALL_H * 0.78 };
+    }
+    return null;
+  }
+
+  /** Ease the camera (0.5 s) so a point sits in the middle of the free screen, between awning and strip. */
+  focusOn(t: FocusTarget) {
+    const p = 'thing' in t ? this.thingPoint(t.thing) : 'tile' in t ? { x: iso(t.tile.x, t.tile.y).x, y: iso(t.tile.x, t.tile.y).y - 30 } : t;
+    if (!p) return;
+    const cam = this.cameras.main;
+    const dpr = window.devicePixelRatio || 1;
+    const u = dpr / cam.zoom;
+    // the free band's middle is a little above the screen's middle (the awning is shorter than the strip)
+    const off = ((STRIP_PX - this.awningPx()) / 2) * u;
+    cam.pan(p.x, p.y + off, 500, 'Cubic.easeOut', true);
+  }
+
+  /** A selection that lands under the command strip (or the awning) is scrolled into the clear. */
+  private keepSelectionInView() {
+    const sel = this.ctl.selection;
+    if (!sel || this.ctl.mode !== 'play') return;
+    const thing: TutTarget | null =
+      sel.kind === 'worker' ? { t: 'worker', id: sel.id } : sel.kind === 'customer' ? { t: 'customer', id: sel.id } : sel.kind === 'stove' ? { t: 'stove', id: sel.id } : sel.kind === 'counter' || sel.kind === 'furniture' ? { t: 'furniture', id: sel.id } : null;
+    const p = thing && this.thingPoint(thing);
+    if (!p) return;
+    const cam = this.cameras.main;
+    const dpr = window.devicePixelRatio || 1;
+    const sy = ((p.y - cam.worldView.y) * cam.zoom) / dpr;
+    const sx = ((p.x - cam.worldView.x) * cam.zoom) / dpr;
+    const h = cam.height / dpr;
+    const w = cam.width / dpr;
+    if (sy > h - STRIP_PX - 24 || sy < this.awningPx() + 20 || sx < 40 || sx > w - 40) this.focusOn({ x: p.x, y: p.y });
+  }
+
+  /** Per frame: the tutorial's arrow over its world target, and a pan whenever the target changes. */
+  private updateTutorial() {
+    const s = this.ctl.state;
+    const t = this.ctl.mode === 'play' ? tutorialTarget(s, this.ctl.selection) : null;
+    const key = targetKey(t);
+    if (key !== this.tutKey) {
+      this.tutKey = key;
+      if (t && t.t !== 'dom') this.focusOn({ thing: t });
+    }
+    if (!this.arrow) this.arrow = this.add.graphics().setDepth(2e6);
+    const g = this.arrow;
+    const p = t && t.t !== 'dom' ? this.thingPoint(t) : null;
+    if (!p) {
+      g.setVisible(false);
+      return;
+    }
+    // a fat red arrow pointing down at it, bobbing (drawn once, moved every frame)
+    if (!g.getData('drawn')) {
+      g.setData('drawn', true);
+      const pts = [
+        [-8, -46],
+        [8, -46],
+        [8, -20],
+        [20, -20],
+        [0, 0],
+        [-20, -20],
+        [-8, -20],
+      ].map(([x, y]) => new Phaser.Math.Vector2(x, y));
+      g.fillStyle(0x16120c, 0.35).fillPoints(pts.map((v) => new Phaser.Math.Vector2(v.x + 3, v.y + 4)), true);
+      g.fillStyle(0xdf1e00, 1).fillPoints(pts, true);
+      g.fillStyle(0xff6a4a, 1).fillRect(-5, -43, 4, 20);
+      g.lineStyle(3, 0x16120c, 1).strokePoints(pts, true, true);
+    }
+    const bob = Math.abs(Math.sin(this.t * 5)) * 12;
+    g.setVisible(true).setPosition(p.x, p.top - bob);
   }
 
   private applyZoom(recenter = false) {
@@ -612,7 +721,8 @@ export class JointScene extends Phaser.Scene {
     const pl = ctl.placing;
     const sel = ctl.editSel;
     const pulse = 0.5 + Math.sin(this.t * 6) * 0.5;
-    for (const [id, vs] of this.furnViews) for (const v of vs) v.setAlpha(pl?.source === 'move' && pl.id === id ? 0.25 : 1);
+    // placing: everything else goes see-through (the original's way), the piece being moved more so
+    for (const [id, vs] of this.furnViews) for (const v of vs) v.setAlpha(pl?.source === 'move' && pl.id === id ? 0.25 : pl && !pl.wall ? 0.45 : 1);
     for (const [id, v] of this.wallViews) {
       const moving = pl?.source === 'move' && pl.id === id;
       const picked = sel?.kind === 'wall' && sel.id === id;
@@ -627,6 +737,13 @@ export class JointScene extends Phaser.Scene {
       const pf = sel?.kind === 'furn' ? ctl.state.furniture.find((f) => f.id === sel.id) : undefined;
       if (pf && !pl) this.footprint(fg, pf.x, pf.y, 0xe5b53c, 0.16 + pulse * 0.14, 0.7 + pulse * 0.3);
       if (pl && !pl.wall) {
+        // every tile it could go on glows green (the original's "green boxes")
+        const k = `${pl.itemId}|${pl.dir}|${pl.source}|${layoutVersion(ctl.state)}`;
+        if (k !== this.okTilesKey) {
+          this.okTilesKey = k;
+          this.okTiles = ctl.placeableTiles();
+        }
+        for (const t of this.okTiles) if (t.x !== pl.x || t.y !== pl.y) this.footprint(fg, t.x, t.y, 0x7fc24a, 0.14 + pulse * 0.08, 0.35);
         const ok = !ctl.placementProblem();
         this.footprint(fg, pl.x, pl.y, ok ? 0x7fc24a : 0xd04a3a, 0.32, 1);
       }
@@ -1045,6 +1162,7 @@ export class JointScene extends Phaser.Scene {
     this.updateRemains();
     this.updateStations(dt);
     this.updateEdit();
+    this.updateTutorial();
   }
 
   /** A customer eaten where they stood: their body drops (dazed, flat on the floor) under the feasting

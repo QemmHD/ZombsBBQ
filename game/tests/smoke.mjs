@@ -50,11 +50,22 @@ let shotN = 0;
 const shotScale = process.env.SMOKE_HIRES ? 'device' : 'css';
 const shot = (name) => page.screenshot({ path: join(out, `${String(++shotN).padStart(2, '0')}-${name}.png`), scale: shotScale });
 const wait = (ms) => page.waitForTimeout(ms);
-const ff = (sec) =>
-  page.evaluate((n) => {
+// Gus's chalkboard bar: a tutorial step freezes the café until OK (like the original's dialogs)
+const barUp = () => page.evaluate(() => !document.querySelector('[data-k="tutbar"]')?.classList.contains('hidden'));
+const tutOk = async () => {
+  for (let i = 0; i < 3 && (await barUp()); i++) {
+    await page.locator('[data-a="tutok"]').tap();
+    await wait(450);
+  }
+};
+const ff = async (sec) => {
+  await tutOk();
+  return page.evaluate((n) => {
     for (let i = 0; i < n; i++) window.zbbq.ctl.update(0.1);
   }, Math.round(sec * 10));
+};
 const tapSel = async (sel, name) => {
+  if (sel !== '[data-a="tutok"]') await tutOk();
   const l = page.locator(sel).first();
   if (!(await l.count())) return check(false, `missing ${name ?? sel}`);
   await l.tap();
@@ -82,17 +93,18 @@ const screenOf = (wx, wy, scene = 'joint') =>
   );
 const isoW = (x, y) => ({ x: (x - y) * 48, y: (x + y) * 30 });
 const tapWorld = async (wx, wy, scene) => {
-  await wait(300); // let a sliding card or bar settle before checking what covers the spot
+  await tutOk();
+  await wait(300); // let a sliding strip or bar settle before checking what covers the spot
   let p = await screenOf(wx, wy, scene);
-  // the room is framed taller than the screen: pan first (as a player would) if the spot sits under the awning,
-  // the bottom bars or an open card; the pan lands the spot left of centre, clear of the right-hand card
+  // the room is framed bigger than the screen: pan first (as a player would) if the spot sits under the awning,
+  // the command strip or a side column
   const covered = async () => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName !== 'CANVAS', [p.x, p.y]);
-  if ((await covered()) || p.y < 70 || p.y > 290) {
+  if ((await covered()) || p.y < 70 || p.y > 300 || p.x < 80 || p.x > 760) {
     await page.evaluate(
       ([x, y, sc]) => {
         const cam = window.zbbq.game.scene.getScene(sc).cameras.main;
-        const u = Math.min(3, window.devicePixelRatio || 1) / cam.zoom;
-        cam.centerOn(x + 122 * u, y);
+        cam.panEffect?.reset?.();
+        cam.centerOn(x, y);
       },
       [wx, wy, scene ?? 'joint'],
     );
@@ -116,9 +128,24 @@ const tapActor = async (id) => {
 };
 
 // ---------- 1. tutorial: YOU cooks at the grimy stove ----------
+// a new joint opens like the original's: sign on CLOSED, Gus's bar up and the café frozen until OK
+check(await page.evaluate(() => window.zbbq.ctl.state.closed === true), 'a new joint starts closed');
+check(await barUp(), 'Gus’s tutorial bar is up at the start');
+check(await page.evaluate(() => window.zbbq.ctl.frozen), 'the tutorial bar freezes the café');
+const t0 = await page.evaluate(() => window.zbbq.ctl.state.now);
+await page.evaluate(() => window.zbbq.ctl.update(0.1));
+check((await page.evaluate(() => window.zbbq.ctl.state.now)) === t0, 'no sim time passes while the bar is up');
+await tapSel('[data-a="tutok"]', 'tutorial OK');
+await wait(700);
+check(!(await page.evaluate(() => window.zbbq.ctl.frozen)), 'OK unfreezes the café');
+check(await page.evaluate(() => window.zbbq.game.scene.getScene('joint').arrow?.visible), 'the red arrow points at YOU');
+await shot('tutorial-arrow');
 const youId = await page.evaluate(() => window.zbbq.ctl.state.workers[0].id);
 await tapActor(youId);
 check((await page.evaluate(() => window.zbbq.ctl.selection?.kind)) === 'worker', 'tap YOU selects YOU');
+await wait(700);
+await shot('you-strip');
+check(await page.evaluate(() => !document.querySelector('[data-k="strip"]').classList.contains('hidden')), 'the command strip shows for YOU');
 const stove = await page.evaluate(() => {
   const s = window.zbbq.ctl.state;
   const f = s.furniture.find((f) => f.id === s.stoves[0].furnitureId);
@@ -126,6 +153,7 @@ const stove = await page.evaluate(() => {
 });
 const sp = isoW(stove.x, stove.y);
 await tapWorld(sp.x, sp.y - 20);
+check(await page.evaluate(() => !!document.querySelector('.modal.picker')), 'tapping the stove opens the cookbook (tutorial stove step)');
 await shot('dish-picker');
 await tapSel('[data-dish="sliders"]', 'sliders button');
 await wait(1500);
@@ -139,6 +167,12 @@ await shot('dish-done');
 await tapWorld(sp.x, sp.y - 20); // tap the stove: someone carries it to the counter
 await ff(20);
 check(await page.evaluate(() => window.zbbq.ctl.state.counter.some((c) => c.dish && c.servings > 0)), 'food reaches the counter');
+// customers next, but the joint is still CLOSED: Gus points at the front door
+await tutOk();
+check(await page.evaluate(() => window.zbbq.ctl.state.closed), 'still closed before the door is opened');
+const door0 = await page.evaluate(() => ({ x: (window.zbbq.sim.DOOR_X + 0.5) * 48, y: (window.zbbq.sim.DOOR_X - 0.5) * 30 - 70 }));
+await tapWorld(door0.x, door0.y);
+check(await page.evaluate(() => !window.zbbq.ctl.state.closed), 'tapping the door opens the joint');
 await ff(40);
 await wait(800);
 await shot('serving');
@@ -313,7 +347,7 @@ await page.evaluate(() => window.zbbq.ctl.select(null));
 
 // ---------- 5. shop: every tab, buy + place a table and a chair facing it ----------
 await tapSel('[data-k="shop"]', 'shop');
-for (const tab of ['featured', 'decor', 'kitchen', 'furniture', 'walls', 'special', 'storage']) {
+for (const tab of ['featured', 'furniture', 'decor', 'walls', 'utility', 'cash', 'special', 'storage']) {
   await tapSel(`.tab[data-id="${tab}"]`, `shop tab ${tab}`);
   await shot(`shop-${tab}`);
 }

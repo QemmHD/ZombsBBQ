@@ -23,12 +23,12 @@ import { CUSTOMER_IDS } from '../../art/manifest';
 import type { Ctx, Expr, Look } from './rig';
 import { NECK_STD, part, elbowAt, kneeAt } from './rig';
 import { skullFront, skullBack, earFront, earBack, face } from './head';
-import { LOOKS } from './cast';
+import { LOOKS, CHEF_LOOK_IDS } from './cast';
 import { handAt, PROP_S } from './body';
 import { ZSKINS } from './paint';
 
 export const CHAR3_BASE_IDS = [...CUSTOMER_IDS, 'joe', 'jane', 'senior', 'hipster'] as const;
-export const CHAR3_IDS: string[] = [...CHAR3_BASE_IDS, ...CHAR3_BASE_IDS.map((b) => `${b}_z`), 'you', 'gus'];
+export const CHAR3_IDS: string[] = [...CHAR3_BASE_IDS, ...CHAR3_BASE_IDS.map((b) => `${b}_z`), 'you', 'gus', ...CHEF_LOOK_IDS];
 
 export type Part3Name = 'armL' | 'armL2' | 'armR' | 'armR2' | 'legL' | 'legL2' | 'legR' | 'legR2' | 'torso' | 'head';
 export const PART_ORDER3: Part3Name[] = ['armR', 'armR2', 'legR', 'legR2', 'legL', 'legL2', 'torso', 'head', 'armL', 'armL2'];
