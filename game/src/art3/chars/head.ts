@@ -399,7 +399,7 @@ export function nose(c: Ctx, kind: NoseKind, flare = false): string {
   const inner = fill('M8,-80L24,-80L24,-60L8,-60Z', sk.s, 'opacity="0"') +
     fill(`M14,-71C17,-70 21,-69 21,-66C20,-64.6 17,-64.6 15,-65Z`, sk.s, 'opacity="0.55"') +
     fill(ellD(13.6, -72.6, 2.2, 1.4), lt(sk.b, 0.35), 'opacity="0.5"');
-  s += shade(d, n.d, sk, { lw: 0, off: [-0.6, -0.6], inner, k: 0.5 });
+  s += shade(d, n.d, sk, { lw: 0, off: [-0.6, -0.6], inner });
   if (kind === 'bulb' && !c.z) s += fill(ellD(18.4, -68.4, 3.2, 2.6), '#9A6A5A', 'opacity="0.35"');
   s += line(n.o, 1.05);
   s += line(n.nostril, flare ? 1.1 : 0.8);

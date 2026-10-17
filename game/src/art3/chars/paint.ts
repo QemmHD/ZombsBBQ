@@ -1,7 +1,8 @@
 /**
- * C1 character paint kit: thin warm-black ink, two-tone cel shading with a soft gradient, cloth and
- * skin texture, grime, stains, rips, stitches and flies. Built on the shared SVG kit (art/svg.ts) and
- * the v3 kit (art3/kit.ts); nothing here edits those modules.
+ * C1 character paint kit: brush-weight warm-black ink (heavier on the shadow side), hard two-tone cel
+ * shading (no gradients on characters: doc 18 §2), cloth and skin texture, grime, stains, rips,
+ * stitches and flies. Built on the shared SVG kit (art/svg.ts) and the v3 kit (art3/kit.ts); nothing
+ * here edits those modules.
  */
 import { Doc, f, ell } from '../../art/svg';
 import type { Pt } from '../../art/svg';
@@ -10,10 +11,13 @@ import { INK, rnd, blob } from '../kit';
 export { INK, f, ell, rnd, blob };
 export type { Pt };
 
-/** Main character outline (world units). */
-export const LW = 1.25;
+/** Main character outline (world units): ~1.5 % of a 100-unit character, like the original's 2 px on 190. */
+export const LW = 1.5;
+/** Extra ink on the shadow side of a silhouette (see `shade`): width and offset of the weighted stroke. */
+export const LW_SHADOW = 2.0;
+export const LW_SHADOW_OFF = 0.55;
 /** Interior detail line. */
-export const LI = 0.7;
+export const LI = 0.55;
 /** Fine detail line (wrinkles, strands). */
 export const LF = 0.5;
 
@@ -52,20 +56,27 @@ export function tone(b: string, s?: string, d?: string): Tone {
 }
 
 // ---------------------------------------------------------------- palette
+/**
+ * Human skins (doc 18 §1.1). Peach is the original's default for most bodies; khaki is the one "generic
+ * man" skin that docs 08/09 overgeneralised. About half the cast is peach, the rest khaki / tan / dark / pale.
+ */
+export const SKIN_PEACH: Tone = { b: '#FFDDAA', s: '#BBAA77', d: '#7A6A44' };
 export const SKIN: Tone = { b: '#B3B294', s: '#968E6F', d: '#655534' };
-export const SKIN_TAN: Tone = { b: '#A69C7A', s: '#877B5A', d: '#5A4C30' };
+export const SKIN_TAN: Tone = { b: '#CCBB88', s: '#BB9966', d: '#6E5636' };
 export const SKIN_DARK: Tone = { b: '#7E6E52', s: '#62533B', d: '#3F3424' };
 export const SKIN_PALE: Tone = { b: '#BCBDA6', s: '#9C9C84', d: '#66654C' };
-/** Zombie skin shades (mixed greens). */
+/** Zombie skin shades: blue-green, sage, yellow-green, leaf (cooler and more varied than one lime). */
 export const ZSKINS: Tone[] = [
-  { b: '#88BB44', s: '#5E9638', d: '#254424' },
-  { b: '#55AA66', s: '#427E40', d: '#254424' },
-  { b: '#79B04C', s: '#4F8A3A', d: '#254424' },
-  { b: '#6AAE58', s: '#467F42', d: '#254424' },
+  { b: '#55AA66', s: '#337733', d: '#254424' },
+  { b: '#88AA66', s: '#556644', d: '#254424' },
+  { b: '#99CC55', s: '#668822', d: '#254424' },
+  { b: '#77AA55', s: '#557733', d: '#254424' },
 ];
-export const ZEYE = '#DECC54';
-export const ZEYE_D = '#B8A13A';
-export const SCLERA = '#E2DECB';
+/** Zombie eye: a solid yellow disc with a darker ring, no pupil. */
+export const ZEYE = '#CCCC44';
+export const ZEYE_D = '#999922';
+/** Human sclera: near pure white so the eyes pop against the skin. */
+export const SCLERA = '#FAF8F0';
 export const TEETH = '#D9CFA4';
 export const TEETH_D = '#A89A6A';
 export const GUM = '#7A3A34';
@@ -145,27 +156,7 @@ function cached(d: Doc, key: string, make: (id: string) => string): string {
   return u;
 }
 
-/** Soft volume gradient (bounding-box space): lit upper-left to base to a touch of shadow. */
-export function vgrad(d: Doc, t: Tone, k = 1): string {
-  return cached(d, `v${t.b}${t.s}${k}`, (id) =>
-    `<linearGradient id="${id}" x1="0.1" y1="0" x2="0.85" y2="1">` +
-      `<stop offset="0" stop-color="${lt(t.b, 0.16 * k)}"/><stop offset="0.5" stop-color="${t.b}"/>` +
-      `<stop offset="1" stop-color="${mix(t.b, t.s, 0.45 * k)}"/></linearGradient>`,
-  );
-}
-/**
- * Limb volume gradient across the limb (user space, x0 → x1 in the part's own frame): lit on the
- * left, shadowed on the right. Two segments that share a joint use the same span at the pivot, so
- * their colours match exactly where they meet (no ring at the elbow or knee).
- */
-export function xgrad(d: Doc, t: Tone, x0: number, x1: number): string {
-  return cached(d, `x${t.b}${t.s}${f(x0)}_${f(x1)}`, (id) =>
-    `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${f(x0)}" y1="0" x2="${f(x1)}" y2="0">` +
-      `<stop offset="0" stop-color="${lt(t.b, 0.2)}"/><stop offset="0.45" stop-color="${t.b}"/>` +
-      `<stop offset="1" stop-color="${mix(t.b, t.s, 0.5)}"/></linearGradient>`,
-  );
-}
-/** Vertical fade gradient (for grime at hems, shading under chins). */
+/** Vertical fade gradient (grime at hems, dyed hair tips; never for volume on a character). */
 export function fadeV(d: Doc, col: string, o0: number, o1: number): string {
   return cached(d, `f${col}${o0}${o1}`, (id) =>
     `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="${f(o0)}"/>` +
@@ -184,27 +175,38 @@ export interface ShadeOpts {
   lw?: number;
   /** offset of the lit shape: the shadow crescent falls bottom-right. */
   off?: Pt;
-  /** gradient strength (0 = flat). */
-  k?: number;
   /** extra content painted inside the shape (texture, folds) before the outline. */
   inner?: string;
   /** outline this path instead of the fill's own edge (open joint caps: see `seg`). */
   stroke?: string;
-  /** limb gradient across x0 → x1 (see `xgrad`) instead of the bounding-box volume gradient. */
-  across?: [number, number];
+  /** skip the weighted shadow-side ink (tiny parts, strokes that must stay even). */
+  even?: boolean;
 }
 
-/** Two-tone cel shading + a soft gradient + optional inner texture + ink outline. */
+/**
+ * Hard two-tone cel shading + optional inner texture + a brush-weight ink outline: one flat shadow
+ * tone, the flat base shape shifted up-left so a clean shadow band stays along the right and lower
+ * edges, then the outline. The outline is a plain stroke plus a wider stroke offset down-right and
+ * painted *under* the fill, so the ink only shows past the silhouette on the shadow side (the
+ * original's brush line: thin top-left, thick bottom-right and under the chin).
+ */
 export function shade(d: Doc, path: string, t: Tone, o: ShadeOpts = {}): string {
   const lw = o.lw ?? LW;
-  const off = o.off ?? [-1.5, -1.3];
+  const off = o.off ?? [-2.2, -2];
   const cid = d.clipId(path);
-  const g = o.across ? xgrad(d, t, o.across[0], o.across[1]) : (o.k ?? 1) > 0 ? vgrad(d, t, o.k ?? 1) : t.b;
-  let s = `<path d="${path}" fill="${t.s}"/>`;
-  s += `<g clip-path="url(#${cid})"><path d="${path}" fill="${g}" transform="translate(${f(off[0])} ${f(off[1])})"/>`;
+  const edge = o.stroke ?? path;
+  const join = o.stroke ? ' stroke-linejoin="round"' : '';
+  let s = '';
+  if (lw > 0 && !o.even && lw >= LW * 0.7) {
+    const w = LW_SHADOW * (lw / LW);
+    const k = LW_SHADOW_OFF * (lw / LW);
+    s += `<path d="${edge}" fill="none" stroke="${INK}" stroke-width="${f(w)}"${join} transform="translate(${f(k)} ${f(k)})"/>`;
+  }
+  s += `<path d="${path}" fill="${t.s}"/>`;
+  s += `<g clip-path="url(#${cid})"><path d="${path}" fill="${t.b}" transform="translate(${f(off[0])} ${f(off[1])})"/>`;
   if (o.inner) s += o.inner;
   s += '</g>';
-  if (lw > 0) s += `<path d="${o.stroke ?? path}" fill="none" stroke="${INK}" stroke-width="${f(lw)}"${o.stroke ? ' stroke-linejoin="round"' : ''}/>`;
+  if (lw > 0) s += `<path d="${edge}" fill="none" stroke="${INK}" stroke-width="${f(lw)}"${join}/>`;
   return s;
 }
 

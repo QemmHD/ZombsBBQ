@@ -30,7 +30,7 @@ import type { FacePaint } from './index';
 import {
   INK, f, ellD, fill, line, outl, circ, inside, shade, speck, hatch, grime, fold, stain, drip, rnd, mix, dk, lt, jag, smooth,
   limb, tube, toothP, tone, spot, fly, poly, blob,
-  SKIN, SKIN_TAN, SKIN_DARK, SKIN_PALE, ZSKINS, SCLERA, TEETH, TEETH_D, MOUTH, TONGUE, BLOOD, BLOOD_D, SLIME, SLIME_L, GREASE, C,
+  SKIN, SKIN_PEACH, SKIN_TAN, SKIN_DARK, SKIN_PALE, ZSKINS, SCLERA, TEETH, TEETH_D, MOUTH, TONGUE, BLOOD, BLOOD_D, SLIME, SLIME_L, GREASE, C,
 } from './paint';
 import type { Tone, Pt } from './paint';
 
@@ -198,7 +198,7 @@ function flipper(ang: number, sc: number): HandItem {
   return weapon(ang, [-5, -5, 26, 5], (c) => {
     const d = c.d;
     let s = shade(d, limb([-4.6, 0], [10, 0], 3, 2.6), IRON, { lw: 0.9, inner: circ(1, 0, 0.5, '#8A8A84') + circ(6, 0, 0.5, '#8A8A84') });
-    s += shade(d, 'M9.6,-0.9L15.6,-1.2L15.6,1.2L9.6,0.9Z', STEEL, { lw: 0.8, k: 0 });
+    s += shade(d, 'M9.6,-0.9L15.6,-1.2L15.6,1.2L9.6,0.9Z', STEEL, { lw: 0.8 });
     const blade = 'M15,-4.4L24.4,-4.8Q25.4,0 24.4,4.8L15,4.4Z';
     let inner = line('M17,-2.6H23.6M17,0H23.6M17,2.6H23.6', 0.9, '#4A4A46') + grime([15, -5, 25, 5], 5, '#4A3A1E', c.seed + 3, 1.6, 0.45);
     inner += fill('M15,-4.4L24.4,-4.8L24.4,-3.4L15,-3.2Z', lt(STEEL.b, 0.4), 'opacity="0.6"');
@@ -217,7 +217,7 @@ function pepperMill(ang: number, sc: number): HandItem {
     const inner = fill('M-4,-3.6H20V-2H-4Z', lt(col.b, 0.35), 'opacity="0.6"') + line('M1.6,-3.4V3.4M17.6,-3.8V3.8', 0.6, col.d) + speck([-4, -4, 20, 4], 14, [col.d, lt(col.b, 0.3)], c.seed + 3, 0.2, 0.5, 0.5);
     let s = shade(d, body, col, { lw: 1, inner });
     s += shade(d, 'M19,-2.6C21.6,-3 22.4,-1.6 22.4,0C22.4,1.6 21.6,3 19,2.6Z', col, { lw: 0.9 });
-    s += shade(d, ellD(23.6, 0, 1.6, 1.4), C.chrome, { lw: 0.8, k: 0 });
+    s += shade(d, ellD(23.6, 0, 1.6, 1.4), C.chrome, { lw: 0.8 });
     return s;
   }, { sc });
 }
@@ -315,7 +315,7 @@ function zucchiniClub(ang: number, sc: number): HandItem {
     for (const y of [-3.2, -0.6, 2.4]) inner += line(`M-2,${f(y * 0.7)}Q16,${f(y * 1.2)} 36,${f(y * 0.8)}`, 1.1, '#9AAA6A', 'opacity="0.5"');
     inner += speck([-4, -6, 38, 6], 40, ['#C8CC9A', Z.d], c.seed + 3, 0.2, 0.55, 0.6) + grime([10, -6, 38, 6], 4, '#3A3A1E', c.seed + 5, 2.4, 0.35);
     let s = shade(d, p, Z, { lw: 1.2, inner });
-    s += shade(d, 'M-5,0L-7,-1.4L-6.6,1.6Z', tone('#7A6A3A'), { lw: 0.7, k: 0 });
+    s += shade(d, 'M-5,0L-7,-1.4L-6.6,1.6Z', tone('#7A6A3A'), { lw: 0.7 });
     for (const [x, y, dx, dy] of [[14, -5.2, -1, -4], [22, -6, 1, -4.4], [30, -5.6, 1.6, -3.6], [26, 6, 0.6, 4], [34, 3.6, 3.4, 2.4], [18, 5.4, -1, 4]] as [number, number, number, number][]) {
       s += line(`M${f(x)},${f(y)}l${f(dx)},${f(dy)}`, 1.5) + line(`M${f(x)},${f(y)}l${f(dx)},${f(dy)}`, 0.7, '#8A6A4A') + circ(x + dx, y + dy, 0.5, '#6A4A2A');
     }
@@ -331,7 +331,7 @@ function drumstickClub(ang: number, sc: number): HandItem {
     const d = c.d;
     const bone = tone('#D6CCAA', '#AEA282');
     let s = shade(d, 'M-6.8,-3.4C-9.4,-4.6 -10.2,-1.6 -8.2,-0.4C-10.2,0.8 -9.4,4 -6.8,2.8L4,1.6L4,-1.8Z', bone, { lw: 0.9 });
-    s += shade(d, limb([-6, -0.2], [7, -0.1], 3.2, 3.6), bone, { lw: 0.9, k: 0 });
+    s += shade(d, limb([-6, -0.2], [7, -0.1], 3.2, 3.6), bone, { lw: 0.9 });
     const meat = smooth([[5, 0], [8, -5], [16, -8.6], [26, -9], [33, -5.6], [34.6, 0.4], [32, 6.4], [23, 8.8], [13, 7.4], [7, 4.4]]);
     let inner = speck([4, -10, 35, 10], 70, ['#C8944A', '#5A3414', '#D8B068'], c.seed + 3, 0.3, 0.9, 0.75);
     inner += fill('M4,-10H36V-5H4Z', lt(CR.b, 0.25), 'opacity="0.45"') + grime([4, -9, 35, 9], 5, '#4A2A10', c.seed + 5, 2.4, 0.4);
@@ -385,7 +385,7 @@ function carrot(ang: number, sc: number): HandItem {
     const d = c.d;
     let s = '';
     for (const [dx, dy, r] of [[-8, -3.6, -0.5], [-9.4, 0, 0], [-8, 3.4, 0.5]] as [number, number, number][]) {
-      s += shade(d, limb([-2, 0], [dx, dy + r * 2], 2.2, 1.2), tone('#5A6A34', '#3E4A22'), { lw: 0.7, k: 0 });
+      s += shade(d, limb([-2, 0], [dx, dy + r * 2], 2.2, 1.2), tone('#5A6A34', '#3E4A22'), { lw: 0.7 });
     }
     const p = 'M-3,-3.6C6,-4.6 16,-3.4 29,-0.6C29.6,0 29.6,0.4 29,0.8C16,3.6 6,4.6 -3,3.6C-4.4,2 -4.4,-2 -3,-3.6Z';
     let inner = line('M3,-3.6l0.6,2M9,-3.6l0.4,1.8M15,-2.8l0.4,1.4M6,3.8l0.4,-1.6M12,3.4l0.4,-1.4M19,2l0.3,-1.2', 0.5, O.d);
@@ -405,7 +405,7 @@ function coffeePot(ang: number, sc: number): HandItem {
     s += fill(pot, '#B8C4BC', 'opacity="0.45"');
     s += inside(d, pot, fill('M-4,4H20V16H-4Z', '#3A2216', 'opacity="0.92"') + fill('M-4,4H20V5.4H-4Z', '#6A4A2A') + fill(ellD(4, 0, 1.4, 3.4), '#E8ECE4', 'opacity="0.55"'));
     s += line(pot, 1);
-    s += shade(d, 'M2.4,-6.4L12.8,-6.4L12.6,-3.6L2.8,-3.6Z', tone('#3A3A3A'), { lw: 0.9, k: 0 });
+    s += shade(d, 'M2.4,-6.4L12.8,-6.4L12.6,-3.6L2.8,-3.6Z', tone('#3A3A3A'), { lw: 0.9 });
     s += line('M13,-5.6l2.6,0.6', 1.2) + circ(7.6, -7.2, 1, '#2A2A2A');
     s += line('M6,-10q-1.6,-2 0,-4M10,-10q1.6,-2 0,-4', 0.6, '#A8A8A0', 'opacity="0.6"');
     return s;
@@ -474,7 +474,7 @@ function flamingSpatula(ang: number, sc: number): HandItem {
       const d = c.d;
       const CH = tone('#4A4440', '#2C2826');
       let s = shade(d, limb([-5.4, 0], [15, 0], 3.6, 3), DWOOD, { lw: 1, inner: line('M-3,-0.6l3,0.2M2,-0.4l4,0.2', 0.5, '#2A1A10') + fill('M8,-2H15V2H8Z', '#1A1410', 'opacity="0.55"') });
-      s += shade(d, 'M14.4,-1.2L18.6,-1.6L18.6,1.6L14.4,1.2Z', CH, { lw: 0.8, k: 0 });
+      s += shade(d, 'M14.4,-1.2L18.6,-1.6L18.6,1.6L14.4,1.2Z', CH, { lw: 0.8 });
       const blade = 'M18,-6.4L31,-7Q32.4,0 31,7L18,6.4Z';
       let inner = line('M20.4,-3.6H29.6M20.4,0H29.6M20.4,3.6H29.6', 1.1, '#1A1614') + grime([18, -7, 32, 7], 6, '#1A1410', c.seed + 3, 2.2, 0.6);
       inner += fill(ellD(27, -3, 3, 2), '#7A3A1A', 'opacity="0.45"');
@@ -558,7 +558,7 @@ function combHat(): HatPaint {
       let s = shade(c.d, comb(0), R, { lw: 1.1, inner: speck([-14, -116, 16, -100], 14, [R.d, lt(R.b, 0.25)], c.seed + 41, 0.3, 0.6, 0.6) + line('M-4,-103l-1,-4M3,-103v-5M9,-103l1,-4', 0.5, R.d) });
       const cap = 'M-19.6,-90.6C-12,-94 10,-95.4 22.4,-92.4L21,-101.6C12,-104.6 -6,-105 -16.6,-101.2Z';
       s += shade(c.d, cap, P, { lw: 1.1, inner: fill('M-24,-97.4H26V-95.4H-24Z', R.b) + grime([-19, -105, 22, -90], 4, GREASE, c.seed + 42, 2.6, 0.45) });
-      s += shade(c.d, 'M21,-99.6L26.6,-97.4L21.6,-95.2Z', tone('#B0882E'), { lw: 0.8, k: 0 });
+      s += shade(c.d, 'M21,-99.6L26.6,-97.4L21.6,-95.2Z', tone('#B0882E'), { lw: 0.8 });
       return s;
     },
     back: (c) => {
@@ -743,8 +743,8 @@ function bowTie(col: Tone): Paint {
     const { d, b } = c;
     const x = 3.4 + b.hunch;
     const y = b.tTop + 1.6;
-    let s = shade(d, `M${f(x)},${f(y)}L${f(x - 4.4)},${f(y - 2.6)}L${f(x - 4.8)},${f(y + 2.6)}Z`, col, { lw: 0.8, k: 0 });
-    s += shade(d, `M${f(x)},${f(y)}L${f(x + 4)},${f(y - 2.4)}L${f(x + 4.2)},${f(y + 2.4)}Z`, col, { lw: 0.8, k: 0 });
+    let s = shade(d, `M${f(x)},${f(y)}L${f(x - 4.4)},${f(y - 2.6)}L${f(x - 4.8)},${f(y + 2.6)}Z`, col, { lw: 0.8 });
+    s += shade(d, `M${f(x)},${f(y)}L${f(x + 4)},${f(y - 2.4)}L${f(x + 4.2)},${f(y + 2.4)}Z`, col, { lw: 0.8 });
     return s + outl(ellD(x, y, 1.2, 1.3), col.s, 0.6);
   };
 }
@@ -801,7 +801,7 @@ function chefCoat(col: Tone, o: { stains?: number; dark?: boolean; drop?: number
     for (let k = 0; k < n; k++) inner += stain(-8 + r() * 18, b.shY + 6 + r() * 22, 1.2 + r() * 1.6, [BLOOD, GREASE, '#7A3A1E', '#5A4A2A'][k % 4], seed + k * 3, 0.6);
     let s = shade(d, td, col, { inner });
     // standing collar
-    s += shade(d, back ? `M${f(-5.4 + x0)},${f(b.tTop + 2.6)}L${f(-5 + x0)},${f(b.tTop - 1.4)}Q${f(1 + x0)},${f(b.tTop - 2.6)} ${f(7 + x0)},${f(b.tTop - 1.4)}L${f(7.4 + x0)},${f(b.tTop + 2.6)}Q${f(1 + x0)},${f(b.tTop + 1.4)} ${f(-5.4 + x0)},${f(b.tTop + 2.6)}Z` : `M${f(-4.6 + x0)},${f(b.tTop + 2.4)}L${f(-4.2 + x0)},${f(b.tTop - 1.6)}Q${f(1.4 + x0)},${f(b.tTop - 2.6)} ${f(7 + x0)},${f(b.tTop - 1.6)}L${f(7.4 + x0)},${f(b.tTop + 2.4)}Q${f(1.4 + x0)},${f(b.tTop + 3.6)} ${f(-4.6 + x0)},${f(b.tTop + 2.4)}Z`, col, { lw: 0.9, k: 0.4 });
+    s += shade(d, back ? `M${f(-5.4 + x0)},${f(b.tTop + 2.6)}L${f(-5 + x0)},${f(b.tTop - 1.4)}Q${f(1 + x0)},${f(b.tTop - 2.6)} ${f(7 + x0)},${f(b.tTop - 1.4)}L${f(7.4 + x0)},${f(b.tTop + 2.6)}Q${f(1 + x0)},${f(b.tTop + 1.4)} ${f(-5.4 + x0)},${f(b.tTop + 2.6)}Z` : `M${f(-4.6 + x0)},${f(b.tTop + 2.4)}L${f(-4.2 + x0)},${f(b.tTop - 1.6)}Q${f(1.4 + x0)},${f(b.tTop - 2.6)} ${f(7 + x0)},${f(b.tTop - 1.6)}L${f(7.4 + x0)},${f(b.tTop + 2.4)}Q${f(1.4 + x0)},${f(b.tTop + 3.6)} ${f(-4.6 + x0)},${f(b.tTop + 2.4)}Z`, col, { lw: 0.9 });
     return s;
   };
 }
@@ -816,7 +816,7 @@ function waistApron(col: Tone, len = 9): Paint {
     const wR = edgeX(b, wy, 1) + 0.6;
     if (back) {
       let s = inside(d, torsoD(b), fill(`M-30,${f(wy - 1.2)}H30V${f(wy + 1.2)}H-30Z`, col.b) + line(`M-30,${f(wy - 1.2)}H30M-30,${f(wy + 1.2)}H30`, 0.6));
-      s += shade(d, `M-1,${f(wy)}l-3,7l1.6,0l2,-6.4ZM0,${f(wy)}l3,6.6l1.4,-0.6l-3.6,-6Z`, col, { lw: 0.7, k: 0 }) + outl(ellD(-0.4, wy, 1.4, 1.1), col.s, 0.7);
+      s += shade(d, `M-1,${f(wy)}l-3,7l1.6,0l2,-6.4ZM0,${f(wy)}l3,6.6l1.4,-0.6l-3.6,-6Z`, col, { lw: 0.7 }) + outl(ellD(-0.4, wy, 1.4, 1.1), col.s, 0.7);
       return s;
     }
     const p = `M${f(wL)},${f(wy)}L${f(wR)},${f(wy)}L${f(wR + 1.6)},${f(bot)}Q${f((wL + wR) / 2)},${f(bot + 1.2)} ${f(wL - 1)},${f(bot)}Z`;
@@ -1060,7 +1060,7 @@ function furArm(T: Tone, o: { bulk?: number; sleeve?: Tone; claws?: string } = {
     for (const [dx, dy] of [[-2.4, 8.2], [-0.5, 9.1], [1.2, 8.7]] as Pt[]) hs += `<path d="M${f(x + dx - 0.7)},${f(y + dy - 0.4)}Q${f(x + dx)},${f(y + dy + 2.2)} ${f(x + dx + 1.1)},${f(y + dy + 2.4)}Q${f(x + dx + 0.4)},${f(y + dy + 0.8)} ${f(x + dx + 0.7)},${f(y + dy - 0.4)}Z" fill="${cl}" stroke="${INK}" stroke-width="0.35"/>`;
     s += `<g transform="translate(${f(x)} ${f(y)}) scale(${HAND_S}) translate(${f(-x)} ${f(-y)})">${hs}</g>`;
     // a fur cuff over the wrist
-    s += shade(c.d, jag(x, y - 0.6, A * 0.5, 2.2, c.seed + 31 + c.side, 7, 0.3), T, { lw: 0.8, k: 0 });
+    s += shade(c.d, jag(x, y - 0.6, A * 0.5, 2.2, c.seed + 31 + c.side, 7, 0.3), T, { lw: 0.8 });
     return s + dimFar(c, [p, ellD(x, y + 5, 3 * HAND_S, 4.4 * HAND_S)]);
   };
   return { up, lo, items: {} };
@@ -1109,7 +1109,7 @@ function furLeg(T: Tone, o: { foot: 'big' | 'paw'; shorts?: Tone }): LegSet {
     }
     s += foot;
     // fur spilling over the top of the foot
-    s += shade(c.d, jag(c.back ? 0 : 1.2, L - 5.6 * k, Wd * 0.6, 2.6, c.seed + 81 + c.side, 8, 0.35), T, { lw: 0.9, k: 0 });
+    s += shade(c.d, jag(c.back ? 0 : 1.2, L - 5.6 * k, Wd * 0.6, 2.6, c.seed + 81 + c.side, 8, 0.35), T, { lw: 0.9 });
     return s + dimFar(c, [p]);
   };
   return { up, lo };
@@ -1125,7 +1125,7 @@ const bigfootTorso: Paint = (c) => {
   const { d, b, back, seed } = c;
   const td = torsoD(b, { drop: 1 });
   // fur neck stub
-  let s = shade(d, `M${f(-5 + b.hunch)},${f(b.neckY - 6)}H${f(7 + b.hunch)}V${f(b.tTop + 5)}H${f(-5 + b.hunch)}Z`, BF_FUR, { lw: 1, k: 0 });
+  let s = shade(d, `M${f(-5 + b.hunch)},${f(b.neckY - 6)}H${f(7 + b.hunch)}V${f(b.tTop + 5)}H${f(-5 + b.hunch)}Z`, BF_FUR, { lw: 1 });
   s += shade(d, td, BF_FUR, { inner: furInner([-24, b.tTop, 30, b.tBot + 2], BF_FUR, seed + 3, 70) + fill(ellD(4, b.shY + 14, 8, 10), mix(BF_FUR.b, '#8A3A2A', 0.25), 'opacity="0.45"') });
   // bun halves along both sides
   const half = (x1: number, y1: number, x2: number, y2: number, w1: number, w2: number, sd: number) => {
@@ -1170,7 +1170,7 @@ const bigfootHair: HairSet = {
     let s = `<g clip-path="url(#${id})">${shade(c.d, outer, BF_FUR, { lw: 1.15, inner: furInner([-30, -112, 30, -48], BF_FUR, c.seed + 95, 70) })}</g>`;
     s += line(hole, 0.9, BF_FUR.d) + line(hole, 0.5, INK, 'opacity="0.7"');
     // heavy fur brow
-    s += shade(c.d, jag(8, -86.4, 14, 2.8, c.seed + 96, 10, 0.3), BF_FUR, { lw: 0.9, k: 0 });
+    s += shade(c.d, jag(8, -86.4, 14, 2.8, c.seed + 96, 10, 0.3), BF_FUR, { lw: 0.9 });
     return s;
   },
   hairBack: (c) => shade(c.d, jag(0, -79, 27, 29, c.seed + 97, 22, 0.12), BF_FUR, { lw: 1.15, inner: furInner([-30, -112, 30, -48], BF_FUR, c.seed + 98, 70) + stain(6, -88, 2, SLIME, c.seed + 99, 0.4, 1) }),
@@ -1245,7 +1245,7 @@ const werewoofTorso: Paint = (c) => {
   const { d, b, back, seed } = c;
   const td = torsoD(b, { torn: true }, seed);
   const shirt = tone('#6A3A30', '#4E2822');
-  let s = shade(d, `M${f(-5 + b.hunch)},${f(b.neckY - 6)}H${f(7 + b.hunch)}V${f(b.tTop + 5)}H${f(-5 + b.hunch)}Z`, WW_FUR, { lw: 1, k: 0 });
+  let s = shade(d, `M${f(-5 + b.hunch)},${f(b.neckY - 6)}H${f(7 + b.hunch)}V${f(b.tTop + 5)}H${f(-5 + b.hunch)}Z`, WW_FUR, { lw: 1 });
   s += shade(d, td, WW_FUR, { inner: furInner([-22, b.tTop, 26, b.tBot + 2], WW_FUR, seed + 3, 60) + fill(ellD(5 + b.hunch, b.shY + 12, 7, 10), WW_MUZ.b, 'opacity="0.55"') });
   const shirtInner = W.plaid([-24, b.tTop - 2, 28, b.tBot + 4], '#2A120E', '#B88A6A', 3.6) + grime([-18, b.tTop, 22, b.tBot], 5, '#1A0C08', seed + 5, 3, 0.35);
   if (back) {
@@ -1339,6 +1339,7 @@ const staff_chuck = mk({
 });
 
 const staff_chuck_b = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 106,
   face: { shape: 'heart', lid: 0.5, bags: 1, brow: 'arched', browCol: '#6A3A1E', nose: 'small', mouth: 'smirk', lips: '#7A3A34', lash: true, wrinkles: 0 },
@@ -1381,7 +1382,7 @@ const boss_chuck = mk({
 const staff_hank = mk({
   body: 'teen',
   height: 105,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'small', lid: 0.6, bags: 2, brow: 'sparse', nose: 'pug', mouth: 'sneer', wrinkles: 0, look: [1, 0.4] },
   hair: HAIR.blond,
   set: H.withHat(H.messy(HAIR.blond, { vol: 1.2 }), paperHat('#8A2E26')),
@@ -1399,6 +1400,7 @@ const staff_hank = mk({
 });
 
 const staff_hank_b = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 121,
   face: { shape: 'heart', lid: 0.55, bags: 1, brow: 'arched', browCol: '#6A5030', nose: 'small', mouth: 'lips', lips: '#7A2A30', lash: true, shadow: '#5A6A70', wrinkles: 1, look: [1.2, 0.2] },
@@ -1437,6 +1439,7 @@ const boss_hank = mk({
 
 // ---------------------------------------------------------------- Vegan Vera's Salad Fortress
 const staff_vera = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   bodyMod: { hipX: 4.6 },
   height: 105,
@@ -1476,6 +1479,7 @@ const staff_vera_b = mk({
 });
 
 const boss_vera = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   bodyMod: { s: 1.08, wBot: 12, belly: 0.6 },
   height: 112,
@@ -1536,7 +1540,7 @@ const boss_crunch = mk({
   body: 'old',
   bodyMod: { s: 1.14, belly: 4.4, wBot: 14, hunch: 1.4 },
   height: 104,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'jowl', lid: 0.5, bags: 2, brow: 'bushy', browCol: '#D0CCC0', nose: 'bulb', mouth: 'smirk', wrinkles: 3 },
   hair: HAIR.white,
   set: H.slick(HAIR.white, { recede: 3 }),
@@ -1555,6 +1559,7 @@ const boss_crunch = mk({
 
 // ---------------------------------------------------------------- Le Snob Bistro
 const staff_snob = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   bodyMod: { hipX: 4.6 },
   height: 104,
@@ -1594,6 +1599,7 @@ const staff_snob_b = mk({
 });
 
 const boss_snob = mk({
+  skin: SKIN_PEACH,
   body: 'std',
   bodyMod: { s: 1.08, belly: 3 },
   height: 136,
@@ -1612,7 +1618,7 @@ const boss_snob = mk({
 const staff_boss = mk({
   body: 'stocky',
   height: 104,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'square', lid: 0.5, bags: 2, brow: 'thick', browCol: '#1E1A16', nose: 'broken', mouth: 'sneer', stubble: true, wrinkles: 1 },
   hair: HAIR.black,
   set: H.withHat(H.underHat(HAIR.black), H.backCap(tone('#2E2A28', '#1E1A18'), '#7A2A1E')),
@@ -1764,7 +1770,7 @@ const staff_sushi = mk({
 const staff_sushi_b = mk({
   body: 'slim',
   height: 104,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'heart', lid: 0.55, bags: 0, brow: 'arched', browCol: '#1E1A16', nose: 'small', mouth: 'lips', lips: '#8A2A30', lash: true, wrinkles: 0 },
   hair: HAIR.black,
   set: H.bun(HAIR.black),
@@ -1838,7 +1844,7 @@ const boss_taco = mk({
 const staff_lab = mk({
   body: 'teen',
   height: 106,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'egg', lid: 0.6, bags: 2, brow: 'sparse', nose: 'pointy', mouth: 'gap', wrinkles: 0, look: [1.2, -0.4] },
   hair: HAIR.ginger,
   set: H.messy(HAIR.ginger, { vol: 1.6 }),
@@ -1851,6 +1857,7 @@ const staff_lab = mk({
 });
 
 const staff_lab_b = mk({
+  skin: SKIN_PEACH,
   body: 'slim',
   height: 104,
   face: { shape: 'heart', lid: 0.55, bags: 1, brow: 'arched', browCol: '#3A2A1E', nose: 'small', mouth: 'pout', lips: '#5A2A3A', lash: true, shadow: '#4A6A3A', wrinkles: 0 },
@@ -1886,7 +1893,7 @@ const staff_clown = mk({
   body: 'std',
   bodyMod: { belly: 2 },
   height: 110,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'round', lid: 0.45, bags: 1, brow: 'raised', browCol: '#2A2420', nose: 'pug', mouth: 'grin', wrinkles: 1 },
   hair: LIME,
   set: H.withHat(H.perm(LIME), partyHat(tone('#2C6985', '#1E4A5E'), '#D8B060')),
@@ -1918,7 +1925,7 @@ const boss_clown = mk({
   body: 'fat',
   bodyMod: { s: 1.14, belly: 5.4 },
   height: 118,
-  skin: SKIN_PALE,
+  skin: SKIN_PEACH,
   face: { shape: 'jowl', lid: 0.4, bags: 2, brow: 'raised', browCol: '#2A2420', nose: 'bulb', mouth: 'grin', wrinkles: 2, look: [1.2, 0.2] },
   hair: RAINBOW,
   set: H.withHat(H.perm(RAINBOW), partyHat(tone('#7EA83A', '#5A7E26'), '#C8402E')),

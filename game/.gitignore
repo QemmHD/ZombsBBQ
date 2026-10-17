@@ -4,3 +4,4 @@ test-results/
 *.log
 public/icons/
 public/manifest.webmanifest
+test-results-style/
