@@ -16,15 +16,16 @@ const CONTRACT_KITCHEN = [
   'counter_plain', 'counter_steel', 'counter_bar',
   'sink_dirty', 'sink_plain', 'sink_steel', 'trash_red', 'trash_green',
   'fridge_dirty', 'fridge_plain', 'fridge_steel', 'keg_toxic',
+  'witch_cauldron', 'kiln', 'pit_oven', 'tomb_smoker', 'fx_cauldron_bubbles', 'fx_kiln_fire', 'fx_pit_embers', 'fx_tomb_smoke', 'fridge_magic',
 ];
-const TABLES = [...TINT_LIST.map((t) => `table_plain_${t}`), 'table_diner', 'table_wood', 'table_barrel', 'table_coffin'];
-const CHAIR_BASES = [...TINT_LIST.map((t) => `chair_plain_${t}`), 'chair_diner', 'chair_wood', 'chair_barrel', 'chair_bone'];
+const TABLES = [...TINT_LIST.map((t) => `table_plain_${t}`), 'table_diner', 'table_wood', 'table_barrel', 'table_coffin', 'table_drum', 'table_butcher', 'table_morgue'];
+const CHAIR_BASES = [...TINT_LIST.map((t) => `chair_plain_${t}`), 'chair_diner', 'chair_wood', 'chair_barrel', 'chair_bone', 'chair_tire', 'chair_cleaver', 'chair_electric'];
 const CONTRACT_FURN = [
   ...TABLES,
   ...CHAIR_BASES.flatMap((c) => [`${c}_sw`, `${c}_ne`, `${c}_ne_back`]),
   'divider_plain', 'divider_brick', 'divider_wood',
 ];
-const OVERLAYS = ['fx_steam_1', 'fx_steam_2', 'fx_steam_3', 'grill_flames', 'fryer_bubbles', 'pot_burnt'];
+const OVERLAYS = ['fx_steam_1', 'fx_steam_2', 'fx_steam_3', 'grill_flames', 'fryer_bubbles', 'pot_burnt', 'fx_cauldron_bubbles', 'fx_kiln_fire', 'fx_pit_embers', 'fx_tomb_smoke'];
 
 function checkSvg(a: ArtAsset): void {
   const { key, svg, w, h } = a;
@@ -124,6 +125,14 @@ describe('art3 META', () => {
     for (const k of ['sink_dirty', 'sink_plain', 'sink_steel']) expect(KITCHEN_META.sinkTopZ[k], k).toBeGreaterThanOrEqual(34);
   });
 
+  it('every station kind has a cooking overlay, and every station a top height', () => {
+    for (const k of ['stove', 'grill', 'smoker', 'fryer', 'cauldron', 'kiln', 'pit', 'tomb']) expect(by.has(KITCHEN_META.stationFx[k]), k).toBe(true);
+    for (const k of ['witch_cauldron', 'kiln', 'pit_oven', 'tomb_smoker']) {
+      expect(KITCHEN_META.stoveTopZ[k], k).toBeGreaterThan(10);
+      expect(KITCHEN_META.stoveTopZ[k], k).toBeLessThan(by.get(k)!.h);
+    }
+  });
+
   it('covers every table', () => {
     for (const k of TABLES) {
       expect(FURN_META.tableTopZ[k], k).toBeGreaterThanOrEqual(28);
@@ -136,7 +145,7 @@ describe('art3 META', () => {
   });
 
   it('covers every chair family', () => {
-    expect([...CHAIR_FAMILIES].sort()).toEqual(['barrel', 'bone', 'diner', 'plain', 'wood']);
+    expect([...CHAIR_FAMILIES].sort()).toEqual(['barrel', 'bone', 'cleaver', 'diner', 'electric', 'plain', 'tire', 'wood']);
     for (const c of CHAIR_BASES) {
       const fam = chairFamilyOf(`${c}_sw`);
       expect(fam, c).not.toBeNull();

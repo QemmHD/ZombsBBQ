@@ -36,6 +36,8 @@ import {
   paintFloor,
   stoveCooks,
   rivalReady,
+  rivalLevel,
+  rivalStats,
   sendAll,
   startCooking,
   startRaid,
@@ -193,7 +195,7 @@ function raidIfReady(s: GameState): RaidState | null {
     if (healthy.length < RAID_CREW[RIVALS.indexOf(rv)]) return null;
     // a sensible player sizes up the joint first: total punch vs. the Head Chef
     const punch = healthy.reduce((a, w) => a + (3 + w.stats.power * 1.6) * (w.energy / 100), 0);
-    if (punch < rv.boss.hp / 9) return null;
+    if (punch < rivalStats(rv.id, rivalLevel(s, rv.id)).chef.hp / 9) return null;
     const r = startRaid(s, rv.id, healthy.map((w) => w.id), s.pets.map((p) => p.id));
     if (typeof r === 'string') return null;
     sendAll(r);
@@ -237,7 +239,8 @@ describe('economy pacing (engaged player)', () => {
     expect(marks['10m'].level).toBeGreaterThanOrEqual(2);
     expect(marks['10m'].crew).toBeGreaterThanOrEqual(1);
     expect(marks['30m'].level).toBeGreaterThanOrEqual(3);
-    expect(marks['30m'].seats).toBeGreaterThanOrEqual(4);
+    // the retuned dish ladder (first dishes earn less, so the first dish isn't the best forever) buys the 4th seat a bit later
+    expect(marks['30m'].seats).toBeGreaterThanOrEqual(3);
     expect(marks['60m'].stars).toBeGreaterThanOrEqual(2);
     expect(marks['120m'].level).toBeGreaterThanOrEqual(4);
     // an afternoon of play: the first expansion ($3,500), the first rival beaten, a real crew

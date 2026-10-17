@@ -69,11 +69,14 @@ describe('the corner lot', () => {
     expect(findPath({ x: -1, y: 11 }, { x: 2, y: 2 }, new Set(), r)).not.toBeNull();
   });
 
-  it('the crew starts at one zombie and grows to about ten by level 20', () => {
-    expect(crewCapForLevel(1)).toBe(1);
-    expect(crewCapForLevel(5)).toBe(3);
+  it('the crew starts at one zombie and grows like the original (1, 2, 3, 3, 4, 4 … 10 at 17, 14 at 56)', () => {
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 15, 16].map(crewCapForLevel)).toEqual([1, 2, 3, 3, 4, 4, 5, 5, 9, 9]);
+    expect(crewCapForLevel(17)).toBe(10);
     expect(crewCapForLevel(20)).toBe(10);
-    expect(crewCapForLevel(46)).toBe(12);
+    expect(crewCapForLevel(27)).toBe(11);
+    expect(crewCapForLevel(36)).toBe(12);
+    expect(crewCapForLevel(46)).toBe(13);
+    expect(crewCapForLevel(56)).toBe(14);
   });
 });
 
@@ -236,7 +239,7 @@ describe('energy, patience, biting, resting outside, levels', () => {
     }
     expect(s.stats.bites).toBe(1);
     expect(s.rating).toBeLessThan(before);
-    expect(z.energy).toBeGreaterThan(TUNING.biteEnergyGain * 0.9);
+    expect(z.energy).toBeGreaterThan(maxEnergy(z) * TUNING.biteEnergyFrac * 0.9);
     expect(s.customers.filter((c) => c.state === 'waiting' || c.state === 'eating')).toHaveLength(0);
   });
 

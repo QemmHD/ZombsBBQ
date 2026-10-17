@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArtAsset } from '../src/art/types';
 import { DISH3_IDS, DISH_H, DISH_W, buildDishes } from '../src/art3/dishes';
 import { BUBBLE_H, BUBBLE_W, FX3_KEYS, FX_H, FX_W, buildFx } from '../src/art3/fx';
+import { DISH_BY_ID } from '../src/sim/data';
 
 const dishes = buildDishes();
 const fx = buildFx();
@@ -18,6 +19,10 @@ const CONTRACT_DISH_IDS = [
   'burger', 'wings', 'kebab', 'smash', 'chili', 'salad',
   'pork', 'ribs', 'brisket', 'foie',
   'rings', 'nuggets', 'fries', 'chicken',
+  // late game (levels 10-40) and the new stations' secret recipes
+  'chowder', 'corndog', 'eyesoup', 'stew', 'links', 'tbone', 'donuts', 'pizza', 'calzone', 'jerky', 'knots', 'meatballs', 'brats', 'swamp',
+  'hog', 'deepdish', 'fishchips', 'turducken', 'burntends', 'fondue', 'coffinribs', 'beans', 'stromboli', 'mammoth', 'tomahawk', 'mummywrap',
+  'potpie', 'tempura', 'hash', 'elixir', 'kraken', 'pizzaface', 'damned', 'apocalypse', 'toadstew', 'ratpizza', 'luau', 'tenders',
 ];
 
 function checkSvg(a: ArtAsset): void {
@@ -56,6 +61,11 @@ describe('art3 dishes + fx coverage', () => {
   it('lists exactly the contract dish ids', () => {
     expect([...DISH3_IDS]).toEqual(CONTRACT_DISH_IDS);
     expect([...FX3_KEYS].sort()).toEqual([...FX_KEYS].sort());
+  });
+
+  it('draws an icon for every dish the sim can cook', () => {
+    const keys = new Set(dishes.map((a) => a.key));
+    for (const d of Object.values(DISH_BY_ID)) expect(keys.has(d.icon), d.icon).toBe(true);
   });
 
   it('provides every key exactly once and nothing else', () => {

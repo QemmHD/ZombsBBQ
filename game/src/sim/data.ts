@@ -63,7 +63,7 @@ const D = (id: string, name: string, station: StationKind, source: 'level' | 'ra
 export const DISHES: DishDef[] = [
   // the house cookbook: cooks on any stove
   D('sliders', 'Mystery Sliders', 'stove', 'level', 1, 2 * M, 10, 8, 4, 1, "Three tiny burgers. Don't count the eyes."),
-  D('hobodog', 'Hobo Hot Dog', 'stove', 'level', 1, 5 * M, 20, 18, 4, 3, 'Found it. Grilled it. Band-aid optional.'),
+  D('hobodog', 'Hobo Hot Dog', 'stove', 'level', 1, 5 * M, 20, 18, 4, 4, 'Found it. Grilled it. Band-aid optional.'),
   D('gumbo', 'Gutter Gumbo', 'stove', 'level', 2, 15 * M, 55, 45, 5, 7, 'Fished fresh from the storm drain.'),
   D('tacos', 'Toe-tally Tacos', 'stove', 'level', 3, 60 * M, 340, 150, 9, 20, 'Ten little piggies, extra crunchy.'),
   D('lasagut', 'Leftover Lasagut', 'stove', 'level', 3, 8 * H, 740, 425, 7, 57, 'Layers of pasta. Layers of… other things.'),
@@ -261,7 +261,29 @@ export interface CustomerDef {
   infect: { cash?: number; sauce?: number };
   stats: ZombieStats;
   gag: string;
+  /** what this type is especially good at once it joins the crew (most have none; rarer types better) */
+  perks?: Perks;
+  /** picks a first name from the women's list (unset: the mixed list) */
+  fem?: boolean;
 }
+
+/**
+ * Per-type crew perks, as multipliers (1.25 = +25%):
+ *   cook   dishes cook faster while they stand at the stove
+ *   tips   diners they serve tip more
+ *   regen  energy comes back faster while they nap
+ *   xp     dishes they cook give more XP
+ */
+export interface Perks {
+  cook?: number;
+  tips?: number;
+  regen?: number;
+  xp?: number;
+}
+
+export type PerkId = keyof Perks;
+export const PERK_IDS: PerkId[] = ['cook', 'tips', 'regen', 'xp'];
+export const PERK_LABEL: Record<PerkId, string> = { cook: 'COOK', tips: 'TIPS', regen: 'REGEN', xp: 'XP' };
 
 const C = (
   id: string,
@@ -326,7 +348,58 @@ export const CUSTOMERS: CustomerDef[] = [
   C('pitmaster', 'Pitmaster', 'The Smoke Lord', 'legendary', 38, 4.5, 0.5, 2.0, { sauce: 100 }, [260, 7, 9, 8, 7, 9, 9], 'Forty years at the pit. The pit won.'),
 ];
 
+/** Perks and name lists per type (kept apart from the stat table so new types can be added there as plain rows). */
+const EXTRAS: Record<string, Pick<CustomerDef, 'perks' | 'fem'>> = {
+  jane: { fem: true },
+  yoga: { fem: true, perks: { regen: 1.15 } },
+  politician: { perks: { tips: 1.15 } },
+  nurse: { fem: true, perks: { regen: 1.25 } },
+  ceo: { perks: { tips: 1.3 } },
+  trafficcop: { perks: { cook: 1.1 } },
+  benchwarmer: { perks: { regen: 1.3 } },
+  lumberjack: { perks: { cook: 1.2 } },
+  cheerleader: { fem: true, perks: { tips: 1.2, regen: 1.1 } },
+  critic: { perks: { xp: 1.25 } },
+  boxer: { perks: { regen: 1.15 } },
+  grandma: { fem: true, perks: { cook: 1.25, xp: 1.15 } },
+  moviestar: { fem: true, perks: { tips: 1.3 } },
+  sumo: { perks: { cook: 1.15, regen: 1.2 } },
+  influencer: { fem: true, perks: { tips: 1.4 } },
+  celebrity: { perks: { tips: 1.4, xp: 1.15 } },
+  champ: { perks: { cook: 1.2, tips: 1.2, regen: 1.3, xp: 1.2 } },
+  trucker: { perks: { regen: 1.2 } },
+  biker: { perks: { cook: 1.15 } },
+  firefighter: { perks: { cook: 1.2, regen: 1.15 } },
+  bride: { fem: true, perks: { tips: 1.35 } },
+  headbanger: { perks: { cook: 1.25, regen: 1.2 } },
+  surgeon: { perks: { cook: 1.2, xp: 1.25 } },
+  tycoon: { perks: { tips: 1.5, xp: 1.1 } },
+  pitmaster: { perks: { cook: 1.3, tips: 1.2, regen: 1.2, xp: 1.3 } },
+};
+for (const c of CUSTOMERS) Object.assign(c, EXTRAS[c.id]);
+
 export const CUSTOMER_BY_ID: Record<string, CustomerDef> = Object.fromEntries(CUSTOMERS.map((c) => [c.id, c]));
+
+/** A crew member's perk multiplier (1 when the type has none, and for YOU). */
+export function perk(type: string, id: PerkId): number {
+  return CUSTOMER_BY_ID[type]?.perks?.[id] ?? 1;
+}
+
+/** Our own first names for customers (and the zombies they become). */
+export const FIRST_NAMES = {
+  m: ['Gary', 'Dale', 'Earl', 'Ron', 'Walt', 'Doug', 'Phil', 'Lyle', 'Marv', 'Stan', 'Otis', 'Vic', 'Lenny', 'Burt', 'Gil', 'Herb', 'Rudy', 'Wes', 'Floyd', 'Mort', 'Clint', 'Duane', 'Hal', 'Irv'],
+  f: ['Doris', 'Gail', 'Pam', 'Rita', 'Bev', 'Lorna', 'Midge', 'Fay', 'Trish', 'Wanda', 'Opal', 'Dot', 'Edna', 'Joan', 'Kay', 'Nell', 'Peg', 'Roz', 'Sal', 'Tammy', 'Vi', 'Mavis', 'Lois', 'Bonnie'],
+  x: ['Sam', 'Alex', 'Jo', 'Robin', 'Casey', 'Terry', 'Lee', 'Pat', 'Jody', 'Kim', 'Dana', 'Frankie'],
+};
+
+const MEN = new Set(['joe', 'hipster', 'senior', 'accountant', 'teen', 'politician', 'construction', 'cop', 'ceo', 'trafficcop', 'benchwarmer', 'lumberjack', 'critic', 'boxer', 'sumo', 'celebrity', 'champ', 'trucker', 'biker', 'headbanger', 'tycoon', 'pitmaster']);
+
+/** A seeded first name for a customer of this type (seed: any well-mixed 32-bit number). */
+export function firstName(type: string, seed: number): string {
+  const fem = CUSTOMER_BY_ID[type]?.fem ?? (MEN.has(type) ? false : undefined);
+  const list = fem === true ? FIRST_NAMES.f : fem === false ? FIRST_NAMES.m : FIRST_NAMES.x;
+  return list[(seed >>> 0) % list.length];
+}
 
 export const YOU_STATS: ZombieStats = { energy: 100, speed: 5, power: 3, tips: 4, recharge: 5, focus: 10, patience: 10 };
 
@@ -337,6 +410,8 @@ export const TUNING = {
   /** how long a seated customer waits for food before leaving unhappy */
   customerWaitSec: 60, // original: a minute, then they storm off
   eatSec: 30, // original: half a minute at the table
+  /** the tutorial's very first diner eats in 10 s (original: TUTORIAL_CUSTOMER_EAT_TIME) */
+  tutorialEatSec: 10,
   fleeSpeed: 3.0,
   baseWalkSpeed: 1.4, // tiles/sec at speed 0 (original: an average person walks ~1.9 tiles/s)
   walkSpeedPerStat: 0.125,
@@ -348,10 +423,47 @@ export const TUNING = {
   energyPerServe: 1.5,
   energyPerClear: 0.6,
   energyCookPerSec: 1 / 20, // original: cooks burn 1 energy / 20 s
+  /** …but only while prepping, the first this-many seconds of a dish; after that they just stand and
+   * stir (a 5 h dish would otherwise cost 900 energy, and a hangry cook would pause it forever) */
+  prepSec: 10 * 60,
   restRegenPerSec: 1 / 16, // ~3.75/min at average recharge (original ~3/min)
-  /** each Toxic Barrel adds this much to the rest recharge rate (they stack) */
-  kegBonus: 0.6,
-  biteEnergyGain: 20,
+  /** each Toxic Barrel adds this much to the rest recharge rate (they stack; original +10%) */
+  kegBonus: 0.1,
+  /** a bite gives back this share of the zombie's max energy (≈20 for an average zombie) */
+  biteEnergyFrac: 0.2,
+  /** a hangry zombie slumps and moans this long before it goes for a customer (original 5 s warning) */
+  hungrySec: 5,
+  /** at most one bite per zombie this often (original ZOMBIE_ATTACK_INTERVAL 60 s) */
+  biteCooldownSec: 60,
+  /** a zombie that can't get to its snack tries again after this long */
+  huntRetrySec: 10,
+  /** a zombie that works itself down to 0 energy passes out face-down; lying there it recovers at this
+   * fraction of the nap rate and gets back up on its own at wakeAt of its max energy */
+  asleepRegenMult: 0.5,
+  asleepWakeAt: 0.5,
+  /** freshly infected zombies start out starving (original: 20 energy) */
+  infectEnergy: 20,
+  /** Brain Sauce refills only work below this share of max energy (original) */
+  refillBelow: 0.8,
+  /** tip = bill x tips stat x this (Tips 10 ≈ 20% of the bill, original) */
+  tipPerStat: 0.02,
+  /** customers stop just inside the door to look around (original 1 s ± 0.8 s) */
+  doorPauseSec: 1,
+  doorPauseJitter: 0.8,
+  /** a served diner holds the plate a moment before tucking in (original 2 s) */
+  holdFoodSec: 2,
+  /** the fridge holds this many stolen dishes */
+  fridgeMax: 12,
+  /** while you're away (app hidden / offline catch-up) a zombie this close above its bite line takes
+   * itself out for a nap instead of snacking on the customers (the "union break"; a Settings toggle) */
+  unionBreakMargin: 0.1,
+  /** while away, stoves keep cooking on real time for up to this long (customers stop at the 8 h cap) */
+  offlineStoveCapSec: 24 * 3600,
+  /** the Zombie Pug: one find of $5–15 every ~6 min, never while closed, at most $600 a day */
+  pugFindSec: 360,
+  pugFindMin: 5,
+  pugFindMax: 15,
+  pugDailyMax: 600,
   /** a zombie who catches a customer eats them on the spot for this long before getting back to work */
   feastSec: 3,
   daydreamBaseSec: 100, // original: focus 1 ~ every 100 s
@@ -368,7 +480,7 @@ export const TUNING = {
   /** a bite counts as this many angry customers */
   ratingAttackWeight: 3,
   /** a closed café's rating slowly sags (per second) */
-  closedDriftPerSec: 0.00002,
+  closedDriftPerSec: 0.000003,
   reanimateSec: 60 * 60, // raid KO (original went from 8 h to 1 h)
   reanimateEnergy: 20, // comes back with 20 energy (original)
   sellBack: 0.5,
@@ -392,9 +504,9 @@ export const PURPLE = {
   max: 3,
   /** the first star lasts 48 h; the second adds 36 h to the timer, the third 24 h (original) */
   hours: [48, 36, 24],
-  /** with all three up, another finished list tops the timer up by 24 h, never past 108 h away */
+  /** with all three up, another finished list tops the timer up by 24 h, never past a week away (original) */
   refillHours: 24,
-  capHours: 108,
+  capHours: 168,
   /** bribe the reviewer: tick off one unfinished task for this much Brain Sauce (original: 2 toxin) */
   bribeSauce: 2,
 };
@@ -422,10 +534,19 @@ export function xpToNext(level: number): number {
   return Math.round(950 * Math.pow(1.1, level - 10));
 }
 
-/** Crew slots: one zombie at the start, about ten by level 20, thirteen late (original). */
+/** Crew slots (original): 1, 2, 3, 3, 4, 4 … one more every two levels to 9 at levels 15–16, then 10 from
+ * level 17, 11 from 27, 12 from 36, 13 from 46 and 14 from 56. */
 export function crewCapForLevel(level: number): number {
-  if (level <= 20) return 1 + Math.floor(level * 0.45);
-  return Math.min(13, 10 + Math.floor((level - 20) / 11));
+  if (level <= 1) return 1;
+  if (level <= 16) return Math.floor((level + 3) / 2);
+  for (const [lv, cap] of [
+    [56, 14],
+    [46, 13],
+    [36, 12],
+    [27, 11],
+  ] as const)
+    if (level >= lv) return cap;
+  return 10;
 }
 
 /** Rare customers get more common the further your stars exceed their requirement (original behavior). */
