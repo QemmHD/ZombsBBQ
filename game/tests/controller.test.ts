@@ -129,3 +129,48 @@ describe('Controller saves', () => {
     expect(ctl.state.now).toBeGreaterThan(now);
   });
 });
+
+describe('Controller: the rebuilt controls', () => {
+  it('a brand-new joint starts closed with YOU one step in from the front door', async () => {
+    const { Controller, S } = await load();
+    const ctl = new Controller();
+    const you = ctl.state.workers.find((w) => w.kind === 'you')!;
+    expect(ctl.state.closed).toBe(true);
+    expect([you.x, you.y]).toEqual([S.DOOR_X, 1]);
+  });
+
+  it('a hold (the tutorial bar) freezes the café clock until it is lifted', async () => {
+    const { Controller } = await load();
+    const ctl = new Controller();
+    ctl.hold('tutorial', true);
+    const t = ctl.state.now;
+    for (let i = 0; i < 10; i++) ctl.update(0.1);
+    expect(ctl.frozen).toBe(true);
+    expect(ctl.state.now).toBe(t);
+    ctl.hold('tutorial', false);
+    ctl.update(0.1);
+    expect(ctl.state.now).toBeGreaterThan(t);
+  });
+
+  it('ORDER repeats the last dish cooked on a stove', async () => {
+    const { Controller } = await load();
+    const ctl = new Controller();
+    const st = ctl.state.stoves[0];
+    expect(ctl.reorderDish(st.id)).toBeNull();
+    ctl.select({ kind: 'dishPicker', stoveId: st.id });
+    ctl.chooseDish('sliders');
+    expect(ctl.reorderDish(st.id)).toBe('sliders');
+  });
+
+  it('placing lists every tile the piece could go on, and only valid ones', async () => {
+    const { Controller, S } = await load();
+    const ctl = new Controller();
+    ctl.state.cash = 10000;
+    ctl.state.level = 5;
+    ctl.beginPlace('table_diner', 'buy');
+    const ok = ctl.placeableTiles();
+    expect(ok.length).toBeGreaterThan(3);
+    for (const t of ok) expect(S.canPlace(ctl.state, 'table_diner', t.x, t.y, ctl.placing!.dir)).toBeNull();
+    expect(ok.some((t) => t.x === ctl.state.furniture[0].x && t.y === ctl.state.furniture[0].y)).toBe(false);
+  });
+});

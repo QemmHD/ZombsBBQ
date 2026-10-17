@@ -491,12 +491,14 @@ export class Hud {
     // above the button, or below it when it sits under the awning
     const below = r.top < 90;
     a.classList.toggle('up', below);
-    a.style.left = `${r.left + r.width / 2}px`;
+    // a wide row (a dish in the cookbook): point at its picture, not the middle of its text
+    a.style.left = `${r.width > 200 ? r.left + 46 : r.left + r.width / 2}px`;
     a.style.top = `${below ? r.bottom + 4 : r.top - 4}px`;
   }
 
   // ---------- 5 Hz refresh ----------
-  private refresh() {
+  /** The 5 Hz refresh, run now (tests call it so a just-reached tutorial step shows its bar at once). */
+  refresh() {
     const s = this.ctl.state;
     this.el.lvl.textContent = String(s.level);
     this.el.name.textContent = jointName(s);

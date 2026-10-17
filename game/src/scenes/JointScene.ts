@@ -122,6 +122,8 @@ export class JointScene extends Phaser.Scene {
   /** valid tiles for the piece being placed (recomputed when the placement changes) */
   private okTiles: { x: number; y: number }[] = [];
   private okTilesKey = '';
+  /** tests: camera moves land at once instead of easing (a slow software renderer stretches a 0.5 s pan) */
+  instantCamera = false;
 
   constructor() {
     super('joint');
@@ -146,7 +148,11 @@ export class JointScene extends Phaser.Scene {
         this.setupInput();
         this.ctl.onEvent((e) => this.fx(e));
         this.ctl.onFocus((t) => this.focusOn(t));
-        this.ctl.onSelection(() => this.keepSelectionInView());
+        this.ctl.onSelection(() => {
+          this.keepSelectionInView();
+          // a new selection can move the tutorial's arrow (YOU picked: now the stove): pan right away
+          this.updateTutorial();
+        });
         this.ctl.onMode(() => this.onModeChange());
         this.scale.on('resize', () => this.applyZoom(true));
         this.game.events.emit('joint-ready');
@@ -396,7 +402,16 @@ export class JointScene extends Phaser.Scene {
     const u = dpr / cam.zoom;
     // the free band's middle is a little above the screen's middle (the awning is shorter than the strip)
     const off = ((STRIP_PX - this.awningPx()) / 2) * u;
-    cam.pan(p.x, p.y + off, 500, 'Cubic.easeOut', true);
+    // aim for a spot the bounds allow, so the ease ends where it's going instead of grinding on an edge
+    const b = cam.getBounds();
+    const hw = cam.width / cam.zoom / 2;
+    const hh = cam.height / cam.zoom / 2;
+    const x = b.width > hw * 2 ? Phaser.Math.Clamp(p.x, b.x + hw, b.right - hw) : b.centerX;
+    const y = b.height > hh * 2 ? Phaser.Math.Clamp(p.y + off, b.y + hh, b.bottom - hh) : b.centerY;
+    if (this.instantCamera) {
+      cam.panEffect.reset();
+      cam.centerOn(x, y);
+    } else cam.pan(x, y, 500, 'Cubic.easeOut', true);
   }
 
   /** A selection that lands under the command strip (or the awning) is scrolled into the clear. */

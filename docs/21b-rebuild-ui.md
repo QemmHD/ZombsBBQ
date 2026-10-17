@@ -86,7 +86,7 @@ Which buttons show (our features mapped onto the original's verbs):
 |---|---|
 | Hints (`nextHint`/`showHint`/`hintEvent`/`hintTick`) and the guided first table + chair (`guideStep`, `GUIDE_TEXT`) | Gus's chalkboard bar, non-freezing, with OK; one at a time, `HINT_GAP` apart, held while a menu is open. |
 | Badges (`badges`, `markSeen`) | A bouncing "!" on shop / cookbook / crew / Zombiepedia / map; opening the menu clears it. |
-| Alerts (`upcomingAlerts`) | Settings → "Check-in alerts" list (what will happen while you're away: dish done, burn soon, revived, rival reopens), and a toast summary when the app is hidden. |
+| Alerts (`upcomingAlerts`) | Settings → "Coming up": the next four check-ins (dish done, burn soon, revived, rival reopens) — what the iOS wrapper will schedule as local notifications. |
 | Eat! (`orderEat`) | **Attack** on a zombie's strip, then tap a customer (strip says "Tap a customer"). |
 | Rest-all (`restTired`) | Crew list header button "Rest the tired ones". |
 | Union-break toggle (`unionBreak`, `setUnionBreak`) | Settings switch. |
