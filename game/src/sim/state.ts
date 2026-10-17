@@ -44,7 +44,14 @@ export type CustomerState = 'entering' | 'waiting' | 'eating' | 'leaving' | 'tur
 export interface Customer extends Mover {
   id: string;
   type: string;
+  /** a first name (older saves: none) */
+  name?: string;
   state: CustomerState;
+  /** walking in: 'door' = heading for the doorway, 'look' = stopped there looking round until doorUntil */
+  stage?: 'door' | 'look';
+  doorUntil?: number;
+  /** just served: holding the plate (no eating yet) until this time */
+  holdUntil?: number;
   seatId?: string;
   tableId?: string;
   waitLeft: number;
@@ -70,6 +77,10 @@ export type WorkerState =
   | 'toRest'
   | 'resting'
   | 'daydream'
+  /** hangry warning: slumped and moaning for a few seconds before going for a customer (Rest cancels) */
+  | 'hungry'
+  /** worked down to 0 energy: passed out face-down where they stood (tap to wake) */
+  | 'asleep'
   | 'raiding'
   | 'down';
 
@@ -100,6 +111,18 @@ export interface Worker extends Mover {
   nextDaydream: number;
   /** raid KO: back on their feet at this sim time */
   downUntil?: number;
+  /** hangry warning: goes for a customer at this time */
+  hungryEnd?: number;
+  /** no bites before this time (one bite a minute at most) */
+  nextBiteAt?: number;
+  /** last time a "can't reach" was reported for them (so it isn't repeated every frame) */
+  cantReachAt?: number;
+}
+
+/** A fired zombie shambling off down the street (drawn until they're out of sight). */
+export interface Departing extends Mover {
+  id: string;
+  type: string;
 }
 
 export type StoveStatus = 'empty' | 'reserved' | 'cooking' | 'paused' | 'done' | 'burnt';
@@ -133,6 +156,8 @@ export interface Pet extends Mover {
   homeId: string;
   nextAction: number;
   state: 'roam' | 'sniff' | 'raiding';
+  /** the Zombie Pug's next find (sim time) */
+  nextFind?: number;
 }
 
 export interface FridgeItem {
@@ -192,6 +217,14 @@ export type GameEvent =
   | { t: 'goal'; goalId: string }
   | { t: 'purple'; stars: number; gained: boolean }
   | { t: 'daydream'; workerId: string }
+  /** a zombie went hangry: the warning slump before it bites */
+  | { t: 'hungry'; workerId: string }
+  /** worked down to nothing: passed out face-down */
+  | { t: 'asleep'; workerId: string }
+  /** back on their feet after a nap, passing out or a knock-out */
+  | { t: 'woke'; workerId: string; from: 'asleep' | 'resting' | 'down' }
+  /** somebody can't find a way to where they need to be */
+  | { t: 'cantReach'; workerId: string; what: string }
   | { t: 'toast'; text: string };
 
 export interface GameState {
@@ -225,9 +258,14 @@ export interface GameState {
   seen: Record<string, 'met' | 'infected'>;
   goalsDone: string[];
   rivals: Record<string, RivalProgress>;
-  graves: { day: string; green: number; red: number };
   inventory: { headstone: number; summon: number };
   spawnCooldown: number;
+  /** the Zombie Pug's takings today: { day: floor(now / 1 day), cash } */
+  pugDay?: { day: number; cash: number };
+  /** the "union break": while you're away, tired zombies nap instead of biting (Settings; default on) */
+  unionBreak?: boolean;
+  /** fired zombies on their way out */
+  departing?: Departing[];
   /** last few customer types, to keep the crowd varied */
   recentTypes: string[];
   tut: number;
@@ -247,6 +285,8 @@ export interface GameState {
     infectedRare: number;
     happy: number;
     angry: number;
+    /** dishes left on the stove until they burnt */
+    burnt: number;
     cleared: number;
     floorsFixed: number;
     cooked: Record<string, number>;
@@ -301,7 +341,7 @@ export function addFurniture(s: GameState, item: string, x: number, y: number, d
 }
 
 export function freshStats(): GameState['stats'] {
-  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0 };
+  return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, burnt: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0 };
 }
 
 /** The starting café, as the original handed it over: a grimy 7x6 room with the bare essentials. */
@@ -334,7 +374,6 @@ export function createInitialState(seed = 1234): GameState {
     seen: {},
     goalsDone: [],
     rivals: {},
-    graves: { day: '', green: 5, red: 5 },
     inventory: { headstone: 1, summon: 0 },
     spawnCooldown: 6,
     recentTypes: [],
@@ -369,13 +408,95 @@ export function createInitialState(seed = 1234): GameState {
   return s;
 }
 
+const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+
+/** The bones a v3 save must have to be playable (anything less is treated as corrupt, not loaded). */
+function validShape(st: GameState): boolean {
+  if (![st.now, st.cash, st.sauce, st.xp, st.level, st.rng, st.nextId, st.roomW, st.roomH, st.rating].every(isNum)) return false;
+  if (![st.workers, st.furniture, st.customers, st.stoves, st.counter].every(Array.isArray)) return false;
+  if (!st.walls || !Array.isArray(st.walls.l) || !Array.isArray(st.walls.r)) return false;
+  if (!st.workers.every((w) => w && typeof w.id === 'string' && isNum(w.x) && isNum(w.y) && isNum(w.energy) && typeof w.state === 'string' && w.stats)) return false;
+  if (!st.workers.some((w) => w.kind === 'you')) return false;
+  if (!st.furniture.every((f) => f && typeof f.id === 'string' && typeof f.item === 'string' && isNum(f.x) && isNum(f.y))) return false;
+  return st.customers.every((c) => c && typeof c.id === 'string' && isNum(c.x) && isNum(c.y));
+}
+
+/**
+ * Anyone still marked "out on a raid" (a save written mid-raid, or the app killed during one) comes
+ * home: back on the sidewalk by the door, ready to work. Nothing else ever clears that state.
+ */
+export function repairRaiders(st: GameState) {
+  for (const w of st.workers ?? []) {
+    if (w.state !== 'raiding') continue;
+    w.state = 'idle';
+    w.x = DOOR_X;
+    w.y = -1;
+    w.path = [];
+    w.job = undefined;
+    w.restSpot = undefined;
+  }
+  for (const p of st.pets ?? []) if (p.state === 'raiding') p.state = 'roam';
+}
+
+/**
+ * Dishes, items or customer types a content update renamed or removed: cleared out of stoves, counters,
+ * the fridge, the crew's hands and the dining room, so one stale id can't break the whole save.
+ */
+function dropUnknownContent(st: GameState) {
+  const ok = (d?: string) => !d || !!DISH_BY_ID[d];
+  const gone = new Set(st.furniture.filter((f) => !ITEM_BY_ID[f.item]).map((f) => f.id));
+  st.furniture = st.furniture.filter((f) => !gone.has(f.id));
+  st.stoves = st.stoves.filter((x) => !gone.has(x.furnitureId) && st.furniture.some((f) => f.id === x.furnitureId));
+  st.counter = st.counter.filter((x) => !gone.has(x.furnitureId));
+  for (const x of st.stoves)
+    if (!ok(x.dish)) {
+      x.status = 'empty';
+      x.dish = x.cookId = x.carrierId = undefined;
+      x.left = x.total = x.burnAt = undefined;
+    }
+  for (const c of st.counter)
+    if (!ok(c.dish)) {
+      c.dish = undefined;
+      c.servings = 0;
+    }
+  st.fridge = st.fridge.filter((f) => f && DISH_BY_ID[f.dish]);
+  st.customers = st.customers.filter((c) => CUSTOMER_BY_ID[c.type] && ok(c.dish) && !(c.seatId && gone.has(c.seatId)) && !(c.tableId && gone.has(c.tableId)));
+  for (const w of st.workers) {
+    const j = w.job;
+    const bad =
+      (j?.kind === 'serve' && (!ok(j.dish) || !st.customers.some((c) => c.id === j.customerId))) ||
+      (j?.kind === 'dish' && (!ok(j.dish) || !st.stoves.some((x) => x.id === j.stoveId))) ||
+      (j?.kind === 'plate' && !st.furniture.some((f) => f.id === j.tableId)) ||
+      !ok(w.pendingDish) ||
+      (w.stoveId && !st.stoves.some((x) => x.id === w.stoveId));
+    if (!bad) continue;
+    w.job = undefined;
+    w.pendingDish = undefined;
+    w.stoveId = undefined;
+    w.targetId = undefined;
+    if (w.state !== 'raiding' && w.state !== 'down' && w.state !== 'resting') {
+      w.state = 'idle';
+      w.path = [];
+    }
+  }
+  for (const c of st.customers) if (c.serverId && !st.workers.some((w) => w.id === c.serverId)) c.serverId = undefined;
+}
+
 /** Upgrade older saves in place. Returns null if the save can't be migrated. */
 export function migrate(raw: unknown): GameState | null {
   const st = raw as (GameState & { version?: number }) | null;
   if (!st || typeof st !== 'object') return null;
   if (st.version === SAVE_VERSION) {
+    if (!validShape(st)) return null;
+    for (const k of ['pets', 'wallItems', 'fridge', 'recipes', 'goalsDone', 'recentTypes'] as const) if (!Array.isArray(st[k])) (st as unknown as Record<string, unknown>)[k] = [];
+    for (const k of ['seen', 'rivals', 'storage', 'floors'] as const) if (!st[k] || typeof st[k] !== 'object') (st as unknown as Record<string, unknown>)[k] = {};
+    repairRaiders(st);
+    dropUnknownContent(st);
     // newer stat counters (e.g. decor) start at zero on older v3 saves
     st.stats = { ...freshStats(), ...(st.stats ?? {}) };
+    // the never-used daily grave counters of earlier builds
+    delete (st as { graves?: unknown }).graves;
+    st.crewCap = Math.max(st.crewCap ?? 1, crewCapForLevel(st.level ?? 1));
     if (st.recipes) st.recipes = st.recipes.filter((r) => DISH_BY_ID[r]);
     return st;
   }

@@ -102,6 +102,8 @@ const STATUS: Record<WorkerState, string> = {
   toRest: 'Off for a nap',
   resting: 'Napping outside',
   daydream: 'Daydreaming about brains',
+  hungry: 'HUNGRY! About to bite',
+  asleep: 'Passed out (no energy)',
   raiding: 'Out raiding',
   down: 'Knocked out',
 };

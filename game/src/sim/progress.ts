@@ -1,4 +1,4 @@
-import { DISH_BY_ID } from './data';
+import { DISH_BY_ID, TUNING } from './data';
 import { GOALS, type GoalDef } from './catalog';
 import { DOOR_X, isInside, key } from './grid';
 import { grimeCount } from './build';
@@ -92,6 +92,16 @@ export function claimGoal(s: GameState, id: string): string | null {
 
 // ---------- the fridge ----------
 
+/** The fridge only holds so much: past this, new loot pushes out the oldest dish. */
+export const fridgeFull = (s: GameState) => s.fridge.length >= TUNING.fridgeMax;
+
+/** Throw a fridge dish out (to make room for raid loot). */
+export function binFridge(s: GameState, index: number): string | null {
+  if (!s.fridge[index]) return 'Nothing there.';
+  s.fridge.splice(index, 1);
+  return null;
+}
+
 export function serveFromFridge(s: GameState, index: number): string | null {
   const it = s.fridge[index];
   if (!it) return 'Nothing there.';
@@ -171,13 +181,19 @@ function updatePet(s: GameState, p: Pet, dt: number) {
   move(p, dt);
   if (s.now < p.nextAction || p.path.length) return;
   if (p.state === 'sniff') {
-    // the Zombie Pug sniffs out loose change, like a furry metal detector
-    const amount = 15 + Math.floor(rand(s) * 40);
+    // the Zombie Pug sniffs out loose change, like a furry metal detector: a few dollars every few
+    // minutes, nothing while the café is shut, and only so much in a day
+    p.state = 'roam';
+    p.nextAction = s.now + 2;
+    p.nextFind = s.now + TUNING.pugFindSec * (0.75 + rand(s) * 0.5);
+    const day = Math.floor(s.now / 86400);
+    if (!s.pugDay || s.pugDay.day !== day) s.pugDay = { day, cash: 0 };
+    const amount = Math.min(TUNING.pugDailyMax - s.pugDay.cash, TUNING.pugFindMin + Math.floor(rand(s) * (TUNING.pugFindMax - TUNING.pugFindMin + 1)));
+    if (s.closed || amount <= 0) return;
+    s.pugDay.cash += amount;
     s.cash += amount;
     s.stats.earned += amount;
     s.events.push({ t: 'petFind', petId: p.id, amount });
-    p.state = 'roam';
-    p.nextAction = s.now + 2;
     return;
   }
   const blocked = blockedTiles(s);
@@ -189,21 +205,11 @@ function updatePet(s: GameState, p: Pet, dt: number) {
     setPath(s, p, { x, y }, p.type === 'pug' ? 1.6 : 2.4);
     break;
   }
-  if (p.type === 'pug' && rand(s) < 0.12) {
+  p.nextFind ??= s.now + TUNING.pugFindSec * (0.5 + rand(s) * 0.5);
+  if (p.type === 'pug' && s.now >= p.nextFind && !s.closed) {
     p.state = 'sniff';
     p.nextAction = s.now + 3;
   } else p.nextAction = s.now + 4 + rand(s) * 6;
-}
-
-// ---------- daily raid items ----------
-
-export function today(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
-
-export function refreshDaily(s: GameState, day = today()) {
-  if (s.graves.day !== day) s.graves = { day, green: 5, red: 5 };
 }
 
 export function updateProgress(s: GameState, dt: number) {

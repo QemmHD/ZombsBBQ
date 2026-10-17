@@ -8,7 +8,7 @@ import { TUNING } from './data';
 import { DIR2, DIR4, DIR_STEP, EXPANSIONS, FLOOR_BY_ID, ITEM_BY_ID, WALL_BY_ID, type Dir, type ItemDef } from './catalog';
 import { DOOR_X, isInside, key, onLawn, reachable, type Pt } from './grid';
 import { addFurniture, type Furniture, type GameState } from './state';
-import { addXp, furnById, itemOf, releaseJob, room } from './sim';
+import { addXp, furnById, itemOf, releaseJob, room, setPath } from './sim';
 
 const KEEP_WARM_COST = 300;
 
@@ -85,7 +85,8 @@ export function canPlace(s: GameState, itemId: string, x: number, y: number, dir
 export function layoutProblem(s: GameState, furniture: Furniture[]): string | null {
   const r = room(s);
   const inside = furniture.filter((f) => !ITEM_BY_ID[f.item].outdoor);
-  const blocked = new Set(inside.map((f) => key(f.x, f.y)));
+  // every piece blocks its tile, wherever it stands (the sim's pathfinding sees it the same way)
+  const blocked = new Set(furniture.map((f) => key(f.x, f.y)));
   const reach = reachable({ x: DOOR_X, y: 0 }, blocked, r);
   const free = (p: Pt) => isInside(p.x, p.y, r) && reach.has(key(p.x, p.y));
   const nextToReach = (f: Pt) =>
@@ -108,6 +109,14 @@ export function layoutProblem(s: GameState, furniture: Furniture[]): string | nu
       const hasChair = inside.some((c) => ITEM_BY_ID[c.item].kind === 'chair' && c.dir && c.x + DIR_STEP[c.dir].x === f.x && c.y + DIR_STEP[c.dir].y === f.y);
       if (hasChair && !nextToReach(f)) return 'Servers can’t reach that table!';
     }
+  }
+  // nobody standing in the café may be shut in a pocket they can't walk out of
+  for (const w of s.workers) {
+    if (w.state === 'raiding') continue;
+    const p = { x: Math.round(w.x), y: Math.round(w.y) };
+    if (!isInside(p.x, p.y, r) || free(p)) continue;
+    if (blocked.has(key(p.x, p.y)) && nextToReach(p)) continue; // furniture put down at their feet: they step off it
+    return `That would box in ${w.name}!`;
   }
   return null;
 }
@@ -159,11 +168,19 @@ export function moveFurniture(s: GameState, id: string, x: number, y: number, di
   if (busy) return busy;
   const err = canPlace(s, f.item, x, y, dir ?? f.dir, id);
   if (err) return err;
-  // anyone heading to this piece needs a fresh plan
-  for (const w of s.workers) if (w.path.length && (w.state === 'toCounter' || w.state === 'toPlate' || w.state === 'carryPlate' || w.state === 'carryDish')) releaseJob(s, w);
+  // only a job that involves this piece is dropped (a pot on its way to this counter, plates to this sink)
+  const kind = itemOf(f).kind;
+  for (const w of s.workers) if (w.path.length && ((w.state === 'carryDish' && w.targetId === f.id) || (w.state === 'carryPlate' && kind === 'sink'))) releaseJob(s, w);
   f.x = x;
   f.y = y;
   if (dir) f.dir = dir;
+  // everyone else walking somewhere finds a way round it
+  for (const m of [...s.workers, ...s.customers]) {
+    if (!m.path.length) continue;
+    const goal = m.path[m.path.length - 1];
+    if (setPath(s, m, goal, m.speed)) continue;
+    if ('kind' in m) releaseJob(s, m);
+  }
   return null;
 }
 
@@ -202,6 +219,8 @@ export function storeFurniture(s: GameState, id: string): string | null {
   if (!f) return 'Nope.';
   const err = removable(s, f);
   if (err) return err;
+  // storage only counts items, so a tombstone would come back fully charged: wait for the recharge
+  if (itemOf(f).kind === 'tombstone' && ((f.uses ?? 5) < 5 || (f.usesResetAt ?? 0) > s.now)) return 'This tombstone is recharging. Store it once it’s back to full.';
   removeFurniture(s, f);
   s.storage[f.item] = (s.storage[f.item] ?? 0) + 1;
   return null;
@@ -374,6 +393,15 @@ export function expand(s: GameState): string | null {
   const fin = common([...s.walls.l, ...s.walls.r]);
   while (s.walls.r.length < e.w) s.walls.r.push(fin);
   while (s.walls.l.length < e.h) s.walls.l.push(fin);
+  // the front lawn moves out with the walls: tombstones and pet houses stay outside
+  const dw = e.w - s.roomW;
+  const dh = e.h - s.roomH;
+  for (const f of s.furniture) {
+    if (!itemOf(f).outdoor) continue;
+    const ox = f.x;
+    if (ox >= s.roomW) f.x += dw;
+    if (f.y >= s.roomH) f.y += dh;
+  }
   s.roomW = e.w;
   s.roomH = e.h;
   s.stats.purchases++;

@@ -8,6 +8,8 @@ import {
   VARIANT_DISHES,
   attackThreshold,
   crewCapForLevel,
+  firstName,
+  perk,
   rechargeMult,
   type DishDef,
   spawnWeight,
@@ -17,7 +19,7 @@ import {
 } from './data';
 import { DIR_STEP, FLOOR_BY_ID, ITEM_BY_ID, WALL_BY_ID, type ItemDef } from './catalog';
 import { DOOR_X, findPath, isInside, key, reachable, restSpots, streetEnds, walkable, type Pt, type Room } from './grid';
-import { makeWorker, maxEnergy, type Customer, type Furniture, type GameState, type Mover, type Stove, type Worker } from './state';
+import { makeWorker, maxEnergy, type Customer, type Furniture, type GameState, type Mover, type Stove, type Worker, type WorkerState } from './state';
 import { updateProgress } from './progress';
 import { stealingRivals } from './rivals';
 
@@ -41,6 +43,8 @@ export const itemOf = (f: Furniture): ItemDef => ITEM_BY_ID[f.item];
 export const furnById = (s: GameState, id: string) => s.furniture.find((f) => f.id === id);
 export const furnAt = (s: GameState, x: number, y: number) => s.furniture.find((f) => f.x === x && f.y === y);
 export const zombies = (s: GameState) => s.workers.filter((w) => w.kind === 'zombie');
+/** Crew slots in use: the zombies, plus customers still turning into one. */
+export const crewCount = (s: GameState) => zombies(s).length + s.customers.filter((c) => c.state === 'infecting').length;
 export const atWork = (w: Worker) => w.state !== 'raiding' && w.state !== 'down';
 
 export function blockedTiles(s: GameState): Set<string> {
@@ -138,6 +142,73 @@ export function faceTowards(m: Mover, x: number, y: number) {
   if (Math.abs(sdx) > 0.01) m.facing = sdx > 0 ? 1 : -1;
   m.back = x - m.x + (y - m.y) < -0.01;
 }
+
+/** Tell the player (once in a while, not every frame) that someone can't find a way somewhere. */
+function cantReach(s: GameState, w: Worker, what: string) {
+  if (s.now - (w.cantReachAt ?? -Infinity) < 8) return;
+  w.cantReachAt = s.now;
+  s.events.push({ t: 'cantReach', workerId: w.id, what });
+}
+
+/** Walk a worker somewhere; if there's no way through, say so (see cantReach) and return false. */
+function goTo(s: GameState, w: Worker, goal: Pt, speed: number, what: string): boolean {
+  if (setPath(s, w, goal, speed)) return true;
+  cantReach(s, w, what);
+  return false;
+}
+
+// ---------- energy: hangry, hungry, asleep ----------
+
+/** Low enough on energy that their patience runs out (they'll go for a customer). */
+export function isHangry(w: Worker): boolean {
+  return w.kind === 'zombie' && w.energy <= maxEnergy(w) * attackThreshold(w.stats.patience);
+}
+
+/** Not still digesting their last snack (one bite a minute at most). */
+export const canBite = (s: GameState, w: Worker) => s.now >= (w.nextBiteAt ?? -Infinity);
+
+/** Seconds until a zombie may bite again. */
+export const biteCooldownLeft = (s: GameState, w: Worker) => Math.max(0, (w.nextBiteAt ?? 0) - s.now);
+
+/** The nearest seated customer a zombie could get to (for a snack). */
+function nearestPrey(s: GameState, w: Worker): Customer | undefined {
+  return s.customers
+    .filter((c) => c.state === 'waiting' || c.state === 'eating')
+    .sort((a, b) => Math.abs(a.x - w.x) + Math.abs(a.y - w.y) - (Math.abs(b.x - w.x) + Math.abs(b.y - w.y)))[0];
+}
+
+/** The hangry warning: drop everything (a cook's dish pauses), slump and moan, then go for a customer. */
+function goHungry(s: GameState, w: Worker) {
+  releaseJob(s, w);
+  w.state = 'hungry';
+  w.hungryEnd = s.now + TUNING.hungrySec;
+  s.events.push({ t: 'hungry', workerId: w.id });
+}
+
+/** Set off after a customer (the hangry lunge, or the player's Eat! order). */
+function huntCustomer(s: GameState, w: Worker, prey: Customer): boolean {
+  const table = prey.tableId ? furnById(s, prey.tableId) : undefined;
+  const at = table ? tableAccess(s, table) : null;
+  w.targetId = prey.id;
+  w.state = 'hunting';
+  w.hungryEnd = undefined;
+  if (goTo(s, w, at ?? { x: Math.round(prey.x), y: Math.round(prey.y) }, workerSpeed(w) * 1.3, 'that customer')) return true;
+  w.state = 'idle';
+  w.targetId = undefined;
+  w.path = [];
+  return false;
+}
+
+/** Worked down to nothing: they pass out face-down right where they are (whatever they held is put back). */
+function fallAsleep(s: GameState, w: Worker) {
+  releaseJob(s, w);
+  w.state = 'asleep';
+  w.energy = 0;
+  s.events.push({ t: 'asleep', workerId: w.id });
+}
+
+/** States where a zombie burns energy on a job (and so can run dry and pass out). */
+const WORKING: ReadonlySet<WorkerState> = new Set<WorkerState>(['toStove', 'cooking', 'toPickup', 'carryDish', 'toCounter', 'carrying', 'toPlate', 'carryPlate']);
 
 // ---------- rating ----------
 
@@ -237,10 +308,17 @@ export function startCooking(s: GameState, workerId: string, stoveId: string, di
   if (!w || !st) return 'Nope.';
   if (!atWork(w)) return `${w.name} is ${w.state === 'down' ? 'still reanimating' : 'out on a raid'}.`;
   if (w.state === 'cooking' && w.stoveId === stoveId) return null;
+  if (w.state === 'asleep') return `${w.name} passed out. Tap them to wake them up, or refill with Brain Sauce.`;
+  if (w.state === 'hungry' || w.state === 'hunting' || w.state === 'feasting') return `${w.name} is HANGRY! Rest them or refill with Brain Sauce first.`;
+  if (w.kind === 'zombie' && w.energy <= 0) return `${w.name} is running on empty. Let them nap or refill with Brain Sauce.`;
   if (w.kind === 'zombie' && w.state === 'resting' && w.energy < maxEnergy(w) * 0.3) return `${w.name} is too tired. Let them nap or refill with Brain Sauce.`;
   const f = stoveFurn(s, st);
   const at = useTile(s, f);
   if (!at) return 'Nobody can reach that stove!';
+  if (!findPath({ x: w.x, y: w.y }, at, blockedTiles(s), room(s))) {
+    cantReach(s, w, `the ${st.kind}`);
+    return `${w.name} can't get to that ${st.kind}! Move some furniture to clear a path.`;
+  }
   if (st.status === 'paused' || (st.status === 'cooking' && !st.cookId)) {
     // resume a paused dish: no extra cost
     releaseJob(s, w);
@@ -300,14 +378,75 @@ export function plateDish(s: GameState, stoveId: string, workerId?: string): str
     w = free[0] ?? s.workers.find((x) => x.kind === 'you' && atWork(x));
   }
   if (!w) return 'Nobody is free to carry it!';
-  if (w.state === 'cooking') {
-    // pulling a cook off their stove pauses that dish
-    releaseJob(s, w);
-  } else releaseJob(s, w);
+  if (!findPath({ x: w.x, y: w.y }, at, blockedTiles(s), room(s))) {
+    cantReach(s, w, `the ${st.kind}`);
+    return `${w.name} can't get to that ${st.kind}! Move some furniture to clear a path.`;
+  }
+  // (pulling a cook off their stove pauses that dish)
+  releaseJob(s, w);
   w.job = { kind: 'dish', stoveId: st.id };
   w.state = 'toPickup';
   st.carrierId = w.id;
   setPath(s, w, at, workerSpeed(w));
+  return null;
+}
+
+/** Who'd cook at this stove if nobody was picked: the nearest crew member who's free and has the energy. */
+export function freeCook(s: GameState, stoveId: string): Worker | undefined {
+  const st = s.stoves.find((x) => x.id === stoveId);
+  if (!st) return undefined;
+  const f = stoveFurn(s, st);
+  const at = useTile(s, f);
+  if (!at) return undefined;
+  const blocked = blockedTiles(s);
+  return s.workers
+    .filter((w) => atWork(w) && (w.state === 'idle' || w.state === 'daydream') && !w.job && !(w.kind === 'zombie' && (w.energy <= 0 || isHangry(w))))
+    .map((w) => ({ w, d: Math.abs(w.x - at.x) + Math.abs(w.y - at.y) + (w.kind === 'you' ? 0.5 : 0) }))
+    .sort((a, b) => a.d - b.d)
+    .find(({ w }) => findPath({ x: w.x, y: w.y }, at, blocked, room(s)))?.w;
+}
+
+/** Tap an empty stove, pick a dish: the nearest free cook goes (or the one the player picked). */
+export function cookAt(s: GameState, stoveId: string, dishId: string, workerId?: string): string | null {
+  const w = workerId ? s.workers.find((x) => x.id === workerId) : freeCook(s, stoveId);
+  if (!w) return 'Nobody’s free to cook. Wake someone up, or tap a cook first.';
+  return startCooking(s, w.id, stoveId, dishId);
+}
+
+/** The cookbook's Cook button: the nearest free cook at the nearest empty stove that can make it. */
+export function cookAnywhere(s: GameState, dishId: string): string | null {
+  const dish = DISH_BY_ID[dishId];
+  if (!dish) return 'Pick a dish.';
+  if (!dishAvailable(s, dishId)) return dish.source === 'raid' ? 'Steal this recipe in a raid first!' : `Unlocks at level ${dish.level}.`;
+  if (s.cash < dish.cost) return 'Not enough cash!';
+  const able = s.stoves.filter((st) => stoveCooks(st, dish.station));
+  if (!able.length) return `${dish.name} needs a ${dish.station}. Get one in the Shop!`;
+  const empty = able.filter((st) => st.status === 'empty');
+  if (!empty.length) return `Every ${dish.station === 'stove' ? 'stove' : dish.station} is busy.`;
+  let best: { st: Stove; w: Worker; d: number } | null = null;
+  for (const st of empty) {
+    const w = freeCook(s, st.id);
+    const f = stoveFurn(s, st);
+    if (!w) continue;
+    const d = Math.abs(w.x - f.x) + Math.abs(w.y - f.y);
+    if (!best || d < best.d) best = { st, w, d };
+  }
+  if (!best) return 'Nobody’s free to cook right now.';
+  return startCooking(s, best.w.id, best.st.id, dishId);
+}
+
+/** The Eat! command: send a zombie to snack on a customer (+energy, but the rest of the room panics). */
+export function orderEat(s: GameState, workerId: string, customerId: string): string | null {
+  const w = s.workers.find((x) => x.id === workerId);
+  const c = s.customers.find((x) => x.id === customerId);
+  if (!w || w.kind !== 'zombie') return 'Only zombies eat customers. Mostly.';
+  if (!atWork(w)) return `${w.name} is ${w.state === 'down' ? 'still reanimating' : 'out on a raid'}.`;
+  if (w.state === 'asleep') return `${w.name} passed out. Wake them up first.`;
+  if (w.state === 'feasting') return `${w.name} is still chewing.`;
+  if (!canBite(s, w)) return `${w.name} is still digesting. Ready in ${Math.ceil(biteCooldownLeft(s, w))}s.`;
+  if (!c || !(c.state === 'waiting' || c.state === 'eating')) return 'Pick a seated customer.';
+  releaseJob(s, w);
+  if (!huntCustomer(s, w, c)) return `${w.name} can't get to them! Clear a path.`;
   return null;
 }
 
@@ -333,7 +472,9 @@ export function finishNow(s: GameState, stoveId: string): string | null {
 export function cancelCooking(s: GameState, stoveId: string): string | null {
   const st = s.stoves.find((x) => x.id === stoveId);
   if (!st || !(st.status === 'cooking' || st.status === 'paused' || st.status === 'reserved') || !st.dish) return 'Nothing cooking there.';
-  s.cash += Math.floor(DISH_BY_ID[st.dish].cost * TUNING.sellBack);
+  // nothing's been cooked yet while the cook is still on the way: all the money back
+  const cost = DISH_BY_ID[st.dish]?.cost ?? 0;
+  s.cash += st.status === 'reserved' && st.left === st.total ? cost : Math.floor(cost * TUNING.sellBack);
   const cook = s.workers.find((w) => w.id === st.cookId);
   if (cook && (cook.state === 'cooking' || cook.state === 'toStove')) {
     cook.state = 'idle';
@@ -356,10 +497,17 @@ export function discardCounter(s: GameState, slotId: string): string | null {
   return null;
 }
 
-/** Flip the door sign. Closing sends idle zombies outside for a nap (original: they line up and snooze). */
+/**
+ * Flip the door sign. Closing up sends the whole zombie crew out to nap on the sidewalk (original: they
+ * line up outside and snooze; any dish on the go pauses), and they stay out until you open again.
+ */
 export function setClosed(s: GameState, closed: boolean) {
   s.closed = closed;
-  if (closed) for (const w of s.workers) if (w.kind === 'zombie' && (w.state === 'idle' || w.state === 'daydream') && w.energy < maxEnergy(w)) rest(s, w.id);
+  for (const w of s.workers) {
+    if (w.kind !== 'zombie' || !atWork(w)) continue;
+    if (closed && w.state !== 'resting' && w.state !== 'toRest' && w.state !== 'feasting') rest(s, w.id);
+    if (!closed && (w.state === 'resting' || w.state === 'toRest') && w.energy >= maxEnergy(w) * 0.3) wake(s, w.id);
+  }
 }
 
 /** Put servings on a counter: dishes stack, so one counter can hold every dish (original). */
@@ -387,7 +535,7 @@ export function infectCost(s: GameState, c: Customer): { cash: number; sauce: nu
 export function infect(s: GameState, customerId: string): string | null {
   const c = s.customers.find((x) => x.id === customerId);
   if (!c || !['entering', 'waiting', 'eating'].includes(c.state)) return 'Too late, they left!';
-  if (zombies(s).length >= s.crewCap) return `Crew is full (${s.crewCap}/${s.crewCap}). Level up for more slots!`;
+  if (crewCount(s) >= s.crewCap) return `Crew is full (${s.crewCap}/${s.crewCap}). Level up for more slots!`;
   const cost = infectCost(s, c);
   if (s.cash < cost.cash) return 'Not enough cash!';
   if (s.sauce < cost.sauce) return 'Not enough Brain Sauce!';
@@ -413,18 +561,20 @@ export function rest(s: GameState, workerId: string): string | null {
   if (!w) return 'Nope.';
   if (!atWork(w)) return `${w.name} is ${w.state === 'down' ? 'still reanimating' : 'out on a raid'}.`;
   if (w.state === 'resting' || w.state === 'toRest') return null;
+  // (a cook's dish pauses, a hangry zombie calms down, a sleeper gets up and shuffles out)
   releaseJob(s, w);
   w.restSpot = outsideSpot(s, w);
   w.state = 'toRest';
-  setPath(s, w, w.restSpot, workerSpeed(w));
+  if (!goTo(s, w, w.restSpot, workerSpeed(w), 'the sidewalk')) w.path = [];
   return null;
 }
 
-/** Back to work: wakes a napper or daydreamer (they walk back inside on their own). */
+/** Back to work: wakes a napper, a daydreamer or a zombie who passed out (they walk back inside on their own). */
 export function wake(s: GameState, workerId: string) {
   const w = s.workers.find((x) => x.id === workerId);
   if (!w) return;
-  if (w.state === 'resting' || w.state === 'toRest' || w.state === 'daydream') {
+  if (w.state === 'resting' || w.state === 'toRest' || w.state === 'daydream' || w.state === 'asleep') {
+    if (w.state === 'asleep' || w.state === 'resting') s.events.push({ t: 'woke', workerId: w.id, from: w.state });
     w.state = 'idle';
     w.restSpot = undefined;
     w.path = [];
@@ -440,7 +590,16 @@ export function fireZombie(s: GameState, workerId: string): string | null {
   if (w.state === 'raiding') return `${w.name} is out on a raid.`;
   releaseJob(s, w);
   s.workers = s.workers.filter((x) => x.id !== workerId);
+  // off down the street, out through the door
+  const d = { id: w.id, type: w.type, x: w.x, y: w.y, path: [] as Pt[], speed: 0, facing: w.facing, back: w.back };
+  if (setPath(s, d, streetEnd(s), workerSpeed(w) * 0.8)) (s.departing ??= []).push(d);
   return null;
+}
+
+function updateDeparting(s: GameState, dt: number) {
+  if (!s.departing?.length) return;
+  for (const d of s.departing) if (move(d, dt)) d.x = GONE;
+  s.departing = s.departing.filter((d) => d.x !== GONE);
 }
 
 export function refill(s: GameState, workerId: string): string | null {
@@ -448,15 +607,20 @@ export function refill(s: GameState, workerId: string): string | null {
   if (!w) return 'Nope.';
   if (w.state === 'raiding') return `${w.name} is out on a raid.`;
   if (s.sauce < 1) return 'Not enough Brain Sauce!';
-  if (w.state !== 'down' && w.energy >= maxEnergy(w)) return `${w.name} is already full of beans. And brains.`;
+  if (w.state !== 'down' && w.energy >= maxEnergy(w) * TUNING.refillBelow) return `${w.name} still has plenty of energy. Brain Sauce works below ${Math.round(TUNING.refillBelow * 100)}%.`;
   s.sauce -= 1;
   w.energy = maxEnergy(w);
   if (w.state === 'down') {
     w.state = 'idle';
     w.downUntil = undefined;
     w.restSpot = undefined;
+    s.events.push({ t: 'woke', workerId: w.id, from: 'down' });
   }
-  if (w.state === 'resting' || w.state === 'toRest') wake(s, w.id);
+  if (w.state === 'hungry') {
+    w.state = 'idle';
+    w.hungryEnd = undefined;
+  }
+  if (w.state === 'resting' || w.state === 'toRest' || w.state === 'asleep') wake(s, w.id);
   return null;
 }
 
@@ -502,9 +666,13 @@ export function releaseJob(s: GameState, w: Worker) {
   }
   w.targetId = undefined;
   w.restSpot = undefined;
+  w.hungryEnd = undefined;
   w.path = [];
   w.state = 'idle';
 }
+
+/** How fast a customer walks: their own Speed stat (original). */
+const customerSpeed = (c: Customer) => walkSpeed(CUSTOMER_BY_ID[c.type]?.stats.speed ?? 4);
 
 function dropServer(s: GameState, c: Customer) {
   if (!c.serverId) return;
@@ -537,7 +705,9 @@ function leave(s: GameState, c: Customer, mood: 'happy' | 'angry', fast = false,
     s.stats.angry++;
   }
   s.events.push({ t: 'face', x: c.x, y: c.y, happy: mood === 'happy' });
-  setPath(s, c, streetEnd(s), fast ? TUNING.fleeSpeed : walkSpeed(4));
+  c.stage = undefined;
+  c.holdUntil = undefined;
+  setPath(s, c, streetEnd(s), fast ? Math.max(TUNING.fleeSpeed, customerSpeed(c) * 1.67) : customerSpeed(c));
 }
 
 /** Tables with a chair facing them that are clean and not taken (one customer per table). */
@@ -583,9 +753,12 @@ function spawnCustomers(s: GameState, dt: number) {
   const seats = freeSeats(s).filter(({ seat }) => findPath(at, { x: seat.x, y: seat.y }, blockedTiles(s), room(s)));
   // with every table taken or dirty most passers-by just walk on; now and then one peeks in and grumbles
   if (!seats.length && rand(s) > 0.3) return;
+  const n = s.nextId++;
   const c: Customer = {
-    id: `c${s.nextId++}`,
+    id: `c${n}`,
     type: def.id,
+    // a first name, seeded from the café's seed stream without drawing from it
+    name: firstName(def.id, Math.imul(n ^ s.rng, 0x9e3779b1) ^ (s.rng >>> 13)),
     state: 'entering',
     x: at.x,
     y: at.y,
@@ -599,13 +772,16 @@ function spawnCustomers(s: GameState, dt: number) {
   if (!seats.length) {
     // no clean table: walk in, look around, leave unhappy (like the original)
     c.state = 'turnedAway';
-    setPath(s, c, { x: DOOR_X, y: 1 }, walkSpeed(4));
+    setPath(s, c, { x: DOOR_X, y: 1 }, customerSpeed(c));
     return;
   }
   const pick = seats[Math.floor(rand(s) * seats.length)];
   c.seatId = pick.seat.id;
   c.tableId = pick.table.id;
-  setPath(s, c, { x: pick.seat.x, y: pick.seat.y }, walkSpeed(4));
+  // in through the door first, where they stop for a look round (original: 1 s ± 0.8 s)
+  const door = { x: DOOR_X, y: 0 };
+  if (!blockedTiles(s).has(key(door.x, door.y)) && setPath(s, c, door, customerSpeed(c))) c.stage = 'door';
+  else setPath(s, c, { x: pick.seat.x, y: pick.seat.y }, customerSpeed(c));
 }
 
 function updateCustomer(s: GameState, c: Customer, dt: number) {
@@ -618,7 +794,23 @@ function updateCustomer(s: GameState, c: Customer, dt: number) {
         leave(s, c, 'angry');
         break;
       }
+      if (c.stage === 'look') {
+        if (s.now < (c.doorUntil ?? 0)) break;
+        c.stage = undefined;
+        c.doorUntil = undefined;
+        if (!setPath(s, c, { x: seat.x, y: seat.y }, customerSpeed(c))) {
+          leave(s, c, 'angry');
+          break;
+        }
+      }
       if (move(c, dt)) {
+        if (c.stage === 'door') {
+          // just inside the door: a look round for a table
+          c.stage = 'look';
+          c.doorUntil = s.now + TUNING.doorPauseSec + (rand(s) * 2 - 1) * TUNING.doorPauseJitter;
+          faceTowards(c, seat.x, seat.y);
+          break;
+        }
         c.state = 'waiting';
         faceTowards(c, table.x, table.y);
       }
@@ -639,7 +831,8 @@ function updateCustomer(s: GameState, c: Customer, dt: number) {
         const server = s.workers.find((w) => w.id === c.serverId);
         const amount = Math.max(1, Math.round(dish.price * def.spend));
         // purple bonus stars: the buzz makes diners tip more
-        const tipRaw = server ? amount * server.stats.tips * 0.04 * (1 + TUNING.purpleTipBoost * purpleStars(s)) : 0;
+        // tips: the server's Tips stat (and their type's tip perk)
+        const tipRaw = server ? amount * server.stats.tips * TUNING.tipPerStat * perk(server.type, 'tips') * (1 + TUNING.purpleTipBoost * purpleStars(s)) : 0;
         const tip = Math.floor(tipRaw) + (rand(s) < tipRaw % 1 ? 1 : 0);
         s.cash += amount + tip;
         s.stats.earned += amount + tip;
@@ -658,6 +851,9 @@ function updateCustomer(s: GameState, c: Customer, dt: number) {
       if (s.now >= (c.infectEnd ?? 0)) {
         const w = makeWorker(s, 'zombie', c.type, { x: Math.round(c.x), y: Math.round(c.y) });
         w.facing = c.facing;
+        // they wake up starving (original), and keep their name
+        w.energy = Math.min(w.energy, TUNING.infectEnergy);
+        if (c.name) w.name = `Zombie ${c.name}`;
         s.workers.push(w);
         s.stats.infected++;
         const tier = CUSTOMER_BY_ID[c.type].tier;
@@ -750,7 +946,7 @@ function findJob(s: GameState, w: Worker): boolean {
       if (food.slot.servings <= 0) food.slot.dish = undefined;
       c.serverId = w.id;
       w.state = 'toCounter';
-      if (!setPath(s, w, food.at, speed)) releaseJob(s, w);
+      if (!goTo(s, w, food.at, speed, 'the counter')) releaseJob(s, w);
       return true;
     }
   }
@@ -784,6 +980,13 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
   const max = maxEnergy(w);
   const speed = workerSpeed(w);
   const r = room(s);
+  // YOU never tires: any raid knocks wear off once you're home
+  if (w.kind === 'you' && w.energy < max && atWork(w)) w.energy = max;
+  // worked down to nothing: they pass out face-down on the spot (original: "…fall asleep")
+  if (w.kind === 'zombie' && w.energy <= 0 && WORKING.has(w.state)) {
+    fallAsleep(s, w);
+    return;
+  }
   switch (w.state) {
     case 'idle': {
       if (w.path.length) {
@@ -792,22 +995,13 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
       }
       if (!isInside(Math.round(w.x), Math.round(w.y), r)) {
         // outside (after a nap or a raid): head back in through the door
-        if (!setPath(s, w, { x: DOOR_X, y: 1 }, speed)) w.path = [];
+        if (!goTo(s, w, { x: DOOR_X, y: 1 }, speed, 'the door')) w.path = [];
         break;
       }
-      if (w.kind === 'zombie' && w.energy <= max * attackThreshold(w.stats.patience)) {
-        // HANGRY: go bite the nearest customer
-        const prey = s.customers
-          .filter((c) => c.state === 'waiting' || c.state === 'eating')
-          .sort((a, b) => Math.abs(a.x - w.x) + Math.abs(a.y - w.y) - (Math.abs(b.x - w.x) + Math.abs(b.y - w.y)))[0];
-        if (prey) {
-          const table = prey.tableId ? furnById(s, prey.tableId) : undefined;
-          const at = table ? tableAccess(s, table) : null;
-          w.targetId = prey.id;
-          w.state = 'hunting';
-          setPath(s, w, at ?? { x: Math.round(prey.x), y: Math.round(prey.y) }, speed * 1.3);
-          break;
-        }
+      if (isHangry(w) && canBite(s, w) && nearestPrey(s, w)) {
+        // HANGRY: a few seconds' warning (slumped, moaning), then they go for a customer
+        goHungry(s, w);
+        break;
       }
       if (w.kind === 'zombie' && s.now >= w.nextDaydream) {
         w.state = 'daydream';
@@ -836,12 +1030,16 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
       break;
     }
     case 'cooking': {
-      drain(w, TUNING.energyCookPerSec * dt);
       const st = s.stoves.find((x) => x.id === w.stoveId);
+      // the prep is the work (the first 10 min of a dish); after that they just stand and stir
+      if (st && (st.total ?? 0) - (st.left ?? 0) < TUNING.prepSec) drain(w, TUNING.energyCookPerSec * dt);
       if (!st || st.status !== 'cooking' || st.cookId !== w.id) {
         w.state = 'idle';
         w.stoveId = undefined;
+        break;
       }
+      // cooks get hangry too: they walk off the job (the dish pauses) to go find a snack
+      if (isHangry(w) && w.energy > 0 && canBite(s, w) && nearestPrey(s, w)) goHungry(s, w);
       break;
     }
     case 'toPickup': {
@@ -864,7 +1062,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         s.events.push({ t: 'plated', stoveId: st.id });
         const counter = nearestCounterTile(s, { x: w.x, y: w.y });
         w.state = 'carryDish';
-        if (!counter || !setPath(s, w, counter.at, speed)) w.path = [];
+        if (!counter || !goTo(s, w, counter.at, speed, 'the counter')) w.path = [];
         w.targetId = counter?.f.id;
       }
       break;
@@ -896,7 +1094,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         const table = c.tableId ? furnById(s, c.tableId) : undefined;
         const at = table ? tableAccess(s, table) : null;
         w.state = 'carrying';
-        if (!at || !setPath(s, w, at, speed)) releaseJob(s, w);
+        if (!at || !goTo(s, w, at, speed, 'that table')) releaseJob(s, w);
       }
       break;
     }
@@ -912,7 +1110,9 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         if (table) faceTowards(w, table.x, table.y);
         c.state = 'eating';
         c.dish = job.dish;
-        c.eatEnd = s.now + TUNING.eatSec;
+        // a moment holding the plate, then they tuck in (original)
+        c.holdUntil = s.now + TUNING.holdFoodSec;
+        c.eatEnd = c.holdUntil + TUNING.eatSec;
         w.job = undefined;
         drain(w, TUNING.energyPerServe);
         addZombieXp(s, w, 1);
@@ -939,7 +1139,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         t.dirty = false;
         s.events.push({ t: 'cleared', tableId: t.id });
         w.state = 'carryPlate';
-        if (!setPath(s, w, sink, speed)) w.path = [];
+        if (!goTo(s, w, sink, speed, 'the sink')) w.path = [];
       }
       break;
     }
@@ -950,6 +1150,25 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         w.job = undefined;
         w.state = 'idle';
       }
+      break;
+    }
+    case 'hungry': {
+      // the warning: slumped and moaning (Rest or a refill calms them down)
+      if (s.now < (w.hungryEnd ?? 0)) break;
+      w.hungryEnd = undefined;
+      const prey = nearestPrey(s, w);
+      if (!prey) {
+        w.state = 'idle';
+        break;
+      }
+      if (!huntCustomer(s, w, prey)) w.nextBiteAt = s.now + TUNING.huntRetrySec;
+      break;
+    }
+    case 'asleep': {
+      // passed out on the floor: a slow recovery, then they get back up on their own
+      const rate = TUNING.restRegenPerSec * rechargeMult(w.stats.recharge) * perk(w.type, 'regen') * TUNING.asleepRegenMult;
+      w.energy = Math.min(max, w.energy + rate * dt);
+      if (w.energy >= max * TUNING.asleepWakeAt) wake(s, w.id);
       break;
     }
     case 'hunting': {
@@ -964,7 +1183,8 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         s.events.push({ t: 'bite', x: c.x, y: c.y, workerId: w.id, customerId: c.id });
         s.stats.bites++;
         addRating(s, 0, TUNING.ratingAttackWeight);
-        w.energy = Math.min(max, w.energy + TUNING.biteEnergyGain);
+        w.energy = Math.min(max, w.energy + max * TUNING.biteEnergyFrac);
+        w.nextBiteAt = s.now + TUNING.biteCooldownSec;
         w.targetId = undefined;
         // original: the zombie eats them right there (its feast), leaving a pile of bones on the floor
         dropServer(s, c);
@@ -994,10 +1214,11 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
       break;
     case 'resting': {
       if (w.kind === 'zombie') {
-        const rate = TUNING.restRegenPerSec * rechargeMult(w.stats.recharge) * (1 + kegCount(s) * TUNING.kegBonus);
+        const rate = TUNING.restRegenPerSec * rechargeMult(w.stats.recharge) * perk(w.type, 'regen') * (1 + kegCount(s) * TUNING.kegBonus);
         w.energy = Math.min(max, w.energy + rate * dt);
       } else w.energy = max;
-      if (w.energy >= max) wake(s, w.id);
+      // closed up: the crew snoozes on the sidewalk until you open again
+      if (w.energy >= max && !(s.closed && w.kind === 'zombie')) wake(s, w.id);
       break;
     }
     case 'daydream':
@@ -1009,6 +1230,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         w.downUntil = undefined;
         w.restSpot = undefined;
         w.energy = Math.max(w.energy, TUNING.reanimateEnergy);
+        s.events.push({ t: 'woke', workerId: w.id, from: 'down' });
       }
       break;
     case 'raiding':
@@ -1025,11 +1247,13 @@ function finishStove(s: GameState, st: Stove) {
   // Frozen variants take FROZEN_BURN_MULT times longer to burn
   const wait = Math.max(TUNING.burnMinSec, dish.cookSec) * (f.keepWarm ? TUNING.keepWarmFactor : 1) * (dish.burnMult ?? 1);
   st.burnAt = s.now + wait;
-  addXp(s, dish.xp);
-  s.stats.cooked[dish.id] = (s.stats.cooked[dish.id] ?? 0) + 1;
-  s.events.push({ t: 'xp', x: f.x, y: f.y, amount: dish.xp });
-  s.events.push({ t: 'dishDone', stoveId: st.id });
+  // a cook with the XP perk (the Critic, Grandma…) makes every dish count for more
   const cook = s.workers.find((w) => w.id === st.cookId);
+  const xp = Math.round(dish.xp * (cook ? perk(cook.type, 'xp') : 1));
+  addXp(s, xp);
+  s.stats.cooked[dish.id] = (s.stats.cooked[dish.id] ?? 0) + 1;
+  s.events.push({ t: 'xp', x: f.x, y: f.y, amount: xp });
+  s.events.push({ t: 'dishDone', stoveId: st.id });
   if (cook && cook.state === 'cooking') {
     cook.state = 'idle';
     cook.stoveId = undefined;
@@ -1037,7 +1261,20 @@ function finishStove(s: GameState, st: Stove) {
   st.cookId = undefined;
 }
 
+/** True while the offline catch-up runs: stoves then cook on real time, cook or no cook. */
+let awayCooking = false;
+
 function updateStove(s: GameState, st: Stove, dt: number) {
+  if (awayCooking && (st.status === 'paused' || st.status === 'reserved') && st.dish && st.left !== undefined) {
+    // nobody needs to babysit the pots while you're away
+    if (st.status === 'reserved') {
+      const cook = s.workers.find((w) => w.id === st.cookId);
+      if (cook?.state === 'toStove') return; // they're on their way: let them get there
+    }
+    st.left = Math.max(0, st.left - dt);
+    if (st.left <= 0) finishStove(s, st);
+    return;
+  }
   if (st.status === 'cooking') {
     // a dish only cooks while its cook stands at the stove (original); otherwise it pauses
     const cook = s.workers.find((w) => w.id === st.cookId);
@@ -1046,10 +1283,12 @@ function updateStove(s: GameState, st: Stove, dt: number) {
       st.cookId = undefined;
       return;
     }
-    st.left = Math.max(0, (st.left ?? 0) - dt);
+    // a fast cook (cook perk) gets through it quicker
+    st.left = Math.max(0, (st.left ?? 0) - dt * perk(cook.type, 'cook'));
     if (st.left <= 0) finishStove(s, st);
   } else if (st.status === 'done' && s.now >= (st.burnAt ?? Infinity) && !st.carrierId) {
     st.status = 'burnt';
+    s.stats.burnt = (s.stats.burnt ?? 0) + 1;
     s.events.push({ t: 'burnt', stoveId: st.id });
   }
 }
@@ -1116,6 +1355,7 @@ export function tick(s: GameState, dt: number) {
   for (const c of s.customers) updateCustomer(s, c, dt);
   s.customers = s.customers.filter((c) => c.x !== GONE);
   for (const w of s.workers) updateWorker(s, w, dt);
+  updateDeparting(s, dt);
   updateMoneyMakers(s, dt);
   if (s.closed) s.rating = Math.max(0, s.rating - TUNING.closedDriftPerSec * dt);
   updateProgress(s, dt);
@@ -1123,18 +1363,136 @@ export function tick(s: GameState, dt: number) {
   if (s.events.length > 200) s.events.splice(0, s.events.length - 200);
 }
 
-/** Offline catch-up: fast-forward in coarse steps, capped like the design says. */
-export function catchUp(s: GameState, seconds: number): number {
-  const total = Math.min(Math.max(0, seconds), TUNING.offlineCapSec);
+/**
+ * Time away beyond what the offline simulation covers. The clock still moves on for everything that
+ * runs on real time (rivals reopening, reanimation, tombstone recharges, the boss café's schedule, the
+ * purple-star timer), while the café's own in-the-moment beats (a diner mid-meal, a feast, a daydream,
+ * a hangry warning) are carried along with it so they don't all go off at once.
+ */
+export function skipTime(s: GameState, sec: number, stoveSec = 0) {
+  if (!(sec > 0)) return;
+  // the pots keep cooking on real time (up to a day away in all)
+  const now0 = s.now;
+  for (const st of s.stoves) {
+    if (!st.dish || st.left === undefined || !(st.status === 'cooking' || st.status === 'paused' || st.status === 'reserved')) continue;
+    const go = Math.min(stoveSec, st.left);
+    if (go <= 0) continue;
+    if (go >= st.left) {
+      // done partway through: it starts waiting (and maybe burning) from then
+      s.now = now0 + st.left;
+      if (st.status === 'reserved') {
+        const cook = s.workers.find((w) => w.id === st.cookId);
+        if (cook) releaseJob(s, cook);
+      }
+      st.left = 0;
+      finishStove(s, st);
+      s.now = now0;
+    } else st.left -= go;
+  }
+  s.now += sec;
+  const shift = (t: number | undefined) => (t === undefined ? t : t + sec);
+  for (const c of s.customers) {
+    c.eatEnd = shift(c.eatEnd)!;
+    c.infectEnd = shift(c.infectEnd);
+    c.doorUntil = shift(c.doorUntil);
+    c.holdUntil = shift(c.holdUntil);
+  }
+  for (const w of s.workers) {
+    w.feastEnd = shift(w.feastEnd);
+    w.daydreamEnd = shift(w.daydreamEnd);
+    w.nextDaydream = shift(w.nextDaydream)!;
+    w.hungryEnd = shift(w.hungryEnd);
+  }
+  for (const p of s.pets) {
+    p.nextAction += sec;
+    if (p.nextFind !== undefined) p.nextFind += sec;
+  }
+  // anything that finished long ago has burnt by now
+  for (const st of s.stoves) updateStove(s, st, 0);
+}
+
+/** Tired enough to nap during a union break (see unionBreak). */
+export function tired(w: Worker, margin = TUNING.unionBreakMargin): boolean {
+  return w.kind === 'zombie' && w.energy <= maxEnergy(w) * (attackThreshold(w.stats.patience) + margin);
+}
+
+/**
+ * The union break: while you're away (app in the background, offline catch-up), a zombie close to
+ * its bite line walks out for a nap instead of snacking on the customers. On unless turned off in Settings.
+ */
+export function unionBreak(s: GameState) {
+  if (s.unionBreak === false) return;
+  for (const w of s.workers) {
+    if (!atWork(w) || !tired(w) || !['idle', 'daydream', 'cooking', 'toStove', 'hungry'].includes(w.state)) continue;
+    rest(s, w.id);
+  }
+}
+
+/** The crew list's "Rest all tired" button: everyone under half their energy goes out for a nap. */
+export function restTired(s: GameState): number {
+  let n = 0;
+  for (const w of s.workers) {
+    if (w.kind !== 'zombie' || !atWork(w) || w.state === 'resting' || w.state === 'toRest' || w.state === 'feasting') continue;
+    if (w.energy >= maxEnergy(w) * 0.5) continue;
+    if (!rest(s, w.id)) n++;
+  }
+  return n;
+}
+
+/** What happened while you were away (the welcome-back card). */
+export interface AwayReport {
+  sec: number;
+  cash: number;
+  served: number;
+  angry: number;
+  bitten: number;
+  burnt: number;
+  /** popularity (0..1) before and after */
+  rating0: number;
+  rating1: number;
+}
+
+/** Offline catch-up: fast-forward in coarse steps, capped like the design says; real-time timers still
+ * count the rest of the time away (skipTime). Returns what happened. */
+export function catchUpReport(s: GameState, seconds: number): AwayReport {
+  const sec = Math.max(0, seconds);
+  const total = Math.min(sec, TUNING.offlineCapSec);
+  const st0 = { ...s.stats };
+  const r: AwayReport = { sec, cash: 0, served: 0, angry: 0, bitten: 0, burnt: 0, rating0: s.rating, rating1: s.rating };
   let left = total;
   const cash0 = s.cash;
-  while (left > 0) {
-    const d = Math.min(1, left);
-    tick(s, d);
-    left -= d;
+  // level-ups earned while away are still announced when you're back; the rest of the chatter isn't
+  const kept = s.events.filter((e) => e.t === 'levelup' || e.t === 'zombieLevel');
+  // long absences step a little coarser (it all runs before the game shows up)
+  const step = total > 3600 ? 5 : 1;
+  awayCooking = true;
+  try {
+    while (left > 0) {
+      const d = Math.min(step, left);
+      unionBreak(s);
+      tick(s, d);
+      for (const e of s.events) if (e.t === 'levelup' || e.t === 'zombieLevel') kept.push(e);
+      s.events.length = 0;
+      left -= d;
+    }
+    skipTime(s, sec - total, Math.max(0, Math.min(sec, TUNING.offlineStoveCapSec) - total));
+  } finally {
+    awayCooking = false;
   }
   s.events.length = 0;
-  return s.cash - cash0;
+  s.events.push(...kept);
+  r.cash = s.cash - cash0;
+  r.served = s.stats.served - st0.served;
+  r.angry = s.stats.angry - st0.angry;
+  r.bitten = s.stats.bites - st0.bites;
+  r.burnt = (s.stats.burnt ?? 0) - (st0.burnt ?? 0);
+  r.rating1 = s.rating;
+  return r;
+}
+
+/** Offline catch-up; returns the cash made (see catchUpReport). */
+export function catchUp(s: GameState, seconds: number): number {
+  return catchUpReport(s, seconds).cash;
 }
 
 export { walkable };
