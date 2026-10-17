@@ -87,6 +87,14 @@ const isoW = (x, y) => ({ x: (x - y) * 48, y: (x + y) * 30 });
 const tapWorld = async (wx, wy, scene) => {
   await wait(300); // let a sliding card or bar settle before checking what covers the spot
   let p = await screenOf(wx, wy, scene);
+  // and let a camera glide (the tutorial pans to each step) finish, or the finger lands off target
+  for (let i = 0; i < 15; i++) {
+    await wait(200);
+    const q = await screenOf(wx, wy, scene);
+    const still = Math.hypot(q.x - p.x, q.y - p.y) < 1;
+    p = q;
+    if (still) break;
+  }
   // the room is framed taller than the screen: pan first (as a player would) if the spot sits under the awning,
   // the bottom bars or an open card; the pan lands the spot left of centre, clear of the right-hand card
   const covered = async () => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName !== 'CANVAS', [p.x, p.y]);
