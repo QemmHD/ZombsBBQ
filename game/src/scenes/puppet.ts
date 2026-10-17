@@ -94,6 +94,20 @@ export class Puppet {
     for (const v of [this.front, this.back]) if (v) for (const p of Object.values(v.parts)) p.clearTint();
   }
 
+  private flashing = false;
+
+  /** A hit flash: the whole figure brightens toward white (additive), without losing its drawing. */
+  flash(on: boolean) {
+    if (on === this.flashing) return;
+    this.flashing = on;
+    for (const v of [this.front, this.back])
+      if (v)
+        for (const p of Object.values(v.parts)) {
+          if (on) p.setTint(0xc8c8c8).setTintMode(Phaser.TintModes.ADD);
+          else p.setTintMode(Phaser.TintModes.MULTIPLY).clearTint();
+        }
+  }
+
   destroy() {
     this.root.destroy();
   }

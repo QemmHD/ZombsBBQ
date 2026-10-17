@@ -48,7 +48,7 @@ import type { Controller } from '../game/controller';
 import { artUrl, headUrl, rasterOrSvg } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import type { Hud } from './hud';
-import { bindActions, energyColor, esc, icon, priceHtml } from './dom';
+import { bindActions, energyColor, esc, icon, priceHtml, star } from './dom';
 
 /** The results card can't be waved away until this long after the fight ends (original REWARD_DELAY_DURATION). */
 export const REWARD_DELAY_MS = 5000;
@@ -154,7 +154,7 @@ function defaultSquad(s: GameState) {
 /** Results stars: the raid scores 1–3, so three slots (not the rating's five). */
 function stars3(n: number): string {
   let h = '';
-  for (let i = 1; i <= 3; i++) h += `<b class="st ${n >= i ? 'on' : ''}">★</b>`;
+  for (let i = 1; i <= 3; i++) h += star(n >= i ? 'on' : 'off');
   return h;
 }
 

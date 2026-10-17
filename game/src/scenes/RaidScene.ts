@@ -15,8 +15,9 @@ import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, RIVAL_BY_ID, feastOn, focusTarget, isBo
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
 import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps } from './assets';
-import { FrontDoor, WALLS, depthOf, drawLot, furnArt, iso, moverDepth, propImage, scenery, wallAnchor } from './lot';
+import { FrontDoor, WALLS, depthOf, drawLot, furnArt, iso, lotGround, moverDepth, propImage, scenery, wallAnchor } from './lot';
 import { Puppet } from './puppet';
+import { FloatTexts, type FloatOpts } from './floattext';
 
 interface UnitView {
   holder: Phaser.GameObjects.Container;
@@ -31,6 +32,8 @@ interface UnitView {
 
 /** Most floating texts alive at once. */
 const FLOAT_POOL = 24;
+/** Extra rings of ground around a rival's lot, so the closer camera never sees past the grass. */
+const RAID_MARGIN = 3;
 
 /** Waitresses (`staff_x_b`) fall back to their waiter's art if they haven't been drawn. */
 function artFor(id: string): string {
@@ -62,7 +65,7 @@ export class RaidScene extends Phaser.Scene {
   private lastHitText = new Map<string, number>();
   private lastPow = -9;
   private door?: FrontDoor;
-  private textPool: Phaser.GameObjects.Text[] = [];
+  private floats?: FloatTexts;
 
   constructor() {
     super('raid');
@@ -74,7 +77,7 @@ export class RaidScene extends Phaser.Scene {
     this.views.clear();
     this.counterDishes = [];
     this.seenEvents = 0;
-    this.textPool = [];
+    this.floats = undefined;
   }
 
   create() {
@@ -130,6 +133,7 @@ export class RaidScene extends Phaser.Scene {
         index: w.index,
       })),
       scenery: scenery(W, H, true),
+      margin: RAID_MARGIN,
     }).door;
     // the shop sign, bolted over the door
     const sign = `rsign_${r.rival}`;
@@ -176,11 +180,24 @@ export class RaidScene extends Phaser.Scene {
     const dpr = window.devicePixelRatio || 1;
     const cssW = this.scale.width / dpr;
     const cssH = this.scale.height / dpr;
-    const w = (r.room.w + r.room.h + 6) * HW;
-    const h = (r.room.w + r.room.h) * (TILE_H / 2) + WALL_H + 40;
-    const z = Math.min((cssW - 40) / w, (cssH - 120) / h) * 1.12;
+    // the same scale as your own joint (characters about a sixth of the screen tall), not a far-off
+    // overview: the action cam leans in further once the fight starts, and you can pan around
+    const w = (r.room.w + r.room.h) * HW;
+    const h = (r.room.w + r.room.h) * (TILE_H / 2) + WALL_H;
+    const z = Math.min((cssW * 0.92) / w, (cssH * 1.3) / h) * 0.9;
     this.baseZoom = z * dpr;
     cam.setZoom(this.baseZoom);
+    // keep the view on painted ground: the largest rectangle inside the ground's diamond
+    const g = lotGround(r.room.w, r.room.h, RAID_MARGIN);
+    const L = iso(g.x0, g.y1).x;
+    const R = iso(g.x1, g.y0).x;
+    const T = iso(g.x0, g.y0).y;
+    const B = iso(g.x1, g.y1).y;
+    const cx = (L + R) / 2;
+    const cy = (T + B) / 2;
+    const hw = (R - L) / 4;
+    const hh = (B - T) / 4;
+    cam.setBounds(cx - hw, cy - hh - WALL_H * 0.5, hw * 2, hh * 2 + WALL_H * 0.5);
     const c = iso(r.room.w / 2 + 0.6, r.room.h / 2 - 1.2);
     cam.centerOn(c.x, c.y - 30);
   }
@@ -204,7 +221,7 @@ export class RaidScene extends Phaser.Scene {
       }
       tx = sx / active.length;
       ty = sy / active.length - 50;
-      tz = this.baseZoom * 1.45;
+      tz = this.baseZoom * 1.4;
     } else {
       const c = iso(r.room.w / 2 + 0.6, r.room.h / 2 - 1.2);
       tx = c.x;
@@ -454,10 +471,18 @@ export class RaidScene extends Phaser.Scene {
                   ? 'angry'
                   : undefined;
       v.puppet.setFace(face as never);
-      if (r.t - u.hitAt < 0.12) v.puppet.setTint(0xff9090);
-      else if (u.side === 'z' && buff) v.puppet.setTint(Math.sin(this.t * 14) > 0 ? (buff === 'str' ? 0xff7a6a : 0x9be36b) : 0xffffff);
-      else if (r.focus === u.id) v.puppet.setTint(0xfff2a0);
-      else v.puppet.clearTint();
+      // a hit: a 60 ms white flash, a squash and a little knockback (not a salmon-pink paint job)
+      const hitT = r.t - u.hitAt;
+      v.puppet.flash(hitT < 0.06 && !down);
+      const k = hitT < 0.16 && !down ? 1 - hitT / 0.16 : 0;
+      v.puppet.root.setScale(1 + k * 0.07, 1 - k * 0.07).setX(-u.facing * 2 * k);
+      if (hitT >= 0.06 || down) {
+        if (u.side === 'z' && buff) v.puppet.setTint(Math.sin(this.t * 14) > 0 ? (buff === 'str' ? 0xff7a6a : 0x9be36b) : 0xffffff);
+        else v.puppet.clearTint();
+      }
+      // the focus target: a red ring on the ground, not a yellow wash
+      if (r.focus === u.id && !down) v.ring.setVisible(true).setStrokeStyle(2.2, 0xd04a3a, 1).setAlpha(0.6 + Math.abs(Math.sin(this.t * 5)) * 0.4);
+      else if (v.ring.strokeColor !== 0xd9b44a) v.ring.setStrokeStyle(2, 0xd9b44a, 1);
     }
     r.counter.forEach((c, i) => this.counterDishes[i]?.setVisible(c.servings > 0));
     // play new events
@@ -467,31 +492,53 @@ export class RaidScene extends Phaser.Scene {
 
   // ---------- juice ----------
 
-  /** Floating combat text, pooled: a brawl throws dozens a second, so reuse a fixed set of Text objects. */
-  private floatText(x: number, y: number, text: string, color: string, size = 13) {
-    let t = this.textPool.find((p) => !p.visible);
-    if (!t) {
-      if (this.textPool.length < FLOAT_POOL) {
-        t = this.add.text(0, 0, '', { fontFamily: 'Arial Black, Arial, sans-serif', stroke: '#16120C', strokeThickness: 3 }).setResolution(TEX_S).setOrigin(0.5).setDepth(1e6);
-        this.textPool.push(t);
-      } else {
-        // all busy: recycle the oldest
-        t = this.textPool.shift()!;
-        this.textPool.push(t);
-      }
-    }
-    this.tweens.killTweensOf(t);
-    t.setText(text).setColor(color).setFontSize(size).setPosition(x, y).setAlpha(1).setScale(0.4).setVisible(true);
-    const txt = t;
-    this.tweens.add({ targets: txt, scale: 1, duration: 160, ease: 'Back.Out' });
-    this.tweens.add({
-      targets: txt,
-      y: y - 30,
-      alpha: 0,
-      delay: 400,
-      duration: 700,
-      onComplete: () => txt.setVisible(false),
-    });
+  /** Floating combat text (pooled, crisp, throttled and stacked per unit: see floattext.ts). */
+  private floatText(x: number, y: number, text: string, color: string, size = 16, opts: FloatOpts = {}) {
+    this.floats ??= new FloatTexts(this, FLOAT_POOL);
+    return this.floats.show(x, y, text, color, { size, ...opts });
+  }
+
+  /** A claw swipe: three tapered gouges, drawn once into a texture (the old "SCRATCH!" text). */
+  private scratchTexture() {
+    const key = 'fx_scratch_spark';
+    if (this.textures.exists(key)) return key;
+    const S = TEX_S;
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    const claw = (ox: number, w: number) => {
+      // a tapered sliver from top-right to bottom-left
+      const pts = [
+        [ox + 20, 2],
+        [ox + 20 + w, 4],
+        [ox + 2, 30],
+        [ox - 1, 29],
+      ].map(([x, y]) => new Phaser.Math.Vector2(x * S, y * S));
+      g.fillStyle(0x16120c, 1).fillPoints(pts, true);
+      const inner = [
+        [ox + 20, 4],
+        [ox + 20 + w * 0.5, 5],
+        [ox + 2.5, 28],
+        [ox + 0.5, 27.5],
+      ].map(([x, y]) => new Phaser.Math.Vector2(x * S, y * S));
+      g.fillStyle(0xf2e7c4, 1).fillPoints(inner, true);
+    };
+    claw(2, 3.4);
+    claw(9, 4.2);
+    claw(16, 3.4);
+    g.generateTexture(key, 40 * S, 32 * S);
+    g.destroy();
+    return key;
+  }
+
+  /** A quick slash where a diner gets clawed. */
+  private scratch(x: number, y: number) {
+    const key = this.scratchTexture();
+    const i = this.add
+      .image(x + (Math.random() - 0.5) * 14, y, key)
+      .setDepth(1e6 + 1)
+      .setScale(0)
+      .setRotation((Math.random() - 0.5) * 0.6);
+    this.tweens.add({ targets: i, scale: 0.8 / TEX_S, duration: 90, ease: 'Back.Out' });
+    this.tweens.add({ targets: i, alpha: 0, delay: 220, duration: 220, onComplete: () => i.destroy() });
   }
 
   private pop(key: string, x: number, y: number, ms = 500) {
@@ -522,14 +569,15 @@ export class RaidScene extends Phaser.Scene {
         const p = iso(e.x, e.y);
         const u = unitOf(e.unit);
         if (u?.kind === 'customer') {
-          this.floatText(p.x, p.y - 80, 'SCRATCH!', '#C9A63A', 12);
+          if (this.t - (this.lastHitText.get(e.unit) ?? -9) > 0.25) {
+            this.lastHitText.set(e.unit, this.t);
+            this.scratch(p.x, p.y - 62);
+          }
           sfx('hit', { volume: 0.4 });
           break;
         }
-        if (this.t - (this.lastHitText.get(e.unit) ?? -9) > 0.45) {
-          this.lastHitText.set(e.unit, this.t);
-          this.floatText(p.x + (Math.random() - 0.5) * 16, p.y - 90, `-${Math.max(1, Math.round(e.dmg))}`, u?.side === 'z' ? '#E06A55' : '#F2E7C4', 12);
-        }
+        // one ticking damage number per unit, not a pile of them
+        this.floatText(p.x, p.y - 112, '-{n}', u?.side === 'z' ? '#E8705A' : '#F2E7C4', 16, { anchor: e.unit, merge: 'dmg', value: Math.max(1, e.dmg) });
         if (this.t - this.lastPow > 0.3 && Math.random() < 0.5 && (this.lastPow = this.t)) this.pop('fx_hit', p.x, p.y - 60, 180);
         const by = unitOf(e.by);
         sfx(by?.kind === 'boss' ? 'whack' : 'hit', { volume: 0.5 });
@@ -544,7 +592,8 @@ export class RaidScene extends Phaser.Scene {
       }
       case 'scream': {
         const p = iso(e.x, e.y);
-        if (Math.random() < 0.6) this.floatText(p.x, p.y - 110, Math.random() < 0.5 ? 'AAAH!' : 'ZOMBIES!', '#F2E7C4', 11);
+        // screams are chatter: one per diner at most, and only while it's quiet around them
+        if (Math.random() < 0.5) this.floatText(p.x, p.y - 112, Math.random() < 0.5 ? 'AAAH!' : 'ZOMBIES!', '#F2E7C4', 16, { anchor: e.unit });
         if (Math.random() < 0.5) sfx('scream', { pitch: 0.9 + Math.random() * 0.5, volume: 0.6 });
         break;
       }
@@ -554,8 +603,8 @@ export class RaidScene extends Phaser.Scene {
         this.bones.push({ img: propImage(this, `bones_pile_${this.bones.length % 3}`, bp.x, bp.y).setDepth(moverDepth(e.x, e.y, -2)).setAlpha(0).setScale(1.3 / TEX_S), t0: this.t });
         const p = iso(e.x, e.y);
         // the text rides above the head and the cash pops beside the body, so they don't print over each other
-        this.floatText(p.x, p.y - 125, `${e.body ? 'FEAST!' : 'CHOMP!'} +$${e.cash}`, '#D9C25A', 14);
-        this.pop('fx_cash', p.x + 26, p.y - 70);
+        this.floatText(p.x, p.y - 118, e.body ? 'FEAST!' : 'CHOMP!', '#E06A55', 18, { anchor: e.customer, force: true });
+        this.floatText(p.x, p.y - 118, `${e.cash}`, '#E3CB5E', 17, { anchor: e.customer, force: true, icon: 'fx_cash' });
         sfx('chomp');
         setTimeout(() => sfx('scream', { pitch: 1 + Math.random() * 0.3 }), 120);
         break;
@@ -565,13 +614,13 @@ export class RaidScene extends Phaser.Scene {
       case 'arrive': {
         // a walk-in at the door: a little "+1 diner" over the doorway
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 100, '+1 DINER', '#F2E7C4', 11);
+        this.floatText(p.x, p.y - 112, '+1 DINER', '#F2E7C4', 16, { anchor: 'door' });
         sfx('tap', { volume: 0.3, pitch: 1.3 });
         break;
       }
       case 'revive': {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 80, 'BACK UP!', '#9BE36B', 15);
+        this.floatText(p.x, p.y - 112, 'BACK UP!', '#9BE36B', 18, { anchor: e.unit, force: true });
         this.pop('fx_heal', p.x, p.y - 50, 700);
         sfx('heal');
         break;
@@ -584,7 +633,7 @@ export class RaidScene extends Phaser.Scene {
       case 'ability': {
         const p = iso(e.x, e.y);
         const label = e.kind === 'slam' ? 'BELLY SLAM!' : e.kind === 'stun' ? 'CUFFED!' : e.kind === 'jab' ? 'ONE-TWO!' : 'HEY! OVER HERE!';
-        if (e.kind !== 'jab' || Math.random() < 0.35) this.floatText(p.x, p.y - 140, label, '#E8B04A', 12);
+        if (e.kind !== 'jab' || Math.random() < 0.35) this.floatText(p.x, p.y - 112, label, '#E8B04A', 17, { anchor: e.unit });
         if (e.kind === 'slam') {
           this.cameras.main.shake(220, 0.006);
           sfx('stomp', { volume: 0.7 });
@@ -596,7 +645,7 @@ export class RaidScene extends Phaser.Scene {
         break;
       case 'steal': {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 90, 'SWIPED!', '#9BD62E', 15);
+        this.floatText(p.x, p.y - 112, 'SWIPED!', '#9BD62E', 18, { anchor: e.unit, force: true });
         this.pop(DISH_BY_ID[e.dish].icon, p.x, p.y - 70, 900);
         sfx('cashRegister', { volume: 0.6 });
         break;
@@ -604,7 +653,7 @@ export class RaidScene extends Phaser.Scene {
       case 'boss': {
         const p = iso(e.x, e.y);
         const def = RIVAL_BY_ID[r.rival];
-        this.floatText(p.x, p.y - 120, `${def.chef.toUpperCase()}!`, '#E06A55', 20);
+        this.floatText(p.x, p.y - 130, `${def.chef.toUpperCase()}!`, '#E06A55', 22, { anchor: 'boss', force: true });
         this.ctl.info(`“${def.taunt}”`);
         this.cameras.main.shake(350, 0.006);
         sfx('summon', { volume: 0.5 });
@@ -618,7 +667,7 @@ export class RaidScene extends Phaser.Scene {
         const u = unitOf(e.unit);
         if (u) {
           const p = iso(u.x, u.y);
-          this.floatText(p.x, p.y - 150, 'BIG FOOT-LONG!', '#D9C25A', 18);
+          this.floatText(p.x, p.y - 150, 'BIG FOOT-LONG!', '#D9C25A', 22, { anchor: u.id, force: true });
         }
         this.cameras.main.shake(500, 0.01);
         sfx('summon');

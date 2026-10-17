@@ -110,6 +110,13 @@ export interface LotOpts {
   doorSign?: boolean;
   /** street furniture to dress the lot with */
   scenery: [string, number, number, boolean?][];
+  /** extra rings of ground beyond the usual lot (for closer cameras) */
+  margin?: number;
+}
+
+/** The tile range the ground covers (inclusive). */
+export function lotGround(w: number, h: number, margin = 0) {
+  return { x0: -9 - margin, y0: -9 - margin, x1: w + 7 + margin, y1: h + 7 + margin };
 }
 
 export interface LotViews {
@@ -140,8 +147,9 @@ export function drawLot(scene: Phaser.Scene, o: LotOpts): LotViews {
     return i;
   };
   // ground: roads and sidewalks behind both back walls, the floor, grass everywhere else
-  for (let y = -9; y <= H + 7; y++)
-    for (let x = -9; x <= W + 7; x++) {
+  const gr = lotGround(W, H, o.margin);
+  for (let y = gr.y0; y <= gr.y1; y++)
+    for (let x = gr.x0; x <= gr.x1; x++) {
       const p = iso(x, y);
       const base = GROUND + depthOf(x, y) * 4;
       if (isRoad(x, y)) {

@@ -1280,7 +1280,7 @@ function texPaper(): ArtAsset {
     inner += L('M4,40H250', 1.2, '#6E8AA4', 'opacity="0.75"');
     for (let y = 58; y < 252; y += 18) inner += L(`M4,${y}H250`, 0.8, '#7E9AB0', 'opacity="0.7"');
     // red margin (double)
-    inner += L('M42,12V252M45.4,12V252', 0.9, '#B0473F', 'opacity="0.8"');
+    inner += L('M17,12V252M20.4,12V252', 0.9, '#B0473F', 'opacity="0.8"');
     // stains: coffee ring, grease, a bloody fingerprint, water
     inner += L(ell(196, 200, 24, 22), 3, U.coffee, 'opacity="0.35"') + L(ell(196, 200, 21, 19.6), 1, U.coffee, 'opacity="0.25"');
     inner += F(blob(176, 222, 6, 4, 3), U.coffee, 0, 'opacity="0.25"');

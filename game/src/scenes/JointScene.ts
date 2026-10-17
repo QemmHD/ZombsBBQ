@@ -33,6 +33,8 @@ import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps, 
 import { GROUND, charIdFor, depthOf, drawLot, floorKeys, furnArt, iso, moverDepth, scenery, wallAnchor, wallKey } from './lot';
 import type { FrontDoor } from './lot';
 import { Puppet } from './puppet';
+import { FloatTexts, type FloatOpts } from './floattext';
+import { FONT_DISPLAY, fontsReady } from '../fonts';
 
 export { iso, furnArt, wallKey, floorKeys, wallAnchor, charIdFor } from './lot';
 
@@ -47,6 +49,8 @@ interface Actor {
   bubble?: Phaser.GameObjects.Image;
   bubbleDish?: Phaser.GameObjects.Image;
   shadow: Phaser.GameObjects.Ellipse;
+  /** the selection marker: a pulsing ring on the ground under their feet */
+  sel?: Phaser.GameObjects.Ellipse;
   faceUntil: number;
   face?: string;
   holder: Phaser.GameObjects.Container;
@@ -77,12 +81,15 @@ export class JointScene extends Phaser.Scene {
   private furnViews = new Map<string, Phaser.GameObjects.Image[]>();
   private wallViews = new Map<string, Phaser.GameObjects.Image>();
   private stoveFx = new Map<string, StoveFx>();
-  private counterFx = new Map<string, { dishes: Phaser.GameObjects.Image[]; text: Phaser.GameObjects.Text }>();
+  /** per counter: up to 3 dishes side by side, each a stack of 1–4 plates, and a servings pill */
+  private counterFx = new Map<string, { dishes: Phaser.GameObjects.Image[][]; empty: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text }>();
   private cashBadges = new Map<string, Phaser.GameObjects.Image>();
   private tablePlates = new Map<string, Phaser.GameObjects.Image>();
   private door?: FrontDoor;
   private grid?: Phaser.GameObjects.Graphics;
   private ghost: Phaser.GameObjects.Image[] = [];
+  private footG?: Phaser.GameObjects.Graphics;
+  private panKey = '';
   private layoutSig = '';
   private sizeSig = '';
   private loadingSig = '';
@@ -97,6 +104,7 @@ export class JointScene extends Phaser.Scene {
   } | null = null;
   private pinch: { d: number; z: number } | null = null;
   private t = 0;
+  private floats?: FloatTexts;
 
   constructor() {
     super('joint');
@@ -110,7 +118,8 @@ export class JointScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#4f5a2c');
     const bar = document.getElementById('boot-progress');
     const s = this.ctl.state;
-    void loadProps(this, (f) => bar && (bar.style.width = `${Math.round(f * 90)}%`))
+    // canvas labels don't redraw when a web font arrives, so the fonts are part of loading
+    void Promise.all([loadProps(this, (f) => bar && (bar.style.width = `${Math.round(f * 90)}%`)), fontsReady])
       .then(() => ensureProps(this, this.neededKeys(s)))
       .then(() => Promise.all(['you', 'gus', ...s.workers.map(charIdFor)].map((id) => loadChar(this, id))))
       .then(() => {
@@ -150,7 +159,7 @@ export class JointScene extends Phaser.Scene {
       if (a.back) k.add(a.back);
     }
     for (const w of s.wallItems) k.add(`${ITEM_BY_ID[w.item].art}_${w.wall}`);
-    for (const [sk] of scenery(s.roomW, s.roomH)) k.add(sk);
+    for (const [sk, , , flip] of scenery(s.roomW, s.roomH)) k.add(flip && hasProp(`${sk}_se`) ? `${sk}_se` : sk);
     for (const d of Object.values(DISH_BY_ID)) k.add(d.icon);
     for (const st of ['fx_steam_1', 'fx_steam_2', 'fx_steam_3', 'grill_flames', 'fryer_bubbles', 'pot_burnt']) k.add(st);
     return k;
@@ -181,7 +190,7 @@ export class JointScene extends Phaser.Scene {
     this.wallViews.clear();
     for (const fx of this.stoveFx.values()) [fx.fx, fx.dish, fx.badge, fx.ring].forEach((o) => o.destroy());
     this.stoveFx.clear();
-    for (const c of this.counterFx.values()) [...c.dishes, c.text].forEach((o) => o.destroy());
+    for (const c of this.counterFx.values()) [...c.dishes.flat(), c.empty, c.text].forEach((o) => o.destroy());
     this.counterFx.clear();
     for (const b of this.cashBadges.values()) b.destroy();
     this.cashBadges.clear();
@@ -261,23 +270,31 @@ export class JointScene extends Phaser.Scene {
       const p = iso(f.x, f.y);
       const d = depthOf(f.x, f.y);
       const top = p.y - (KITCHEN_META.counterTopZ[ITEM_BY_ID[f.item].art] ?? 36);
+      // three spots along the top; each dish is a little stack of plates, taller the more servings
       const dishes = [0, 1, 2].map((i) =>
-        this.img('dish_sliders', p.x - 8 + i * 8, top - 2 - i * 4)
-          .setDepth(d + 3 + i * 0.1)
-          .setVisible(false),
+        [0, 1, 2, 3].map((k) =>
+          this.img('dish_sliders', p.x - 9 + i * 9, top - 1 - i * 4.5 - k * 3.2)
+            .setDepth(d + 3 + i * 0.1 + k * 0.01)
+            .setVisible(false),
+        ),
       );
+      // nothing to serve: a bare plate, so the counter still reads as the counter
+      const empty = this.img(this.textures.exists('plate_clean') ? 'plate_clean' : 'plate_dirty', p.x, top - 2)
+        .setDepth(d + 3)
+        .setAlpha(0.85)
+        .setVisible(false);
       const text = this.add
-        .text(p.x + 24, top - 18, '', {
-          fontFamily: 'Arial Black, Arial, sans-serif',
-          fontSize: '10px',
-          color: '#F2E7C4',
-          backgroundColor: '#3B1A14',
-          padding: { x: 3, y: 1 },
+        .text(p.x + 26, top - 20, '', {
+          fontFamily: FONT_DISPLAY,
+          fontSize: '13px',
+          color: '#2A2418',
+          backgroundColor: '#E8DFC4',
+          padding: { x: 4, y: 1 },
         })
-        .setResolution(TEX_S)
+        .setResolution(Math.max(TEX_S, this.cameras.main.zoom))
         .setOrigin(0.5)
         .setDepth(d + 4);
-      this.counterFx.set(f.id, { dishes, text });
+      this.counterFx.set(f.id, { dishes, empty, text });
     }
     const ss = `${W}x${H}`;
     if (ss !== this.sizeSig) {
@@ -290,14 +307,33 @@ export class JointScene extends Phaser.Scene {
   // ---------- camera & input ----------
 
   private setupCamera(recenter: boolean) {
+    this.applyZoom(recenter);
+  }
+
+  /** CSS px hidden under the awning at the top of the screen (its scalloped hem is see-through). */
+  private awningPx() {
+    const b = document.querySelector('.awning')?.getBoundingClientRect().bottom;
+    return Math.max(36, Math.min(100, (b ?? 58) - 12));
+  }
+
+  /** World y of the top of the back corner, plus room for whatever pops up over a tall fridge. */
+  private wallTop() {
+    return iso(-0.5, -0.5).y - WALL_H - 8;
+  }
+
+  /**
+   * Camera bounds: the lot around the café, except that the top edge stops where the back walls'
+   * top would slide under the awning.
+   */
+  private setBounds() {
     const s = this.ctl.state;
     const cam = this.cameras.main;
+    const u = (window.devicePixelRatio || 1) / cam.zoom;
     const left = iso(-6, s.roomH + 5).x;
     const right = iso(s.roomW + 5, -6).x;
-    const top = iso(-6, -6).y - WALL_H;
     const bottom = iso(s.roomW + 5, s.roomH + 5).y;
+    const top = Math.min(this.wallTop() - (this.awningPx() + 6) * u, bottom - cam.height / cam.zoom);
     cam.setBounds(left, top, right - left, bottom - top);
-    this.applyZoom(recenter);
   }
 
   /** Close in, like the original: the room fills the screen and you pan around the lot. */
@@ -308,7 +344,7 @@ export class JointScene extends Phaser.Scene {
     const cssH = this.scale.height / dpr;
     const roomW = (s.roomW + s.roomH) * HW;
     const roomH = (s.roomW + s.roomH) * HH + WALL_H;
-    return Math.min((cssW * 0.92) / roomW, (cssH * 1.3) / roomH);
+    return Math.min((cssW * 0.92) / roomW, (cssH * 1.18) / roomH);
   }
 
   private applyZoom(recenter = false) {
@@ -317,11 +353,15 @@ export class JointScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const keep = recenter ? null : { x: cam.midPoint.x, y: cam.midPoint.y };
     cam.setZoom(z * dpr);
+    this.setBounds();
     if (keep) cam.centerOn(keep.x, keep.y);
     else {
+      // the room's middle, nudged down the screen so the top of the back corner clears the awning
       const s = this.ctl.state;
       const c = iso((s.roomW - 1) / 2, (s.roomH - 1) / 2);
-      cam.centerOn(c.x, c.y - WALL_H * 0.32);
+      const u = dpr / cam.zoom;
+      const clear = this.wallTop() - (this.awningPx() + 6) * u + cam.height / cam.zoom / 2;
+      cam.centerOn(c.x, Math.min(c.y - WALL_H * 0.32, clear));
     }
   }
 
@@ -569,14 +609,29 @@ export class JointScene extends Phaser.Scene {
     const ctl = this.ctl;
     const pl = ctl.placing;
     const sel = ctl.editSel;
-    for (const [id, vs] of this.furnViews) for (const v of vs) v.setAlpha(pl?.source === 'move' && pl.id === id ? 0.25 : 1).setTint(sel?.kind === 'furn' && sel.id === id ? 0xfff2a0 : 0xffffff);
+    const pulse = 0.5 + Math.sin(this.t * 6) * 0.5;
+    for (const [id, vs] of this.furnViews) for (const v of vs) v.setAlpha(pl?.source === 'move' && pl.id === id ? 0.25 : 1);
     for (const [id, v] of this.wallViews) {
       const moving = pl?.source === 'move' && pl.id === id;
+      const picked = sel?.kind === 'wall' && sel.id === id;
       const painting = ctl.painting && ctl.mode === 'edit' && id.length <= 3 && id[0] === (ctl.painting.kind === 'wall' ? id[0] : '#');
-      v.setAlpha(moving ? 0.25 : 1).setTint(sel?.kind === 'wall' && sel.id === id ? 0xfff2a0 : painting ? 0xf4f0d8 : 0xffffff);
+      v.setAlpha(moving ? 0.25 : picked ? 0.7 + pulse * 0.3 : 1).setTint(painting ? 0xf4f0d8 : 0xffffff);
+    }
+    // footprint diamonds on the floor: gold under the picked piece, green / red under the one being placed
+    if (!this.footG) this.footG = this.add.graphics().setDepth(GROUND + 9e4 + 1);
+    const fg = this.footG;
+    fg.clear();
+    if (ctl.mode === 'edit') {
+      const pf = sel?.kind === 'furn' ? ctl.state.furniture.find((f) => f.id === sel.id) : undefined;
+      if (pf && !pl) this.footprint(fg, pf.x, pf.y, 0xe5b53c, 0.16 + pulse * 0.14, 0.7 + pulse * 0.3);
+      if (pl && !pl.wall) {
+        const ok = !ctl.placementProblem();
+        this.footprint(fg, pl.x, pl.y, ok ? 0x7fc24a : 0xd04a3a, 0.32, 1);
+      }
     }
     if (!pl || ctl.mode !== 'edit') {
       for (const g of this.ghost) g.setVisible(false);
+      this.panKey = '';
       return;
     }
     const def = ITEM_BY_ID[pl.itemId];
@@ -611,10 +666,29 @@ export class JointScene extends Phaser.Scene {
         .setPosition(p.x, p.y)
         .setDepth(9e5 + i)
         .setVisible(true)
-        .setTint(ok ? 0xb8ff9c : 0xff8a80)
-        .setAlpha(0.62 + Math.sin(this.t * 6) * 0.14);
+        .setTint(ok ? 0xd8ffc4 : 0xff9a90)
+        .setAlpha(0.72 + Math.sin(this.t * 6) * 0.12);
     });
     for (let i = parts.length; i < this.ghost.length; i++) this.ghost[i].setVisible(false);
+    // a wall hanging's ghost can start off-screen: bring it into view once per new spot
+    if (pl.wall) {
+      const a = wallAnchor(pl.wall.wall, pl.wall.index);
+      const k = `${pl.itemId}:${pl.wall.wall}${pl.wall.index}`;
+      if (k !== this.panKey) {
+        this.panKey = k;
+        const v = this.cameras.main.worldView;
+        const y = a.y - WALL_H * 0.55;
+        if (a.x < v.x + 40 || a.x > v.right - 40 || y < v.y + 60 || y > v.bottom - 40) this.cameras.main.pan(a.x, y, 350, 'Sine.easeInOut');
+      }
+    }
+  }
+
+  private footprint(g: Phaser.GameObjects.Graphics, x: number, y: number, col: number, fill: number, line: number) {
+    const c = iso(x, y);
+    const pts = [new Phaser.Math.Vector2(c.x, c.y - HH), new Phaser.Math.Vector2(c.x + HW, c.y), new Phaser.Math.Vector2(c.x, c.y + HH), new Phaser.Math.Vector2(c.x - HW, c.y)];
+    g.fillStyle(col, fill).fillPoints(pts, true);
+    g.lineStyle(2.4, 0x16120c, 0.6 * line).strokePoints(pts, true, true);
+    g.lineStyle(1.6, col, line).strokePoints(pts, true, true);
   }
 
   // ---------- characters ----------
@@ -762,8 +836,8 @@ export class JointScene extends Phaser.Scene {
     if (w.kind === 'you' && !a.tag) {
       a.tag = this.add
         .text(0, 0, 'YOU', {
-          fontFamily: 'Arial Black, Arial, sans-serif',
-          fontSize: '9px',
+          fontFamily: FONT_DISPLAY,
+          fontSize: '11px',
           color: '#F2E7C4',
           backgroundColor: '#3B1A14',
           padding: { x: 4, y: 1 },
@@ -775,8 +849,25 @@ export class JointScene extends Phaser.Scene {
     if (a.tag) a.tag.y = lying ? -32 : -pup.height - 7;
     const sel = this.ctl.selection;
     const selected = (sel?.kind === 'worker' && sel.id === w.id) || (sel?.kind === 'dishPicker' && sel.workerId === w.id);
-    if (selected) pup.setTint(0xfff2a0);
-    else pup.clearTint();
+    this.selRing(a, selected, pose === 'lie');
+  }
+
+  /** A pulsing gold ring on the ground (no tint: the character keeps its colours). */
+  private selRing(a: Actor, on: boolean, lying = false) {
+    if (!on) {
+      a.sel?.setVisible(false);
+      return;
+    }
+    if (!a.sel) {
+      a.sel = this.add.ellipse(0, 0, 44, 16, 0xe5b53c, 0.18).setStrokeStyle(2.2, 0xe5b53c, 1);
+      a.holder.addAt(a.sel, 0);
+    }
+    const k = 1 + Math.sin(this.t * 6) * 0.08;
+    a.sel
+      .setVisible(true)
+      .setPosition(lying ? 14 : 0, 0)
+      .setScale(k * (lying ? 1.6 : 1), k)
+      .setAlpha(0.75 + Math.sin(this.t * 6) * 0.25);
   }
 
   /** Seat position for a customer on their chair, and which way they face. */
@@ -862,8 +953,10 @@ export class JointScene extends Phaser.Scene {
     this.bubble(a, b, -pup.height - 6, 8, dish);
     const sel = this.ctl.selection;
     if (c.state === 'infecting') pup.setTint(Math.sin(this.t * 30) > 0 ? 0x9be36b : 0xffffff);
-    else if (sel?.kind === 'customer' && sel.id === c.id) pup.setTint(0xfff2a0);
     else pup.clearTint();
+    this.selRing(a, sel?.kind === 'customer' && sel.id === c.id);
+    // a seated diner's ring sits on the chair's floor tile, not up on the seat
+    if (a.sel?.visible && sp) a.sel.setPosition(-(sp.x - iso(c.x, c.y).x), -(sp.y - iso(c.x, c.y).y));
   }
 
   private syncPet(p: Pet, dt: number) {
@@ -995,19 +1088,24 @@ export class JointScene extends Phaser.Scene {
         else fx.badge.clearTint();
       }
       fx.ring.clear();
-      if ((cooking || st.status === 'paused') && st.dish && st.total) {
+      // the cook timer: a gold arc filling a cream ring (hidden while this stove's card is open: the
+      // card has the same bar, bigger)
+      const carded = this.ctl.selection?.kind === 'stove' && this.ctl.selection.id === st.id;
+      if ((cooking || st.status === 'paused') && st.dish && st.total && !carded) {
         const pct = Phaser.Math.Clamp(1 - (st.left ?? 0) / st.total, 0, 1);
         const y = fx.topY - 50;
-        fx.ring.fillStyle(0x16120c, 0.85).fillCircle(fx.x, y, 9);
-        fx.ring
-          .lineStyle(3, st.status === 'paused' ? 0x8a857a : 0xc9a63a, 1)
+        const R = 7.5;
+        const g = fx.ring;
+        g.fillStyle(0x16120c, 0.35).fillCircle(fx.x + 0.8, y + 1.2, R + 2.2);
+        g.lineStyle(5.4, 0x16120c, 1).strokeCircle(fx.x, y, R);
+        g.lineStyle(3.4, 0xe8dfc4, 1).strokeCircle(fx.x, y, R);
+        g.lineStyle(3.4, st.status === 'paused' ? 0x8a857a : 0xd9a930, 1)
           .beginPath()
-          .arc(fx.x, y, 6.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct)
+          .arc(fx.x, y, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct)
           .strokePath();
         if (st.status === 'paused') {
           // paused: nobody at the stove (the original's cooks had to stay put)
-          fx.ring
-            .fillStyle(0xf2e7c4, 1)
+          g.fillStyle(0x16120c, 1)
             .fillRect(fx.x - 3, y - 3.5, 2, 7)
             .fillRect(fx.x + 1, y - 3.5, 2, 7);
         }
@@ -1032,20 +1130,25 @@ export class JointScene extends Phaser.Scene {
         }
       }
     }
-    // counters: up to three dishes stacked on top, and the servings left
+    // counters: up to three dishes, each a stack of plates (1–4 by servings), and the servings left
     for (const [fid, c] of this.counterFx) {
       const slots = s.counter.filter((x) => x.furnitureId === fid && x.dish && x.servings > 0);
       const total = slots.reduce((a, x) => a + x.servings, 0);
-      c.dishes.forEach((d, i) => {
+      c.dishes.forEach((stack, i) => {
         const slot = slots[i];
-        d.setVisible(!!slot);
-        if (slot) {
-          const k = DISH_BY_ID[slot.dish!].icon;
-          if (d.texture.key !== k && this.textures.exists(k)) d.setTexture(k);
-        }
+        const n = !slot ? 0 : slot.servings >= 15 ? 4 : slot.servings >= 8 ? 3 : slot.servings >= 4 ? 2 : 1;
+        stack.forEach((d, k) => {
+          d.setVisible(k < n);
+          if (k < n) {
+            const key = DISH_BY_ID[slot!.dish!].icon;
+            if (d.texture.key !== key && this.textures.exists(key)) d.setTexture(key);
+          }
+        });
       });
+      c.empty.setVisible(total === 0);
       c.text.setVisible(total > 0);
-      if (total > 0) c.text.setText(`×${total}`);
+      const label = `×${total}`;
+      if (total > 0 && c.text.text !== label) c.text.setText(label);
     }
     // money-makers: "$" when there's cash in them, "!" when they're full and have stopped earning
     for (const f of s.furniture) {
@@ -1085,28 +1188,10 @@ export class JointScene extends Phaser.Scene {
 
   // ---------- juice ----------
 
-  floatText(x: number, y: number, text: string, color: string, size = 12) {
-    const t = this.add
-      .text(x, y, text, {
-        fontFamily: 'Arial Black, Arial, sans-serif',
-        fontSize: `${size}px`,
-        color,
-        stroke: '#16120C',
-        strokeThickness: 3,
-      })
-      .setResolution(TEX_S)
-      .setOrigin(0.5)
-      .setDepth(1e6)
-      .setScale(0.4);
-    this.tweens.add({ targets: t, scale: 1, duration: 180, ease: 'Back.Out' });
-    this.tweens.add({
-      targets: t,
-      y: y - 34,
-      alpha: 0,
-      delay: 500,
-      duration: 900,
-      onComplete: () => t.destroy(),
-    });
+  /** A floating label (pooled, crisp, stacked per anchor: see floattext.ts). */
+  floatText(x: number, y: number, text: string, color: string, size = 16, opts: FloatOpts = {}) {
+    this.floats ??= new FloatTexts(this, 20);
+    this.floats.show(x, y, text, color, { size, ...opts });
   }
 
   private popIcon(x: number, y: number, key: string) {
@@ -1134,19 +1219,20 @@ export class JointScene extends Phaser.Scene {
     switch (e.t) {
       case 'coin': {
         const p = iso(e.x, e.y);
-        this.popIcon(p.x - 10, p.y - 90, 'fx_cash');
-        this.floatText(p.x + 10, p.y - 92, `+$${e.amount + e.tip}`, '#D9C25A');
+        // one popup per customer: the "$" and the amount are a single label
+        this.floatText(p.x, p.y - 96, `${e.amount + e.tip}`, '#E3CB5E', 17, { icon: 'fx_cash', force: true, anchor: `c${Math.round(e.x * 2)},${Math.round(e.y * 2)}` });
         sfx('coin', { volume: 0.6 });
         break;
       }
       case 'face': {
         const p = iso(e.x, e.y);
-        this.popIcon(p.x, p.y - 112, e.happy ? 'face_happy' : 'face_angry');
+        // a happy diner just pays (the coin label says it all); only a stormy exit gets a face
+        if (!e.happy) this.popIcon(p.x, p.y - 112, 'face_angry');
         break;
       }
       case 'xp': {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 100, `+${e.amount} XP`, '#9CC4C8');
+        this.floatText(p.x, p.y - 104, `+${e.amount} XP`, '#A9D3DA', 16, { force: true, anchor: `s${e.x},${e.y}` });
         break;
       }
       case 'eaten': {
@@ -1159,7 +1245,7 @@ export class JointScene extends Phaser.Scene {
       }
       case 'bite': {
         const p = iso(e.x, e.y);
-        this.floatText(p.x, p.y - 80, 'CHOMP!', '#C0392B', 18);
+        this.floatText(p.x, p.y - 112, 'CHOMP!', '#D9513E', 20, { force: true, anchor: e.workerId });
         this.popIcon(p.x, p.y - 50, 'fx_hit');
         this.cameras.main.shake(180, 0.004);
         const a = this.actors.get(e.workerId);
@@ -1176,7 +1262,7 @@ export class JointScene extends Phaser.Scene {
         const w = s.workers.find((x) => x.id === e.workerId);
         if (!w) break;
         const p = iso(w.x, w.y);
-        this.floatText(p.x, p.y - 110, 'INFECTED!', '#9BD62E', 16);
+        this.floatText(p.x, p.y - 120, 'INFECTED!', '#9BD62E', 19, { force: true, anchor: w.id });
         this.popIcon(p.x, p.y - 40, 'fx_stink');
         sfx('infect');
         const a = this.actors.get(w.id);
@@ -1210,7 +1296,7 @@ export class JointScene extends Phaser.Scene {
         const f = s.furniture.find((x) => x.id === e.furnitureId);
         if (f) {
           const p = iso(f.x, f.y);
-          this.floatText(p.x, p.y - 100, `+$${e.amount}`, '#D9C25A', 16);
+          this.floatText(p.x, p.y - 108, `${e.amount}`, '#E3CB5E', 18, { icon: 'fx_cash', force: true, anchor: f.id });
         }
         sfx('cashRegister');
         break;
@@ -1219,8 +1305,7 @@ export class JointScene extends Phaser.Scene {
         const pet = s.pets.find((x) => x.id === e.petId);
         if (pet) {
           const p = iso(pet.x, pet.y);
-          this.popIcon(p.x, p.y - 40, 'fx_cash');
-          this.floatText(p.x, p.y - 50, `+$${e.amount}`, '#D9C25A');
+          this.floatText(p.x, p.y - 50, `${e.amount}`, '#E3CB5E', 16, { icon: 'fx_cash', force: true, anchor: pet.id });
         }
         sfx('pugSnort');
         break;

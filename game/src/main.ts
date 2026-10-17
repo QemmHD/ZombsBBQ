@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import './fonts';
 import './ui/style.css';
 import './ui/theme3.css';
 import { Controller } from './game/controller';

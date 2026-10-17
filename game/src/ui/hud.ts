@@ -90,22 +90,26 @@ export class Hud {
         <div class="xpbar"><i data-k="xpfill"></i><span data-k="xptext"></span></div>
         <div class="cur cash" data-k="cash">${icon('ui_cash', 'cur-ico')}<span data-k="cashv"></span></div>
         <div class="cur sauce" data-k="sauce">${icon('ui_sauce', 'cur-ico')}<span data-k="saucev"></span></div>
-        <button class="gear" data-k="gear" aria-label="Settings">${icon('ui_settings', 'gear-ico')}</button>
+        <button class="gear" data-k="gear" aria-label="Settings"><span class="zb">ZB</span></button>
       </div>
-      <div class="side left grid3 play-only">
-        <button class="btn-sq" data-k="shop" aria-label="Shop">${icon('ui_shop', 'bi')}<label>SHOP</label></button>
-        <button class="btn-sq" data-k="book" aria-label="Cookbook">${icon('ui_menu', 'bi')}<label>MENU</label></button>
-        <button class="btn-sq" data-k="map" aria-label="Raid map">${icon('ui_raid', 'bi')}<label>RAID</label><span class="badge lock" data-k="maplock">${icon('fx_lock', 'ico-s')}</span></button>
-        <button class="btn-sq" data-k="crew" aria-label="Crew">${icon('ui_crew', 'bi')}<label>CREW</label><span class="badge" data-k="crewc"></span></button>
-        <button class="btn-sq" data-k="goals" aria-label="Goals">${icon('ui_goals', 'bi')}<label>GOALS</label><span class="badge ready" data-k="goalc"></span></button>
-        <button class="btn-sq" data-k="edit" aria-label="Decorate">${icon('ui_edit', 'bi')}<label>DECOR</label></button>
+      <div class="side left play-only">
+        <div class="hud-row">
+          <button class="btn-sq" data-k="shop" aria-label="Shop">${icon('ui_shop', 'bi')}</button>
+          <button class="btn-sq" data-k="goals" aria-label="Goals">${icon('ui_goals', 'bi')}<span class="badge ready" data-k="goalc"></span></button>
+          <button class="btn-sq" data-k="map" aria-label="Raid map">${icon('ui_raid', 'bi')}<span class="badge lock" data-k="maplock">${icon('fx_lock', 'ico-s')}</span></button>
+          <button class="btn-sq" data-k="book" aria-label="Cookbook">${icon('ui_menu', 'bi')}</button>
+        </div>
+        <div class="hud-row">
+          <button class="btn-sq crew-btn" data-k="crew" aria-label="Crew">${icon('ui_crew', 'bi')}<span class="crew-count" data-k="crewc"></span></button>
+          <button class="btn-sq" data-k="edit" aria-label="Storage and decorating">${icon('ui_storage', 'bi')}</button>
+        </div>
       </div>
       <div class="side right play-only">
-        <button class="btn-sq sign" data-k="sign" aria-label="Open or close the joint"><img class="bi" data-k="signimg" alt=""/><label data-k="signlbl">OPEN</label></button>
-        <button class="btn-sq" data-k="fridge" aria-label="Fridge">${icon('ui_fridge', 'bi')}<label>FRIDGE</label><span class="badge" data-k="fridgec"></span></button>
-        <button class="btn-sq" data-k="pedia" aria-label="Zombiepedia">${icon('ui_zombiepedia', 'bi')}<label>ZOMBS</label></button>
+        <button class="btn-sq sign" data-k="sign" aria-label="Open or close the joint"><img class="bi" data-k="signimg" alt=""/></button>
+        <button class="btn-sq" data-k="fridge" aria-label="Fridge">${icon('ui_fridge', 'bi')}<span class="badge" data-k="fridgec"></span></button>
+        <button class="btn-sq" data-k="pedia" aria-label="Zombiepedia">${icon('ui_zombiepedia', 'bi')}</button>
       </div>
-      <div class="hint hidden play-only" data-k="hint"><img alt="" data-k="gusimg"/><div class="bubble"><b>GUS, ZOMBIE UNION REP</b><span data-k="hinttext"></span></div></div>
+      <div class="hint hidden play-only" data-k="hint"><span class="gus-badge"><img alt="" data-k="gusimg"/></span><div class="bubble"><b>GUS, ZOMBIE UNION REP</b><span data-k="hinttext"></span></div></div>
       <div class="card hidden play-only" data-k="card"></div>
       <div class="editbar edit-only" data-k="editbar"></div>
       <div class="raidhud raid-only" data-k="raidhud"></div>
@@ -237,7 +241,6 @@ export class Hud {
     if (this.lastClosed !== !!s.closed) {
       this.lastClosed = !!s.closed;
       (this.el.signimg as HTMLImageElement).src = artUrl(s.closed ? 'ui_closed' : 'ui_open');
-      this.el.signlbl.textContent = s.closed ? 'CLOSED' : 'OPEN';
       this.el.sign.classList.toggle('closed', !!s.closed);
     }
     this.el.maplock.style.display = s.level < MAP_LEVEL ? '' : 'none';
@@ -300,7 +303,7 @@ export class Hud {
         <div class="bar"><i data-live="ebar" style="width:${f * 100}%;background:${energyColor(f)}"></i></div>
         <div class="state" data-live="etext">Energy ${Math.floor(w.energy)}/${me}${warn}</div></div></div>
         <div class="state" data-live="state">${state}</div>
-        <div class="chips"><span class="chip">SPD ${w.stats.speed}</span><span class="chip">PWR ${w.stats.power}</span><span class="chip">TIPS ${w.stats.tips}</span><span class="chip">FOCUS ${w.stats.focus}</span><span class="chip">PATIENCE ${w.stats.patience}</span></div>
+        ${statChips(w.stats)}
         <div class="actions">
           ${w.state === 'down' ? '' : resting ? `<button class="btn blue" data-a="wake">Back to work</button>` : `<button class="btn blue" data-a="rest" ${w.state === 'cooking' || w.state === 'raiding' ? 'disabled' : ''}>Rest</button>`}
           <button class="btn sauce" data-a="refill" ${f >= 1 && w.state !== 'down' ? 'disabled' : ''}>${w.state === 'down' ? 'Revive' : 'Refill'} ${icon('ui_sauce', 'ico-s')}1</button>
@@ -322,7 +325,7 @@ export class Hud {
         <div class="grow"><h3>${esc(def.name)}</h3><div class="sub"><span class="tier ${def.tier}">${def.tier}</span> ${c.state === 'eating' ? 'Chowing down' : c.state === 'waiting' ? 'Waiting for food' : 'Walking in'}</div>
         ${c.state === 'waiting' ? `<div class="bar"><i data-live="wait" style="width:${(c.waitLeft / TUNING.customerWaitSec) * 100}%;background:${energyColor(c.waitLeft / TUNING.customerWaitSec)}"></i></div>` : ''}</div>
         <div class="portrait z"><img src="${headUrl(`${c.type}_z`)}" alt=""/></div></div>
-        <div class="chips"><span class="chip">SPD ${def.stats.speed}</span><span class="chip">PWR ${def.stats.power}</span><span class="chip">TIPS ${def.stats.tips}</span><span class="chip">FOCUS ${def.stats.focus}</span><span class="chip">PATIENCE ${def.stats.patience}</span><span class="chip">NRG ${def.stats.energy}</span></div>
+        ${statChips(def.stats, def.stats.energy)}
         <div class="actions"><button class="btn infect" data-a="infect" ${full ? 'disabled' : ''}>INFECT · ${costTxt}</button></div>
         <div class="small">${full ? `Crew full (${s.crewCap}/${s.crewCap}). Fire someone or level up.` : `Becomes ${esc(def.zombieName)}: “${esc(def.gag)}”`}</div>`;
     } else if (sel.kind === 'stove') {
@@ -505,6 +508,12 @@ export class Hud {
       this.renderCard();
     }
   }
+}
+
+/** The stat strip on a card: one line of compact chips (label small, number big). */
+function statChips(st: { speed: number; power: number; tips: number; focus: number; patience: number }, energy?: number): string {
+  const c = (k: string, v: number, title: string) => `<span class="chip" title="${title}"><i>${k}</i>${v}</span>`;
+  return `<div class="chips">${c('SPD', st.speed, 'Speed')}${c('PWR', st.power, 'Power')}${c('TIPS', st.tips, 'Tips')}${c('FOC', st.focus, 'Focus')}${c('PAT', st.patience, 'Patience')}${energy !== undefined ? c('NRG', energy, 'Energy') : ''}</div>`;
 }
 
 function chairTableCount(s: Controller['state'], tableId: string): number {

@@ -25,16 +25,30 @@ export function priceHtml(p: { cash?: number; sauce?: number }) {
   return `${icon('ui_cash', 'ico-s')}${fmt(p.cash ?? 0)}`;
 }
 
+const STAR_PATH = 'M12 1.6l3.2 6.6 7.2 1-5.2 5 1.3 7.2L12 18l-6.5 3.4 1.3-7.2-5.2-5 7.2-1z';
+
+/**
+ * One star, the same everywhere (HUD, rating, raid results): gold = earned, a dark hollow outline =
+ * not yet, purple = a bonus star. Sized by the surrounding font-size (1em).
+ */
+export function star(kind: 'on' | 'half' | 'off' | 'purple') {
+  const fill = kind === 'on' ? '<path class="st-fill" d="' + STAR_PATH + '"/>' : kind === 'purple' ? '<path class="st-fill" d="' + STAR_PATH + '"/>' : '';
+  // half: the gold fill over the left half only (its own polygon, so no clip ids are needed)
+  const half = kind === 'half' ? '<path class="st-fill" d="M12 1.6L8.8 8.2 1.6 9.2l5.2 5-1.3 7.2L12 18z"/>' : '';
+  const shine = kind === 'on' || kind === 'purple' ? '<path class="st-shine" d="M8.6 9.6l2.4-.4 1-2.2"/>' : '';
+  return `<svg class="st ${kind === 'off' ? '' : kind}" viewBox="0 0 24 24" aria-hidden="true"><path class="st-slot" d="${STAR_PATH}"/>${fill}${half}${shine}<path class="st-line" d="${STAR_PATH}"/></svg>`;
+}
+
 export function starsHtml(st: number) {
   let h = '';
-  for (let i = 1; i <= 5; i++) h += st >= i ? '<b class="st on">★</b>' : st >= i - 0.5 ? '<b class="st half">★</b>' : '<b class="st">★</b>';
+  for (let i = 1; i <= 5; i++) h += star(st >= i ? 'on' : st >= i - 0.5 ? 'half' : 'off');
   return h;
 }
 
 /** Purple bonus stars, drawn after the normal five. */
 export function purpleStarsHtml(n: number) {
   let h = '';
-  for (let i = 0; i < n; i++) h += '<b class="st purple">★</b>';
+  for (let i = 0; i < n; i++) h += star('purple');
   return h;
 }
 

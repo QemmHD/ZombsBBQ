@@ -22,8 +22,20 @@
   --olive-d: #486d0d;
   --chalk: #e6e4d6;
   --paper: #e9dfa8;
-  --font: 'Arial Black', 'Arial Rounded MT Bold', ui-rounded, system-ui, sans-serif;
-  --font-body: 'Trebuchet MS', ui-rounded, system-ui, sans-serif;
+  /* bundled OFL faces (src/fonts): Lilita One for display, Nunito for body text */
+  --font: 'Lilita One', 'Arial Black', system-ui, sans-serif;
+  --font-body: Nunito, 'Trebuchet MS', system-ui, sans-serif;
+  /* HUD icon size: about 52 pt on a phone, a touch smaller on short screens */
+  --ib: 52px;
+}
+html {
+  /* Lilita One has a single weight: never fake a bold */
+  font-synthesis: none;
+}
+@media (max-height: 380px) {
+  :root {
+    --ib: 46px;
+  }
 }
 
 /* ---------- the awning: full width, stained canvas stripes with a torn scalloped edge ---------- */
@@ -61,24 +73,55 @@
   text-shadow: 0 2px 0 var(--ink);
   letter-spacing: 1px;
 }
-.st {
-  color: rgba(22, 18, 12, 0.55);
-  text-shadow: 0 0 1px rgba(232, 223, 196, 0.6);
-  font-size: 13px;
+/* stars (inline SVG, see star() in dom.ts): gold = earned, dark hollow = not yet, purple = bonus.
+   The same in the awning, the rating card, the map and the raid results. */
+svg.st {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  overflow: visible;
+  font-size: 15px;
+  margin-right: -1px;
 }
-.st.on {
-  color: var(--gold);
-  text-shadow: 0 1px 0 var(--ink);
+.st .st-slot {
+  fill: rgba(22, 18, 12, 0.32);
 }
-/* a half star fills its left half with gold via a clipped background. A text-shadow would paint over
-   that background and turn the star dark, so outline it with a drop-shadow filter instead */
-.st.half {
-  background: linear-gradient(90deg, var(--gold) 50%, rgba(22, 18, 12, 0.55) 50%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow: none;
-  filter: drop-shadow(0 1px 0 var(--ink));
+.st .st-fill {
+  fill: #e5b53c;
+}
+.st.purple .st-fill {
+  fill: var(--purple, #a45be0);
+}
+.st .st-shine {
+  fill: none;
+  stroke: #fff2b8;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.st.purple .st-shine {
+  stroke: #e2c4ff;
+}
+.st .st-line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.st.on,
+.st.half,
+.st.purple {
+  filter: drop-shadow(0 1px 0 rgba(22, 18, 12, 0.7));
+}
+.modal svg.st {
+  font-size: 18px;
+}
+.modal .big-stars svg.st,
+.big-stars svg.st {
+  font-size: 30px;
+}
+.pin-label svg.st {
+  font-size: 10px;
 }
 .xpbar {
   background: rgba(22, 18, 12, 0.7);
@@ -86,83 +129,142 @@
   border-radius: 3px;
 }
 .xpbar i {
-  background: linear-gradient(#a9c6c9, #5f8a8f);
+  background: linear-gradient(#4f86a0, #3e6f86 60%, #2f5668);
   border-radius: 1px;
 }
 .xpbar span,
 .cur span {
   font-family: var(--font);
+  font-weight: 400;
   color: var(--cream);
   text-shadow: 0 1px 0 var(--ink);
+}
+/* XP text sits on the fill: give it a full ink outline so it reads on any part of the bar */
+.xpbar span {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  -webkit-text-stroke: 2.4px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: none;
+}
+.cur span {
+  font-size: 17px;
 }
 .cur {
   background: rgba(22, 18, 12, 0.62);
   border: 1.5px solid var(--ink);
   border-radius: 4px;
 }
+/* the settings button: an enamel ZB monogram badge riveted to the right end of the awning */
 .gear {
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  position: absolute;
+  right: calc(var(--safe-r) + 6px);
+  top: calc(var(--safe-t) + 4px);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: radial-gradient(circle at 38% 32%, #f0e6c8, #cdbf94 62%, #9c8e64);
+  box-shadow: inset 0 0 0 3px #6d1727, inset 0 0 0 4.5px var(--ink), 0 3px 0 rgba(22, 18, 12, 0.45);
+  cursor: pointer;
+}
+.gear:active {
+  transform: translateY(2px) scale(0.95);
+}
+.gear .zb {
+  font: 400 17px/1 var(--font);
+  color: #6d1727;
+  letter-spacing: -0.5px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  transform: rotate(-8deg);
+  display: block;
+}
+/* a little gear tooth ring, so it still reads as "settings" */
+.gear::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--ink) 0 9deg, transparent 9deg 30deg);
+  -webkit-mask: radial-gradient(circle, transparent 21px, #000 21.5px);
+  mask: radial-gradient(circle, transparent 21px, #000 21.5px);
+  z-index: -1;
 }
 
-/* ---------- icon buttons: the art sits proud, with a little olive sticker label underneath ---------- */
+/* ---------- icon buttons, the original's way: one row of big icons, no label slabs ---------- */
 .side {
-  top: calc(var(--safe-t) + 54px);
+  top: calc(var(--safe-t) + 56px);
+  gap: 2px;
 }
-.side.left.grid3 {
-  display: grid;
-  grid-template-columns: repeat(3, 58px);
-  gap: 4px 2px;
+.side.left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.hud-row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
 }
 .btn-sq {
-  width: 58px;
-  height: 60px;
+  width: var(--ib);
+  height: var(--ib);
   border: none;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
 .btn-sq:active {
-  transform: translateY(2px) scale(0.95);
+  transform: translateY(2px) scale(0.93);
   box-shadow: none;
 }
 .btn-sq .bi {
-  width: 46px;
-  height: 46px;
-  margin-top: -14px;
-  filter: drop-shadow(0 2px 1px rgba(22, 18, 12, 0.55));
-}
-.btn-sq label {
-  bottom: 0;
-  left: 2px;
-  right: 2px;
-  height: 17px;
-  line-height: 13px;
-  font-family: var(--font);
-  font-size: 9px;
-  letter-spacing: 0.4px;
-  color: var(--cream);
-  text-shadow: 0 1px 0 var(--ink);
-  border-style: solid;
-  border-width: 2px 6px;
-  border-image: var(--btn-olive) 16 24 fill / 2px 6px stretch;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  filter: drop-shadow(0 2px 1px rgba(22, 18, 12, 0.6));
 }
 .btn-sq.sign.closed,
 .btn-sq.sign {
   background: transparent;
+  width: calc(var(--ib) * 1.25);
+  height: calc(var(--ib) * 1.12);
 }
-.btn-sq.sign.closed label {
+/* the crew: a zombie head and a stencilled count */
+.btn-sq.crew-btn {
+  width: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.btn-sq.crew-btn .bi {
+  width: var(--ib);
+  flex: none;
+}
+.crew-count {
+  margin-left: -6px;
+  padding: 1px 7px 0;
+  font: 400 15px/20px var(--font);
   color: var(--cream);
-  border-image: var(--btn-red) 16 24 fill / 2px 6px stretch;
+  background: rgba(22, 18, 12, 0.78);
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  text-shadow: 0 1px 0 var(--ink);
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
 }
 .badge {
   background: var(--olive);
   color: var(--cream);
   border: 1.5px solid var(--ink);
   font-family: var(--font);
-  top: -6px;
-  right: -4px;
+  font-weight: 400;
+  top: -3px;
+  right: -3px;
+  min-width: 20px;
+  height: 20px;
+  font-size: 12px;
 }
 .badge.ready {
   background: var(--red);
@@ -176,16 +278,47 @@
   background: var(--tex-paper) 0 0 / 100% 100%;
   border: none;
   border-radius: 0;
-  box-shadow: 2px 3px 0 rgba(22, 18, 12, 0.35);
-  padding: 20px 14px 10px 30px;
+  box-shadow: none;
+  filter: drop-shadow(2px 3px 0 rgba(22, 18, 12, 0.35));
+  /* text starts right of the pad's red margin rule (at ~8% of the sheet) */
+  padding: 20px 16px 12px clamp(30px, 9%, 46px);
   color: #2a2418;
   font-family: var(--font-body);
-  font-weight: 700;
+  font-weight: 800;
   transform: rotate(-0.8deg);
 }
 .hint .bubble b {
   color: var(--maroon);
   font-family: var(--font);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+}
+/* Gus himself: a round enamel union badge that bobs a little while he talks */
+.gus-badge {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: radial-gradient(circle at 40% 35%, #d8cca6, #8f8460 75%);
+  box-shadow: inset 0 0 0 3px rgba(109, 23, 39, 0.85), inset 0 0 0 4.5px var(--ink), 0 3px 0 rgba(22, 18, 12, 0.4);
+  overflow: hidden;
+  display: grid;
+  place-items: end center;
+  animation: gusbob 2.6s ease-in-out infinite;
+}
+.hint .gus-badge img {
+  width: 52px;
+  height: 52px;
+  margin-bottom: -6px;
+  filter: none;
+}
+@keyframes gusbob {
+  50% {
+    transform: translateY(-3px) rotate(-2deg);
+  }
 }
 
 /* ---------- context card + menus: a chalkboard in a beat-up wood frame ---------- */
@@ -220,6 +353,41 @@
   background: rgba(232, 223, 196, 0.12);
   border: 1px solid rgba(232, 223, 196, 0.35);
   color: var(--chalk);
+  font-family: var(--font);
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+/* on cream paper (crew rows, squad cards, shop cards…): ink text on a dark translucent wash */
+.chip.paper,
+.crew-row .chip,
+.squad-tile .chip,
+.pedia-card .chip,
+.item .chip,
+.dish .chip,
+.goal .chip {
+  background: rgba(22, 18, 12, 0.1);
+  border: 1px solid rgba(22, 18, 12, 0.55);
+  color: #2a2418;
+}
+/* the stat strip on a card stays on one line */
+.card .chips {
+  flex-wrap: nowrap;
+  gap: 3px;
+}
+.card .chip {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  padding: 2px 3px;
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card .chip i {
+  font-style: normal;
+  opacity: 0.7;
+  font-size: 9px;
+  margin-right: 2px;
 }
 .bar {
   background: rgba(0, 0, 0, 0.5);
@@ -232,6 +400,14 @@
 .portrait {
   background: rgba(232, 223, 196, 0.1);
   border-color: rgba(232, 223, 196, 0.35);
+}
+/* the zombie-to-be: a sickly olive glow, not a lime tile */
+.portrait.z {
+  background: radial-gradient(circle at 50% 40%, #7d8f52, #3c4a2a 75%);
+}
+/* keep the card's close sticker clear of whatever sits in the top row */
+.card > .row:first-of-type {
+  padding-right: 34px;
 }
 
 /* ---------- buttons: slanted sticker buttons ---------- */
@@ -376,11 +552,38 @@
   background: #1d1a14 var(--tex-brick) center / cover;
 }
 
-/* ---------- leftovers from the old bright skin ---------- */
+/* ---------- close: a little red sticker with a cream X ---------- */
 .x {
-  background: rgba(22, 18, 12, 0.55);
-  border: 1.5px solid rgba(232, 223, 196, 0.45);
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--btn-red) center / 100% 100% no-repeat;
+  transform: rotate(-4deg);
+  filter: drop-shadow(0 2px 0 rgba(22, 18, 12, 0.5));
+}
+.x .x-ico {
+  display: none;
+}
+.x::before,
+.x::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 17px;
+  height: 4px;
   border-radius: 2px;
+  background: var(--cream);
+  box-shadow: 0 0 0 1px rgba(22, 18, 12, 0.8);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.x::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+.x:active {
+  transform: rotate(-4deg) translateY(2px) scale(0.94);
 }
 .item.wide-item {
   background: #d9c98c;
@@ -477,6 +680,10 @@
   animation: pulse 1.2s infinite;
 }
 
+.hint {
+  left: var(--safe-l);
+}
+
 /* Gus's note is information only: taps go straight through it to the café underneath */
 .hint,
 .hint * {
@@ -488,10 +695,8 @@
   --purple: #a45be0;
   --purple-deep: #6a2a9e;
 }
-.st.purple,
-.modal .st.purple {
-  color: var(--purple);
-  text-shadow: 0 1px 0 var(--ink), 0 0 4px rgba(164, 91, 224, 0.6);
+.st.purple {
+  filter: drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 0 3px rgba(164, 91, 224, 0.6));
 }
 .purple-head {
   display: flex;
@@ -500,7 +705,7 @@
   padding: 4px 6px 8px;
   color: var(--chalk);
 }
-.purple-head .st {
+.purple-head svg.st {
   font-size: 24px;
 }
 .purple-head .sub {
