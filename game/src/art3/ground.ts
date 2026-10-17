@@ -6,7 +6,7 @@
  * All ground tiles are (TILE_W + 2) x (TILE_H + 2) with anchor (0.5, 0.5) = tile centre. The diamond is
  * drawn 1 unit oversize so neighbouring tiles overlap and no hairline seams show.
  *
- * Keys: grass_1..grass_4, sidewalk_1..sidewalk_2, road_1..road_3,
+ * Keys: grass_1..grass_6, sidewalk_1..sidewalk_4, road_1..road_3,
  *   overlays (same size/anchor, transparent elsewhere): kerb_ne / kerb_nw / kerb_se / kerb_sw (raised kerb
  *   along that tile edge), lane_ne / lane_nw (dashed yellow centre line along that edge), manhole, drain_ne,
  *   drain_nw, oil_1, oil_2, crack_road, puddle.
@@ -37,13 +37,15 @@ function grass(seed: number) {
   return (d: Doc) => {
     const r = rnd(seed);
     let s = F(DIA, PAL.grass[0]);
-    // mottled patches of darker and lighter grass
+    // fine, low-contrast mottling (big bold blotches tiled into polka dots): lots of small soft
+    // patches, a couple of broader faint ones, so neighbouring tiles blend into one lawn
     let patches = '';
-    for (let k = 0; k < 9; k++) {
-      const x = 8 + r() * (W - 16);
-      const y = 6 + r() * (H - 12);
-      const col = [PAL.grass[1], PAL.grass[2], PAL.grass[3], PAL.grass[1]][k % 4];
-      patches += F(blob(x, y, 8 + r() * 14, 5 + r() * 8, seed * 31 + k), col, 0, `opacity="${f(0.35 + r() * 0.35)}"`);
+    for (let k = 0; k < 2; k++) patches += F(blob(10 + r() * (W - 20), 8 + r() * (H - 16), 14 + r() * 10, 7 + r() * 5, seed * 37 + k), k ? PAL.grass[3] : PAL.grass[1], 0, `opacity="${f(0.1 + r() * 0.08)}"`);
+    for (let k = 0; k < 16; k++) {
+      const x = 4 + r() * (W - 8);
+      const y = 3 + r() * (H - 6);
+      const col = [PAL.grass[1], PAL.grass[3], PAL.grass[2], PAL.grass[4]][k % 4];
+      patches += F(blob(x, y, 2.5 + r() * 5, 1.5 + r() * 3, seed * 31 + k), col, 0, `opacity="${f(0.12 + r() * 0.14)}"`);
     }
     s += d.clip(DIA, patches);
     // grass tufts: little V and W strokes, dark below, light tips
@@ -83,9 +85,11 @@ function sidewalk(seed: number) {
     // concrete speckle + darker weathering
     s += speckle(d, slab, BOX, 70, ['#A9AAA4', '#B5B6B0', '#E2E3DE', '#9C9D97'], seed * 13, 0.3, 0.7, 0.85);
     s += d.clip(slab, F(blob(CX + (r() - 0.5) * 30, CY + (r() - 0.5) * 16, 14 + r() * 10, 6 + r() * 5, seed + 3), PAL.concreteD, 0, 'opacity="0.25"'));
-    // a hairline crack on some slabs, a gum spot on others
-    if (seed % 2 === 0) s += d.clip(slab, crack(CX - 18 + r() * 10, CY - 6 + r() * 6, 0.35, 26, seed, 0.55, '#6F6F6A', 1));
-    else s += dot(CX + (r() - 0.5) * 40, CY + (r() - 0.5) * 20, 1.1, '#8F8F88', 0.8);
+    // only one slab in four is cracked (each at its own angle and length); the rest get a gum spot
+    // or nothing, so the walk doesn't repeat the same check-mark crack every tile
+    if (seed === 4) s += d.clip(slab, crack(CX - 22 + r() * 16, CY - 6 + r() * 10, -0.6 + r() * 1.4, 16 + r() * 18, seed * 3, 0.5, '#6F6F6A', 1));
+    else if (seed === 2) s += dot(CX + (r() - 0.5) * 40, CY + (r() - 0.5) * 20, 1.1, '#8F8F88', 0.8);
+    else if (seed === 3) s += d.clip(slab, F(blob(CX + (r() - 0.5) * 30, CY + (r() - 0.5) * 12, 6, 3, seed + 9), '#8F8F88', 0, 'opacity="0.22"'));
     return s;
   };
 }
@@ -197,8 +201,8 @@ function puddle(d: Doc) {
 
 export function buildGround(): ArtAsset[] {
   const out: ArtAsset[] = [];
-  [1, 2, 3, 4].forEach((n) => out.push(tileAsset(`grass_${n}`, grass(n))));
-  [1, 2].forEach((n) => out.push(tileAsset(`sidewalk_${n}`, sidewalk(n))));
+  [1, 2, 3, 4, 5, 6].forEach((n) => out.push(tileAsset(`grass_${n}`, grass(n))));
+  [1, 2, 3, 4].forEach((n) => out.push(tileAsset(`sidewalk_${n}`, sidewalk(n))));
   [1, 2, 3].forEach((n) => out.push(tileAsset(`road_${n}`, road(n))));
   (['ne', 'nw', 'se', 'sw'] as const).forEach((e) => out.push(tileAsset(`kerb_${e}`, kerb(e))));
   (['ne', 'nw'] as const).forEach((e) => out.push(tileAsset(`lane_${e}`, lane(e))));

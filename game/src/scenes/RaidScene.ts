@@ -91,7 +91,7 @@ export class RaidScene extends Phaser.Scene {
     }
     for (const w of r.wallItems) keys.add(`${ITEM_BY_ID[w.item].art}_${w.wall}`);
     for (const c of r.counter) keys.add(DISH_BY_ID[c.dish].icon);
-    for (const [k, , , flip] of scenery(r.room.w, r.room.h, true)) keys.add(flip && hasProp(`${k}_se`) ? `${k}_se` : k);
+    for (const [k, , , flip] of scenery(r.room.w, r.room.h, r.rival)) keys.add(flip && hasProp(`${k}_se`) ? `${k}_se` : k);
     const chars = new Set(r.units.map((u) => artFor(u.art)));
     let dead = false;
     void Promise.all([loadProps(this).then(() => ensureProps(this, keys)), ...[...chars].map((id) => loadChar(this, id))]).then(() => {
@@ -132,7 +132,7 @@ export class RaidScene extends Phaser.Scene {
         wall: w.wall,
         index: w.index,
       })),
-      scenery: scenery(W, H, true),
+      scenery: scenery(W, H, r.rival),
       margin: RAID_MARGIN,
     }).door;
     // the shop sign, bolted over the door
@@ -140,7 +140,8 @@ export class RaidScene extends Phaser.Scene {
     if (hasProp(sign)) {
       // spans the door's wall section and the next one, its lower edge just above the door frame
       const a = wallAnchor('r', DOOR_X);
-      propImage(this, sign, a.x - HW / 2, a.y - 30 - 118).setDepth(WALLS + DOOR_X * 10 + 4);
+      // above both wall sections it spans (the next section would otherwise cut the lettering in half)
+      propImage(this, sign, a.x - HW / 2, a.y - 30 - 118).setDepth(WALLS + (DOOR_X + 1) * 10 + 6);
     }
     for (const f of r.furniture) {
       const p = iso(f.x, f.y);

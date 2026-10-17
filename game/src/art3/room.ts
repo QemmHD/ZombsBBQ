@@ -190,15 +190,28 @@ function grime(side: Side, d: Doc, variant: number): string {
   let s = '';
   if (variant === 1) {
     // green slime oozing from the top
+    // a lopsided glob where it seeps out, then three uneven runnels that wander, thin out and bead
     const [x, y] = wp(side, 0.45, 0.96);
-    let drips = F(blob(x, y + 4, 9, 5, 3), PAL.slime, 0.6);
-    for (let k = 0; k < 4; k++) {
-      const dx = (k - 1.5) * 4 + r() * 2;
-      const len = 14 + r() * 40;
-      drips += F(`M${f(x + dx - 1.4)},${f(y + 4)}L${f(x + dx - 1)},${f(y + 4 + len)}Q${f(x + dx)},${f(y + 7 + len)} ${f(x + dx + 1)},${f(y + 4 + len)}L${f(x + dx + 1.4)},${f(y + 4)}Z`, PAL.slime, 0.5);
-      drips += dot(x + dx, y + 6 + len, 1.6, PAL.slime) + dot(x + dx - 0.4, y + 5 + len, 0.5, '#B6D86A');
+    let drips = F(blob(x + 1, y + 5, 11, 6.5, 3, 9, 0.5), PAL.slime, 0.6);
+    const runs: [number, number, number][] = [
+      [-6.5 + r() * 1.5, 52 + r() * 26, 2.1],
+      [-1 + r() * 2, 18 + r() * 10, 1.4],
+      [5 + r() * 2.5, 34 + r() * 18, 1.7],
+    ];
+    for (const [dx, len, w] of runs) {
+      const wob = (r() - 0.5) * 5;
+      const x0 = x + dx;
+      const y0 = y + 6;
+      drips += F(
+        `M${f(x0 - w)},${f(y0)}C${f(x0 - w * 0.8 + wob)},${f(y0 + len * 0.35)} ${f(x0 - w * 0.4 - wob * 0.5)},${f(y0 + len * 0.7)} ${f(x0 - w * 0.35 + wob * 0.3)},${f(y0 + len)}Q${f(x0 + wob * 0.3)},${f(y0 + len + 3)} ${f(x0 + w * 0.35 + wob * 0.3)},${f(y0 + len)}C${f(x0 + w * 0.4 - wob * 0.5)},${f(y0 + len * 0.7)} ${f(x0 + w * 0.8 + wob)},${f(y0 + len * 0.35)} ${f(x0 + w)},${f(y0)}Z`,
+        PAL.slime,
+        0.5,
+      );
+      drips += dot(x0 + wob * 0.3, y0 + len + 1.5, w * 0.95, PAL.slime) + dot(x0 + wob * 0.3 - 0.4, y0 + len + 0.8, w * 0.3, '#B6D86A');
     }
-    s += drips + L(`M${f(x - 6)},${f(y + 2)}Q${f(x)},${f(y)} ${f(x + 6)},${f(y + 3)}`, 0.7, '#B6D86A', 'opacity="0.8"');
+    // a stray drop further down
+    drips += dot(x + runs[0][0] + 1, y + 6 + runs[0][1] + 14, 1.3, PAL.slime, 0.85);
+    s += drips + L(`M${f(x - 8)},${f(y + 3)}Q${f(x - 1)},${f(y - 1)} ${f(x + 9)},${f(y + 4)}`, 0.7, '#B6D86A', 'opacity="0.8"');
   } else if (variant === 2) {
     // a jagged crack running down from the corner
     const [x, y] = wp(side, 0.7, 0.9);
@@ -214,12 +227,14 @@ function grime(side: Side, d: Doc, variant: number): string {
   } else {
     // a dried smear at the base + spatter
     const [x, y] = wp(side, 0.5, 0.12);
-    s += F(blob(x, y, 14, 9, 77), PAL.blood, 0, 'opacity="0.55"');
+    const dried = '#5C2A22';
+    s += F(blob(x, y, 14, 9, 77), dried, 0, 'opacity="0.5"');
     s += F(blob(x - 4, y + 8, 18, 5, 78), PAL.grime, 0, 'opacity="0.5"');
-    for (let k = 0; k < 9; k++) s += dot(x + (r() - 0.5) * 34, y - 10 - r() * 30, 0.5 + r() * 1.1, PAL.blood, 0.6);
+    s += F(blob(x + 6, y + 3, 9, 4, 76), '#6E6A3A', 0, 'opacity="0.35"');
+    for (let k = 0; k < 9; k++) s += dot(x + (r() - 0.5) * 34, y - 10 - r() * 30, 0.5 + r() * 1.1, k % 3 ? dried : '#6E6A3A', 0.55);
     // a hand print
-    s += F(blob(x + 9, y - 26, 3.2, 3.6, 79), PAL.blood, 0, 'opacity="0.45"');
-    for (let k = 0; k < 4; k++) s += F(blob(x + 6 + k * 2, y - 33 - (k % 2), 0.8, 2.6, 80 + k), PAL.blood, 0, 'opacity="0.45"');
+    s += F(blob(x + 9, y - 26, 3.2, 3.6, 79), dried, 0, 'opacity="0.42"');
+    for (let k = 0; k < 4; k++) s += F(blob(x + 6 + k * 2, y - 33 - (k % 2), 0.8, 2.6, 80 + k), dried, 0, 'opacity="0.42"');
   }
   return d.clip(FACE(side), s);
 }
@@ -414,9 +429,14 @@ function checker(d: Doc, phase: number): string {
   for (let i = 0; i < n; i++)
     for (let j = 0; j < n; j++) {
       const q = ft.qd(-0.512 + i * 0.512, -0.512 + (i + 1) * 0.512, -0.512 + j * 0.512, -0.512 + (j + 1) * 0.512);
-      s += F(q, (i + j + phase) % 2 ? '#E2DFD3' : '#2C2B2A');
+      s += F(q, (i + j + phase) % 2 ? '#D8D2BE' : '#3A3833');
     }
-  s += speckle(d, FDIA, FBOX, 30, ['#8E8C84', '#555451'], 5 + phase, 0.3, 0.6, 0.5);
+  // scuffs and a grimy film, heavier toward one corner
+  const r = rnd(41 + phase);
+  let grime = F(blob(FW / 2 + (r() - 0.5) * 30, FH / 2 + (r() - 0.5) * 14, 22 + r() * 10, 9 + r() * 4, 70 + phase), '#6E6248', 0, 'opacity="0.2"');
+  for (let k = 0; k < 3; k++) grime += L(`M${f(10 + r() * (FW - 30))},${f(10 + r() * (FH - 20))}l${f(8 + r() * 12)},${f((r() - 0.5) * 4)}`, 0.6, '#1E1C18', 'opacity="0.25"');
+  s += d.clip(FDIA, grime);
+  s += speckle(d, FDIA, FBOX, 40, ['#8E8C84', '#555451', '#A89C74'], 5 + phase, 0.3, 0.7, 0.55);
   return s;
 }
 
@@ -514,8 +534,21 @@ export function buildRoom(): ArtAsset[] {
   // the door section of the north-east wall, in every finish, with the doorway cut through
   for (const a of out.filter((x) => /^wall_r_/.test(x.key))) out.push(withDoorway(a, `${a.key}_door`));
   // floors
-  out.push(floorAsset('floor_dirty_a', (d) => tiles2x2(d, 1, PAL.tile, PAL.tileB, PAL.grout, true)));
-  out.push(floorAsset('floor_dirty_b', (d) => tiles2x2(d, 2, PAL.tileB, PAL.tile, PAL.grout, true)));
+  // the starting café floor: ~7% darker and warmer than the bright tile (it was the brightest thing on
+  // screen), in four chip patterns per phase so the tick marks don't repeat
+  const dirtyA = '#C3C0B6';
+  const dirtyB = '#CDCAC0';
+  for (let v = 0; v < 4; v++) {
+    out.push(floorAsset(`floor_dirty_a${v ? v + 1 : ''}`, (d) => tiles2x2(d, 1 + v * 10, dirtyA, dirtyB, PAL.grout, true)));
+    out.push(floorAsset(`floor_dirty_b${v ? v + 1 : ''}`, (d) => tiles2x2(d, 2 + v * 10, dirtyB, dirtyA, PAL.grout, true)));
+  }
+  out.push(floorAsset('floor_grime_smear', (d) => d.clip(FDIA, F(blob(FW / 2 - 6, FH / 2 + 2, 20, 4, 91, 7, 0.5), PAL.grime, 0, 'opacity="0.3"') + F(blob(FW / 2 + 8, FH / 2, 8, 2.5, 92), '#5C4A30', 0, 'opacity="0.25"'))));
+  out.push(floorAsset('floor_grime_crumbs', (d) => {
+    const r = rnd(93);
+    let s = '';
+    for (let k = 0; k < 10; k++) s += dot(FW / 2 + (r() - 0.5) * 34, FH / 2 + (r() - 0.5) * 16, 0.5 + r() * 0.8, k % 2 ? '#8A6A3A' : '#5C4A30', 0.8);
+    return d.clip(FDIA, s);
+  }));
   out.push(floorAsset('floor_tile_a', (d) => tiles2x2(d, 3, '#D9D9D4', '#E6E6E1', '#9A9A93', false)));
   out.push(floorAsset('floor_tile_b', (d) => tiles2x2(d, 4, '#E6E6E1', '#D9D9D4', '#9A9A93', false)));
   out.push(floorAsset('floor_checker_a', (d) => checker(d, 0)));
