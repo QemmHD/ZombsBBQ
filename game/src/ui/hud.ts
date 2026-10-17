@@ -219,6 +219,8 @@ export class Hud {
   // ---------- modals ----------
   openModal(html: string, opts: { cls?: string; onClose?: () => void; noClose?: boolean } = {}): HTMLElement {
     this.closeModal();
+    // Gus's hints step aside for any menu (a tutorial step's bar stays: it's what freezes the café)
+    if (this.bar && this.bar.kind !== 'tut') this.hideBar();
     const root = this.el.modal;
     root.innerHTML = `<div class="modal-bg"><div class="modal ${opts.cls ?? ''}" role="dialog" aria-modal="true">${opts.noClose ? '' : `<button class="x" data-close aria-label="Close">${icon('ui_cancel', 'x-ico')}</button>`}${html}</div></div>`;
     const bg = root.querySelector<HTMLElement>('.modal-bg')!;
@@ -544,8 +546,6 @@ export class Hud {
     // a bouncing "!" on menus with something new in them
     const b = badges(s);
     for (const k of BADGED) this.el[`new_${k}`]?.classList.toggle('on', b[k]);
-    this.refreshBar();
-    this.refreshArrow();
     applySoundscape(s, this.ctl.mode, this.modalOpen);
     if (this.ctl.mode === 'play' && this.ctl.selection && this.ctl.selection.kind !== 'dishPicker') this.strip.render();
     if (this.ctl.mode === 'edit') this.edit.refresh();
@@ -568,6 +568,9 @@ export class Hud {
       this.ctl.offlineReport = null;
     }
     watchRoad(this, this.el.map); // a rival poaching customers: RAID badge + a one-time alert
+    // last, so a popup opened just above already sends hints out of the way
+    this.refreshBar();
+    this.refreshArrow();
   }
 }
 

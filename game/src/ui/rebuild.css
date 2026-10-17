@@ -333,7 +333,7 @@
   padding: 6px 12px;
 }
 /* while a tutorial step's bar is up the café is frozen: the strip waits underneath */
-.tutbar.freeze ~ .strip {
+.tutbar.freeze:not(.hidden) ~ .strip {
   display: none;
 }
 .tut-veil {

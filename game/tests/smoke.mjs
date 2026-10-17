@@ -55,7 +55,9 @@ const wait = (ms) => page.waitForTimeout(ms);
 const barUp = () =>
   page.evaluate(() => {
     window.zbbq.hud.refresh();
-    return !document.querySelector('[data-k="tutbar"]')?.classList.contains('hidden');
+    // only a tutorial step's bar (it freezes the café); hints step aside on their own
+    const b = document.querySelector('[data-k="tutbar"]');
+    return !!b && !b.classList.contains('hidden') && b.classList.contains('freeze') && !window.zbbq.hud.modalOpen;
   });
 const tutOk = async () => {
   for (let i = 0; i < 3 && (await barUp()); i++) {
