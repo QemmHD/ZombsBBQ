@@ -82,14 +82,23 @@ const screenOf = (wx, wy, scene = 'joint') =>
   );
 const isoW = (x, y) => ({ x: (x - y) * 48, y: (x + y) * 30 });
 const tapWorld = async (wx, wy, scene) => {
+  await wait(300); // let a sliding card or bar settle before checking what covers the spot
   let p = await screenOf(wx, wy, scene);
   // the room is framed taller than the screen: pan first (as a player would) if the spot sits under the awning,
-  // the bottom bars or an open card
-  const covered = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName !== 'CANVAS', [p.x, p.y]);
-  if (covered || p.y < 70 || p.y > 290) {
-    await page.evaluate(([x, y, sc]) => window.zbbq.game.scene.getScene(sc).cameras.main.centerOn(x, y), [wx, wy, scene ?? 'joint']);
-    await wait(100);
+  // the bottom bars or an open card; the pan lands the spot left of centre, clear of the right-hand card
+  const covered = async () => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName !== 'CANVAS', [p.x, p.y]);
+  if ((await covered()) || p.y < 70 || p.y > 290) {
+    await page.evaluate(
+      ([x, y, sc]) => {
+        const cam = window.zbbq.game.scene.getScene(sc).cameras.main;
+        const u = Math.min(3, window.devicePixelRatio || 1) / cam.zoom;
+        cam.centerOn(x + 122 * u, y);
+      },
+      [wx, wy, scene ?? 'joint'],
+    );
+    await wait(150);
     p = await screenOf(wx, wy, scene);
+    check(!(await covered()), `world tap at ${Math.round(p.x)},${Math.round(p.y)} is clear of the HUD`);
   }
   await page.touchscreen.tap(p.x, p.y);
   await wait(250);
@@ -177,6 +186,12 @@ if (zid) {
   await shot('hangry');
   await page.evaluate((id) => window.zbbq.ctl.tapWorker(id), zid);
   await wait(300);
+  // the first dish of the day queues the Frequent Fryer streak popup, which opens over the card here
+  if (await modalOpen()) {
+    log.fryer = await page.evaluate(() => document.querySelector('.modal h2')?.textContent);
+    await shot('fryer');
+    while (await modalOpen()) await closeModal();
+  }
   await tapSel('[data-a="rest"]', 'Rest button');
   await ff(15);
   await wait(600);
@@ -218,10 +233,10 @@ if (fryerFresh) {
   await ff(0.5);
   await wait(500);
   log.fryer = await page.evaluate(() => document.querySelector('.modal h2')?.textContent);
-  check(log.fryer === 'Frequent Fryer', `Frequent Fryer popup shows (got ${log.fryer})`);
   await shot('fryer');
 }
 while (await modalOpen()) await closeModal();
+check(log.fryer === 'Frequent Fryer', `Frequent Fryer popup shows (got ${log.fryer})`);
 
 const panels = [
   ['book', 'cookbook'],

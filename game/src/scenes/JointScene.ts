@@ -325,7 +325,9 @@ export class JointScene extends Phaser.Scene {
     const right = iso(s.roomW + 5, -6).x;
     const bottom = iso(s.roomW + 5, s.roomH + 5).y;
     const top = Math.min(this.wallTop() - (this.awningPx() + 6) * u, bottom - cam.height / cam.zoom);
-    cam.setBounds(left, top, right - left, bottom - top);
+    // sideways slack so any part of the room can be dragged out from under an open card
+    const slack = (cam.width / cam.zoom) * 0.4;
+    cam.setBounds(left - slack, top, right - left + slack * 2, bottom - top);
   }
 
   /** Close in, like the original: the room fills the screen and you pan around the lot. */

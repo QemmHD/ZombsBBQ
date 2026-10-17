@@ -18,7 +18,7 @@ are taken from the original and reimplemented in our own code.
 | `ZombsBBQ` | `claude/zombs-bbq-game-plan` | The original main branch, untouched. REA findings get written here as `docs/16-rea-findings.md` (copy it over when it exists). |
 | `ZombsBBQ-work` | `feat/fix-and-features` | **Integration branch.** `wip/tech-ios` + `wip/visual-fixes` merged and green (814 tests, typecheck, build, audit clean). Windows build fixes. Docs 17, 18, this file. |
 | `ZombsBBQ-anim` | `feat/anim` | Art style pass (doc 18 §3 recipe: ink weight, hard cel, eyes, greens, peach skin, torso, UI materials). Check its last commit and the "What changed / Remaining" section in doc 18. |
-| `ZombsBBQ-audio` | `feat/audio` | Sound bed generated with Higgsfield, matched against the originals; see `docs/20-audio.md` for what is done and the regeneration recipe. |
+| `ZombsBBQ-audio` | `feat/audio` | Sound pipeline done and wired (sample-first, synth fallback, ambience + cooking loops, 827 tests green). Only 4 of 67 sounds generated: the Higgsfield account hit its daily cap (`grace_daily_limit_reached`) after 7 jobs. **When the quota resets:** follow `docs/20-audio.md` (`gen.py generate --max-per 1`, `pick`, copy to public/audio, `node tools/audio-manifest.mjs`, test, commit). |
 | `ZombsBBQ-ui`, `ZombsBBQ-sim` | `feat/ui`, `feat/sim` | Empty, created for the build stage; removed or reusable. |
 
 Original-game reference material (outside the repo, never commit):
