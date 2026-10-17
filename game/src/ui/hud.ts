@@ -176,6 +176,8 @@ export class Hud {
     this.edit = new EditBar(this, this.el.editbar);
     this.raid = new RaidUi(this, this.el.raidhud);
     ctl.onSelection(() => {
+      // a hint or the guide steps aside for the command strip
+      if (ctl.selection && this.bar && this.bar.kind !== 'tut') this.hideBar();
       this.strip.render();
       this.edit.render();
       this.syncDishPicker();
@@ -490,12 +492,12 @@ export class Hud {
       return;
     }
     a.classList.remove('hidden');
-    // above the button, or below it when it sits under the awning
-    const below = r.top < 90;
-    a.classList.toggle('up', below);
+    // above the button; a button up by the awning gets it from the side instead
+    const side = r.top < 90;
+    a.classList.toggle('side', side);
     // a wide row (a dish in the cookbook): point at its picture, not the middle of its text
-    a.style.left = `${r.width > 200 ? r.left + 46 : r.left + r.width / 2}px`;
-    a.style.top = `${below ? r.bottom + 4 : r.top - 4}px`;
+    a.style.left = `${side ? r.right + 26 : r.width > 200 ? r.left + 46 : r.left + r.width / 2}px`;
+    a.style.top = `${side ? r.top + r.height / 2 + 17 : r.top - 4}px`;
   }
 
   // ---------- 5 Hz refresh ----------
