@@ -1,5 +1,5 @@
 import { catchUpReport, type AwayReport } from './sim';
-import { createInitialState, migrate, repairRaiders, type GameState } from './state';
+import { migrate, newGame, repairRaiders, type GameState } from './state';
 
 export const SAVE_KEY = 'zombsbbq.save.v1';
 
@@ -80,7 +80,7 @@ export function nextBackupSlot(raws: (string | null)[]): number {
  * `failed` (so the caller can offer a backup instead of overwriting it).
  */
 export function deserialize(raw: string | null, nowMs: number): Loaded {
-  const fresh = (failed?: boolean): Loaded => ({ state: createInitialState(Math.floor(nowMs) % 2147483647), offlineSec: 0, offlineCash: 0, report: null, ...(failed ? { failed } : {}) });
+  const fresh = (failed?: boolean): Loaded => ({ state: newGame(Math.floor(nowMs) % 2147483647), offlineSec: 0, offlineCash: 0, report: null, ...(failed ? { failed } : {}) });
   if (!raw) return fresh();
   const load = (): { state: GameState; savedAt: number } | null => {
     try {

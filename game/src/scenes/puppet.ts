@@ -6,7 +6,9 @@ import Phaser from 'phaser';
 import type { CharArt, FaceName } from '../art/types';
 import { TEX_S } from './assets';
 
-export type Pose = 'idle' | 'walk' | 'run' | 'cook' | 'eat' | 'feast' | 'sit' | 'shiver' | 'lie' | 'attack' | 'punch' | 'hit' | 'serve' | 'cheer' | 'dance';
+/** run = the panicked human run, arms up (zombies: arms out); chase = running after someone, arms
+ * straight forward (the original's attackHuman reach, as seen in the infect chase) */
+export type Pose = 'idle' | 'walk' | 'run' | 'chase' | 'cook' | 'eat' | 'feast' | 'sit' | 'shiver' | 'lie' | 'attack' | 'punch' | 'hit' | 'serve' | 'cheer' | 'dance';
 
 interface View {
   box: Phaser.GameObjects.Container;
@@ -145,13 +147,15 @@ export class Puppet {
       carry?: boolean;
       /** a seated customer who's been kept waiting (the original's hungry fidget) */
       impatient?: boolean;
+      /** a seated customer waiting for food: one arm up (the original's waiting wave) */
+      wave?: boolean;
     } = {},
   ) {
     const zombie = !!opts.zombie;
     const speed = opts.speed ?? 1;
     // clip lengths from the original (s): walk 1.625 (two steps; sped up by the walker's speed), run 0.667,
     // idle 1.625, eat 2.42, operate 2.08, attack 1.21, feast 0.83
-    const cycle = pose === 'walk' ? 1.625 / (2.2 * speed) : pose === 'run' ? 0.667 / (1.4 * speed) : pose === 'cook' ? 2.08 : pose === 'eat' ? 2.42 : pose === 'attack' || pose === 'punch' ? 1.21 / 1.6 : pose === 'feast' ? 0.83 : pose === 'dance' ? 0.8 : pose === 'shiver' ? 0.2 : 1.625;
+    const cycle = pose === 'walk' ? 1.625 / (2.2 * speed) : pose === 'run' || pose === 'chase' ? 0.667 / (1.4 * speed) : pose === 'cook' ? 2.08 : pose === 'eat' ? 2.42 : pose === 'attack' || pose === 'punch' ? 1.21 / 1.6 : pose === 'feast' ? 0.83 : pose === 'dance' ? 0.8 : pose === 'shiver' ? 0.2 : 1.625;
     this.phase += (dt * Math.PI * 2) / cycle;
     const view = this.showingBack && this.back ? this.back : this.front;
     if (this.rig === 'quad') return this.poseQuad(view, pose);
@@ -166,7 +170,7 @@ export class Puppet {
     const D = Math.PI / 180;
     const s = Math.sin(this.phase);
     const c = Math.cos(this.phase);
-    const moving = pose === 'walk' || pose === 'run';
+    const moving = pose === 'walk' || pose === 'run' || pose === 'chase';
     const seated = pose === 'sit' || (pose === 'eat' && !!opts.seated);
     // joint angles: [upper, bend] per limb (L = the near limb in the front view)
     const J = { legL: [0, 0], legR: [0, 0], armL: [0, 0], armR: [0, 0] } as Record<'legL' | 'legR' | 'armL' | 'armR', [number, number]>;
@@ -178,7 +182,7 @@ export class Puppet {
       // original sit: thighs 64° / 84° forward, shins folded back so they hang straight down
       J.legL = [-64 * D, 64 * D];
       J.legR = [-84 * D, 79 * D + (pose === 'eat' ? 0 : Math.sin(this.phase * 0.4) * 0.05)];
-    } else if (pose === 'run') {
+    } else if (pose === 'run' || pose === 'chase') {
       // original run: thighs ±40°, knees fold to ~50°
       J.legL = [s * 40 * D, Math.max(0, Math.sin(this.phase - 1.3)) * 48 * D];
       J.legR = [-s * 40 * D, Math.max(0, Math.sin(this.phase + Math.PI - 1.3)) * 52 * D];
@@ -247,6 +251,11 @@ export class Puppet {
         J.armL = [0, -80 * D];
         J.armR = [7 * D, -95 * D];
         headRot = Math.sin(this.phase * 0.6) * 0.03;
+        if (opts.wave && !opts.impatient) {
+          // waiting for the waiter: the near arm up, the hand giving a little wave (original)
+          J.armL = [-150 * D + Math.sin(this.phase * 2.2) * 6 * D, -25 * D - Math.max(0, Math.sin(this.phase * 2.2)) * 20 * D];
+          headRot = -0.05;
+        }
         if (opts.impatient) {
           // drumming fingers on the table, glancing round for the waiter
           J.armL = [-6 * D, -80 * D + Math.max(0, Math.sin(this.phase * 9)) * 22 * D];
@@ -275,10 +284,19 @@ export class Puppet {
         J.armR = [-1.6 - s * 0.9, -0.6];
         break;
       case 'run':
-        // original run (a human panicking): hands clamped to the head; zombies lurch arms-out instead
-        J.armL = zombie ? [-80 * D + s * 0.15, -0.1] : [4 * D, -10 * D];
-        J.armR = zombie ? [-60 * D - s * 0.15, -0.1] : [-113 * D - s * 7 * D, -60 * D];
-        headRot = zombie ? 0.1 : 5 * D;
+        // a human panicking (the infect run, fleeing a bite): both arms flung straight up, flailing;
+        // zombies lurch arms-out instead
+        // (a V over the head, wide enough that the hands show past it from behind as well)
+        J.armL = zombie ? [-80 * D + s * 0.15, -0.1] : [-138 * D + s * 12 * D, -14 * D];
+        J.armR = zombie ? [-60 * D - s * 0.15, -0.1] : [148 * D - s * 12 * D, 14 * D];
+        headRot = zombie ? 0.1 : -6 * D;
+        break;
+      case 'chase':
+        // running someone down: both arms stretched straight out in front, reaching, a forward lean
+        J.armL = [-88 * D + s * 5 * D, -4 * D];
+        J.armR = [-78 * D - s * 5 * D, -6 * D];
+        lean = 10 * D;
+        headRot = 0.06;
         break;
       case 'shiver':
         // startled / grabbed: arms jerk out, head pops back
@@ -312,7 +330,7 @@ export class Puppet {
       J.armR = [-7 * D, -55 * D];
     }
     // walking bobs the hips and head (not the torso, in the original, but a tiny ride reads better here)
-    const bob = moving ? -Math.abs(Math.sin(this.phase)) * (pose === 'run' ? 1.2 : 2) : pose === 'dance' ? -Math.abs(s) * 4 : 0;
+    const bob = moving ? -Math.abs(Math.sin(this.phase)) * (pose === 'walk' ? 2 : 1.2) : pose === 'dance' ? -Math.abs(s) * 4 : 0;
     for (const k of BOB_PARTS) if (P[k]) P[k].y = B[k].y + bob;
     for (const limb of LIMBS) {
       const up = P[limb];

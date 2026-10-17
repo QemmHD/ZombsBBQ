@@ -75,6 +75,9 @@ const tapSel = async (sel, name) => {
   if (sel !== '[data-a="tutok"]') await tutOk();
   const l = page.locator(sel).first();
   if (!(await l.count())) return check(false, `missing ${name ?? sel}`);
+  // a popup that came up on its own (a level-up when a dish reaches the counter, a hint) would swallow
+  // the tap: close it first, as a player would
+  for (let i = 0; i < 3 && (await modalOpen()) && !(await l.evaluate((el) => !!el.closest('.modal-root'))); i++) await closeModal();
   await l.tap();
   await wait(300);
 };
@@ -126,7 +129,15 @@ const tapWorld = async (wx, wy, scene) => {
   await nextFrame(scene ?? 'joint');
   await wait(300); // let a sliding strip or bar settle before checking what covers the spot
   let p = await screenOf(wx, wy, scene);
-  // the room is framed bigger than the screen: pan first (as a player would) if the spot sits under the awning,
+  // and let a camera glide (the tutorial pans to each step) finish, or the finger lands off target
+  for (let i = 0; i < 15; i++) {
+    await wait(200);
+    const q = await screenOf(wx, wy, scene);
+    const still = Math.hypot(q.x - p.x, q.y - p.y) < 1;
+    p = q;
+    if (still) break;
+  }
+    // the room is framed bigger than the screen: pan first (as a player would) if the spot sits under the awning,
   // the command strip or a side column
   const covered = async () => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName !== 'CANVAS', [p.x, p.y]);
   if ((await covered()) || p.y < 70 || p.y > 300 || p.x < 80 || p.x > 760) {
@@ -196,7 +207,9 @@ check(['cooking', 'reserved'].includes(log.afterPick), `stove starts cooking (go
 await ff(25); // the very first dish is quick
 check((await page.evaluate(() => window.zbbq.ctl.state.stoves[0].status)) === 'done', 'first dish finishes');
 await shot('dish-done');
-await tapWorld(sp.x, sp.y - 20); // tap the stove: someone carries it to the counter
+// original: pick a cook, then touch the stove, to carry the food to the counter
+await tapActor(youId);
+await tapWorld(sp.x, sp.y - 20);
 await ff(20);
 check(await page.evaluate(() => window.zbbq.ctl.state.counter.some((c) => c.dish && c.servings > 0)), 'food reaches the counter');
 // customers next, but the joint is still CLOSED: Gus points at the front door
@@ -210,7 +223,16 @@ await wait(800);
 await shot('serving');
 
 // ---------- 2. infect a customer ----------
-const custId = await page.evaluate(() => window.zbbq.ctl.state.customers.find((c) => c.state === 'waiting' || c.state === 'eating')?.id);
+// (one table: the first diner may already have eaten and gone; wait for the next to sit down)
+for (let i = 0; i < 120 && !(await page.evaluate(() => window.zbbq.ctl.state.customers.some((c) => c.state === 'waiting' || c.state === 'eating'))); i++) await ff(1);
+await wait(800);
+const custId = await page.evaluate(() => {
+  const s = window.zbbq.ctl.state;
+  // a diner who won't get up and leave while the card is open (the tutorial's first meal is only 10 s)
+  const c = s.customers.find((c) => c.state === 'waiting') ?? s.customers.find((c) => c.state === 'eating');
+  if (c?.state === 'eating') c.eatEnd = Math.max(c.eatEnd, s.now + 30);
+  return c?.id;
+});
 check(!!custId, 'a customer is seated');
 if (custId) await tapActor(custId);
 await shot('infect-card');

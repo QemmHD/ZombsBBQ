@@ -45,7 +45,11 @@ export interface Mover {
   back?: boolean;
 }
 
-export type CustomerState = 'entering' | 'waiting' | 'eating' | 'leaving' | 'turnedAway' | 'fleeing' | 'infecting';
+/**
+ * infecting = INFECT was pressed: running for the door, arms up, with a crew member on their heels (the
+ * catch turns them); cowering = a hungry zombie's victim, frozen, screaming, knocked about by each swing.
+ */
+export type CustomerState = 'entering' | 'waiting' | 'eating' | 'leaving' | 'turnedAway' | 'fleeing' | 'infecting' | 'cowering';
 
 export interface Customer extends Mover {
   id: string;
@@ -65,7 +69,13 @@ export interface Customer extends Mover {
   serverId?: string;
   dish?: string;
   mood?: 'happy' | 'angry';
+  /** older saves: the end of the old 1.6 s shiver (now the chase decides) */
   infectEnd?: number;
+  /** the infection chase: who's after them, and when they give up cornered */
+  chaserId?: string;
+  chaseEnd?: number;
+  /** a hungry zombie's victim: energy left (their type's max to start with) */
+  energy?: number;
 }
 
 export type WorkerState =
@@ -78,8 +88,15 @@ export type WorkerState =
   | 'carrying'
   | 'toPlate'
   | 'carryPlate'
+  /** going for a customer (hangry, or the Eat! order): following them at a walk */
   | 'hunting'
+  /** in reach of the customer: one swing every 1 s / speed multiplier, each knocking them back a tile */
+  | 'attacking'
   | 'feasting'
+  /** after INFECT: running after the customer, arms out; the catch turns them */
+  | 'chasing'
+  /** standing by the table while the diner they served eats (original) */
+  | 'serving'
   | 'toRest'
   | 'resting'
   | 'daydream'
@@ -93,7 +110,7 @@ export type WorkerState =
 export type WorkerJob =
   | { kind: 'serve'; slotId: string; dish: string; customerId: string }
   | { kind: 'plate'; tableId: string }
-  | { kind: 'dish'; stoveId: string; dish?: string; servings?: number };
+  | { kind: 'dish'; stoveId: string; dish?: string; servings?: number; xp?: number };
 
 export interface Worker extends Mover {
   id: string;
@@ -113,13 +130,28 @@ export interface Worker extends Mover {
   restSpot?: Pt;
   /** a feasting zombie gets back up at this time */
   feastEnd?: number;
+  /** feast: flesh chunks still to eat and when the next one comes off */
+  feastChunks?: number;
+  chunkAt?: number;
+  /** attacking: the next swing lands at this time; whether the first hit (the panic) has happened */
+  swingAt?: number;
+  struck?: boolean;
+  /** following a moving target: when to look for a fresh path */
+  repathAt?: number;
+  /** an idle zombie's next stroll, and whether the walk it's on is one (any job interrupts it) */
+  wanderAt?: number;
+  wandering?: boolean;
+  /** a cook who ran off to catch a customer goes back to this stove afterwards */
+  resumeStoveId?: string;
   daydreamEnd?: number;
   nextDaydream: number;
   /** raid KO: back on their feet at this sim time */
   downUntil?: number;
   /** hangry warning: goes for a customer at this time */
   hungryEnd?: number;
-  /** no bites before this time (one bite a minute at most) */
+  /** after a feast: no Eat! order until this time (digesting) */
+  fullUntil?: number;
+  /** the next bite check (original: one roll a minute while not resting or attacking) */
   nextBiteAt?: number;
   /** last time a "can't reach" was reported for them (so it isn't repeated every frame) */
   cantReachAt?: number;
@@ -149,6 +181,10 @@ export interface Stove {
   carrierId?: string;
   /** a finished dish raises a "burnSoon" alert at this sim time (with 25% of its burn window left) */
   burnWarn?: number;
+  /** seconds the dish has sat on the stove with nobody cooking it (only this burns food, original) */
+  unattended?: number;
+  /** XP the finished dish pays when it reaches the counter */
+  xp?: number;
 }
 
 export interface CounterSlot {
@@ -212,11 +248,16 @@ export type GameEvent =
   | { t: 'coin'; x: number; y: number; amount: number; tip: number }
   | { t: 'face'; x: number; y: number; happy: boolean }
   | { t: 'xp'; x: number; y: number; amount: number }
+  /** the first swing of an attack (the panic, the -0.1 rating) */
   | { t: 'bite'; x: number; y: number; workerId: string; customerId: string }
+  /** every swing that lands */
+  | { t: 'hit'; x: number; y: number; workerId: string; customerId: string; damage: number }
   | { t: 'panic' }
   /** a customer eaten where they stood (the scene drops the body, then a pile of bones) */
-  | { t: 'eaten'; x: number; y: number; workerId: string; customerId: string; type: string }
-  | { t: 'infected'; workerId: string }
+  | { t: 'eaten'; x: number; y: number; workerId: string; customerId: string; type: string; feastSec?: number }
+  /** the chase is on: who's running and who's after them */
+  | { t: 'chase'; customerId: string; workerId: string }
+  | { t: 'infected'; workerId: string; customerId?: string }
   | { t: 'levelup'; level: number }
   | { t: 'zombieLevel'; workerId: string; level: number }
   | { t: 'dishDone'; stoveId: string }
@@ -294,6 +335,8 @@ export interface GameState {
   freeInfects: number;
   /** the door sign: closed cafés get no customers and slowly lose rating */
   closed?: boolean;
+  /** sold out: when the last customer looked in on an empty counter */
+  soldOutAt?: number;
   /** Gus's to-do list (from level 6): finish every task for a purple bonus star */
   todo?: TodoList;
   /** purple bonus stars (max 3) and the sim time they all drop */
@@ -336,7 +379,8 @@ export const SAVE_VERSION = 3;
 
 export function maxEnergy(w: Worker): number {
   if (w.kind !== 'zombie') return w.stats.energy;
-  return Math.round(w.stats.energy * (1 + TUNING.zombieLevelEnergy * (zombieLevel(w.xp) - 1)));
+  // original: x1.03 per zombie level
+  return Math.round(w.stats.energy * Math.pow(TUNING.zombieLevelEnergy, zombieLevel(w.xp) - 1));
 }
 
 export function makeWorker(s: GameState, kind: 'you' | 'zombie', type: string, at: Pt): Worker {
@@ -377,7 +421,11 @@ export function freshStats(): GameState['stats'] {
   return { served: 0, earned: 0, bites: 0, infected: 0, infectedRare: 0, happy: 0, angry: 0, burnt: 0, cleared: 0, floorsFixed: 0, cooked: {}, purchases: 0, raidsWon: 0, studied: 0, decor: 0, spent: 0 };
 }
 
-/** The starting café, as the original handed it over: a grimy 7x6 room with the bare essentials. */
+/**
+ * The starting café, as the original handed it over: a grimy 7x6 room with the bare essentials (a stove,
+ * sink and fridge on the back-left wall, a counter, one table and one chair) and YOU in the doorway.
+ * Open for business (tests and tools start here); a new player's game starts CLOSED (see newGame).
+ */
 export function createInitialState(seed = 1234): GameState {
   const s: GameState = {
     version: SAVE_VERSION,
@@ -418,26 +466,33 @@ export function createInitialState(seed = 1234): GameState {
   };
   // grime: stained and loose tiles that count against the rating until you replace them
   for (const [x, y, f] of [
-    [1, 4, 'stain'],
-    [4, 3, 'stain'],
+    [1, 5, 'stain'],
+    [5, 4, 'stain'],
     [5, 1, 'stain'],
-    [2, 5, 'loose'],
-    [6, 4, 'loose'],
+    [2, 1, 'loose'],
+    [6, 3, 'loose'],
   ] as [number, number, string][])
     s.floors[`${x},${y}`] = f;
-  // kitchen against the walls: stove (cook stands in front), counter, sink, fridge
-  addFurniture(s, 'stove_dirty', 2, 0, 'sw');
-  addFurniture(s, 'fridge_dirty', 0, 0, 'sw');
-  addFurniture(s, 'counter_plain', 0, 2, 'se');
-  addFurniture(s, 'sink_dirty', 0, 4, 'se');
-  // two one-seat tables, each with its chair
-  addFurniture(s, 'table_plain_white', 3, 3);
-  addFurniture(s, 'chair_plain_white', 2, 3, 'se');
-  addFurniture(s, 'table_plain_cream', 5, 4);
-  addFurniture(s, 'chair_plain_cream', 5, 3, 'sw');
+  // the kitchen against the back-left wall: fridge, the cook's spot, stove, counter, sink (original)
+  addFurniture(s, 'fridge_dirty', 0, 0, 'se');
+  addFurniture(s, 'stove_dirty', 0, 2, 'se');
+  addFurniture(s, 'counter_plain', 0, 3, 'se');
+  addFurniture(s, 'sink_dirty', 0, 5, 'se');
+  // one plain table and its chair, the diner facing the room (original)
+  addFurniture(s, 'table_plain_white', 4, 3);
+  addFurniture(s, 'chair_plain_white', 3, 3, 'se');
   addFurniture(s, 'plant_dead', 6, 0);
   s.wallItems.push({ id: `wl${s.nextId++}`, item: 'window_boarded', wall: 'l', index: 3 });
-  s.workers.push(makeWorker(s, 'you', 'you', { x: DOOR_X - 1, y: 1 }));
+  // YOU starts in the front doorway on the right wall (original)
+  s.workers.push(makeWorker(s, 'you', 'you', { x: DOOR_X, y: 0 }));
+  return s;
+}
+
+/** A new player's café: the starting room with the sign on CLOSED (original). The tutorial has you open
+ * the door once there's food on the counter. */
+export function newGame(seed = 1234): GameState {
+  const s = createInitialState(seed);
+  s.closed = true;
   return s;
 }
 

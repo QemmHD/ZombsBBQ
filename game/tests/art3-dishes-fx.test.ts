@@ -12,7 +12,7 @@ const by = new Map(all.map((a) => [a.key, a] as [string, ArtAsset]));
 const DISH_KEYS = [...DISH3_IDS.map((id) => `dish_${id}`), 'plate_dirty', 'plate_stack'];
 const FX_KEYS = [
   'fx_cash', 'fx_full', 'bubble_think', 'face_happy', 'face_angry', 'face_sleep',
-  'fx_skull', 'fx_sweat', 'fx_heart', 'fx_hit', 'fx_lock', 'fx_star', 'fx_stink', 'fx_daydream',
+  'fx_skull', 'fx_sweat', 'fx_heart', 'fx_hit', 'fx_lock', 'fx_star', 'fx_stink', 'fx_daydream', 'bubble_check',
 ];
 const CONTRACT_DISH_IDS = [
   'sliders', 'hobodog', 'gumbo', 'tacos', 'lasagut', 'broth', 'meatloaf', 'goulash',
@@ -107,7 +107,7 @@ describe('art3 dishes + fx geometry', () => {
     for (const k of FX_KEYS) {
       const a = by.get(k)!;
       expect([a.ox, a.oy], k).toEqual([0.5, 1]);
-      if (k === 'bubble_think' || k === 'fx_daydream') expect([a.w, a.h], k).toEqual([BUBBLE_W, BUBBLE_H]);
+      if (k === 'bubble_think' || k === 'bubble_check' || k === 'fx_daydream') expect([a.w, a.h], k).toEqual([BUBBLE_W, BUBBLE_H]);
       else expect([a.w, a.h], k).toEqual([FX_W, FX_H]);
     }
     expect([FX_W, FX_H, BUBBLE_W, BUBBLE_H]).toEqual([26, 26, 34, 30]);

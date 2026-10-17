@@ -100,8 +100,9 @@ describe('energy matters for cooks', () => {
     seatSomeone(s);
     s.customers.forEach((c) => (c.waitLeft = 9999));
     cookUntilAtStove(s, z);
-    // just above the patience line: a few seconds of cooking tips them over
-    z.energy = maxEnergy(z) * 0.12 + 0.05;
+    // nearly empty, and the minute's bite check comes up (it runs while cooking too)
+    z.energy = 0.5;
+    z.nextBiteAt = s.now + 2;
     const evs = collect(s, 10, (e) => e.some((x) => x.t === 'hungry'));
     expect(evs.some((e) => e.t === 'hungry')).toBe(true);
     expect(z.state).toBe('hungry');
@@ -110,8 +111,8 @@ describe('energy matters for cooks', () => {
     run(s, TUNING.hungrySec - 0.5);
     expect(z.state).toBe('hungry');
     run(s, 1);
-    expect(z.state).toBe('hunting');
-    const bite = collect(s, 30, (e) => e.some((x) => x.t === 'eaten'));
+    expect(['hunting', 'attacking']).toContain(z.state);
+    const bite = collect(s, 90, (e) => e.some((x) => x.t === 'eaten'));
     expect(bite.some((e) => e.t === 'eaten')).toBe(true);
     expect(s.stats.bites).toBe(1);
   });
@@ -119,7 +120,8 @@ describe('energy matters for cooks', () => {
   it('Rest cancels the hangry warning', () => {
     const { s, z } = withZombie();
     seatSomeone(s);
-    z.energy = 1;
+    z.energy = 0.5;
+    z.nextBiteAt = s.now;
     collect(s, 5, () => z.state === 'hungry');
     expect(z.state).toBe('hungry');
     expect(rest(s, z.id)).toBeNull();
@@ -128,12 +130,13 @@ describe('energy matters for cooks', () => {
     expect(s.stats.bites).toBe(0);
   });
 
-  it('at most one bite a minute per zombie', () => {
+  it('at most one bite a minute per zombie (one bite check a minute, original)', () => {
     const { s, z } = withZombie('teen');
     stock(s, 'sliders', 400);
     seatSomeone(s);
-    z.energy = 1;
-    collect(s, 60, (e) => e.some((x) => x.t === 'eaten'));
+    z.energy = 0.5;
+    z.nextBiteAt = s.now;
+    collect(s, 120, (e) => e.some((x) => x.t === 'eaten'));
     expect(s.stats.bites).toBe(1);
     // still starving after the snack: no second bite until the minute is up
     const t0 = s.now;
@@ -145,7 +148,7 @@ describe('energy matters for cooks', () => {
       z.energy = Math.min(z.energy, 1);
       if (s.events.some((e) => e.t === 'eaten')) second = s.now;
     }
-    expect(second).toBeGreaterThan(t0 + TUNING.biteCooldownSec - 4);
+    expect(second).toBeGreaterThan(t0 + TUNING.biteCheckSec - 4);
   });
 
   it('a zombie worked down to 0 passes out face-down: the dish pauses, a tap wakes them', () => {
@@ -179,15 +182,16 @@ describe('energy matters for cooks', () => {
 
   it('Eat!: tap a customer and the zombie walks over and eats them (+energy), once a minute', () => {
     const { s, z } = withZombie();
+    stock(s); // food on the counter, so customers keep coming (sold out: one every 5 min)
     const c = seatSomeone(s);
     z.energy = 50;
     expect(orderEat(s, z.id, c.id)).toBeNull();
     expect(z.state).toBe('hunting');
-    const evs = collect(s, 30, (e) => e.some((x) => x.t === 'eaten'));
+    const evs = collect(s, 90, (e) => e.some((x) => x.t === 'eaten'));
     const eaten = evs.find((e) => e.t === 'eaten');
     expect(eaten && eaten.t === 'eaten' && eaten.customerId).toBe(c.id);
-    expect(z.energy).toBeCloseTo(50 + maxEnergy(z) * TUNING.biteEnergyFrac, 0);
-    run(s, TUNING.feastSec + 1);
+    run(s, (eaten && eaten.t === 'eaten' ? eaten.feastSec! : 3) + 0.5);
+    expect(z.energy).toBeCloseTo(50 + TUNING.fleshChunks * TUNING.fleshEnergy, 0);
     const next = seatSomeone(s);
     expect(orderEat(s, z.id, next.id)).toMatch(/digesting/);
     expect(orderEat(s, s.workers[0].id, next.id)).toMatch(/Only zombies/);
@@ -209,10 +213,10 @@ describe('refills, new zombies, names', () => {
     const c = seatSomeone(s);
     expect(c.name).toBeTruthy();
     expect(infect(s, c.id)).toBeNull();
-    run(s, 2);
+    run(s, 15);
     const z = zombies(s)[0];
     expect(z.energy).toBe(TUNING.infectEnergy);
-    expect(z.name).toBe(`Zombie ${c.name}`);
+    expect(z.name).toBe(c.name); // same name (original: Donny stays Donny)
   });
 
   it('customer names are seeded: the same café draws the same names', () => {
@@ -250,8 +254,8 @@ describe('perks', () => {
         z.energy = maxEnergy(z);
         t += 0.5;
       }
-      const xp = evs.find((e) => e.t === 'xp');
-      return { t, xp: xp && xp.t === 'xp' ? xp.amount : 0 };
+      // the dish's XP (paid when it reaches the counter)
+      return { t, xp: stove(s).xp ?? 0, evs };
     };
     const plain = time('joe');
     const granny = time('grandma');
@@ -295,7 +299,7 @@ describe('cooking from the stove or the cookbook', () => {
     const s = createInitialState(4);
     s.tut = 99;
     expect(cookAnywhere(s, 'sliders')).toBeNull();
-    expect(stove(s).status).toBe('reserved');
+    expect(stove(s).status).toBe('cooking'); // the pot goes on at once (original)
     expect(cookAnywhere(s, 'sliders')).toMatch(/busy/);
     expect(cookAnywhere(s, 'burger')).toMatch(/Unlocks|grill/);
   });
@@ -316,7 +320,8 @@ describe('customer pacing', () => {
     }
     expect(looked).toBe(true);
     const c = s.customers.find((x) => x.state === 'waiting')!;
-    expect(c.speed).toBeCloseTo(1.4 + CUSTOMER_BY_ID[c.type].stats.speed * TUNING.walkSpeedPerStat, 5);
+    // the original's pace: 2 + 0.2 x Speed
+    expect(c.speed).toBeCloseTo(TUNING.tilesPerSpeedUnit * (2 + 0.2 * CUSTOMER_BY_ID[c.type].stats.speed), 5);
   });
 
   it('a served diner holds the plate for 2 s before eating', () => {
@@ -527,8 +532,12 @@ describe('saves never lose the joint (tech audit)', () => {
     const s = createInitialState(6);
     s.tut = 99;
     s.xp = 9;
-    // a dish that finishes while you're gone (its XP levels you up)
-    expect(startCooking(s, s.workers[0].id, stove(s).id, 'sliders')).toBeNull();
+    // a dish on its way to the counter when you leave (its XP, paid at the counter, levels you up)
+    const you = s.workers[0];
+    you.job = { kind: 'dish', stoveId: s.stoves[0].id, dish: 'sliders', servings: 12, xp: 5 };
+    you.state = 'carryDish';
+    you.targetId = s.furniture.find((f) => itemOf(f).kind === 'counter')!.id;
+    setPath(s, you, { x: 1, y: 3 }, 1);
     const back = deserialize(serialize(s, 0), 2 * H * 1000).state;
     expect(back.level).toBeGreaterThan(1);
     expect(back.events.some((e) => e.t === 'levelup')).toBe(true);
@@ -546,11 +555,15 @@ describe('bug hunt regressions', () => {
     s.cash = 1e6;
     s.sauce = 100;
     s.freeInfects = 0;
-    for (let i = 0; i < 4000 && s.customers.filter((c) => c.state === 'waiting' || c.state === 'entering').length < 2; i++) tick(s, 0.25);
-    const cs = s.customers.filter((c) => ['entering', 'waiting', 'eating'].includes(c.state));
+    // a second table, so two can be seated
+    addFurniture(s, 'table_plain_cream', 5, 4);
+    addFurniture(s, 'chair_plain_cream', 5, 3, 'sw');
+    stock(s, 'sliders', 400);
+    for (let i = 0; i < 4000 && s.customers.filter((c) => c.state === 'waiting' || c.state === 'eating').length < 2; i++) tick(s, 0.25);
+    const cs = s.customers.filter((c) => ['waiting', 'eating'].includes(c.state));
     expect(infect(s, cs[0].id)).toBeNull();
     expect(infect(s, cs[1].id)).toMatch(/Crew is full/);
-    run(s, 5);
+    run(s, 15);
     expect(zombies(s).length).toBeLessThanOrEqual(s.crewCap);
   });
 
@@ -618,18 +631,22 @@ describe('bug hunt regressions', () => {
     s.workers[0].x = 6;
     s.workers[0].y = 5;
     expect(startCooking(s, s.workers[0].id, s.stoves[0].id, 'hobodog')).toBeNull();
-    expect(s.stoves[0].status).toBe('reserved');
+    expect(s.stoves[0].status).toBe('cooking'); // charged and on, nothing cooked yet
+    expect(s.stoves[0].left).toBe(s.stoves[0].total);
     cancelCooking(s, s.stoves[0].id);
     expect(s.cash).toBe(1000);
   });
 
-  it('a bite gives back about 20% of max energy', () => {
+  it('a kill gives back +2 energy per flesh chunk (original FeastTask)', () => {
     const { s, z } = withZombie('sumo');
     const c = seatSomeone(s);
     z.energy = 10;
     orderEat(s, z.id, c.id);
-    collect(s, 30, (e) => e.some((x) => x.t === 'eaten'));
-    expect(z.energy).toBeCloseTo(10 + maxEnergy(z) * 0.2, 0);
+    const evs = collect(s, 60, (e) => e.some((x) => x.t === 'eaten'));
+    const eaten = evs.find((e) => e.t === 'eaten');
+    expect(eaten).toBeDefined();
+    run(s, (eaten && eaten.t === 'eaten' ? eaten.feastSec! : 3) + 0.5);
+    expect(z.energy).toBeCloseTo(10 + TUNING.fleshChunks * TUNING.fleshEnergy, 0);
   });
 
   it('moving a piece only drops jobs that involve it', () => {
@@ -735,11 +752,28 @@ describe('balance fixes from the design audit', () => {
     expect(late).toBeLessThanOrEqual(5);
   });
 
-  it('a closed café loses only a sliver of rating overnight', () => {
+  it('a closed café loses about 0.08 stars an hour while you are away (original: quarter speed, 1.852e-8/ms)', () => {
     const s = createInitialState(4);
     s.rating = 0.6;
     setClosed(s, true);
     catchUpReport(s, 8 * H);
-    expect(0.6 - s.rating).toBeLessThan(0.1);
+    const lost = 0.6 - s.rating;
+    expect(lost).toBeCloseTo(8 * 3600 * TUNING.awayTimeScale * TUNING.closedDriftPerSec, 2);
+    expect((lost * 5) / 8).toBeCloseTo(0.083, 2); // stars per hour
+  });
+
+  it('time away runs the joint at a quarter speed, and one catch-up moves the rating at most ±0.4', () => {
+    const s = createInitialState(4);
+    stock(s, 'sliders', 2000);
+    const t0 = s.now;
+    const r = catchUpReport(s, 4 * H);
+    expect(r.sec).toBe(4 * H);
+    expect(s.now - t0).toBeCloseTo(4 * H, 0);
+    // no food at all for 8 h: the rating can fall no more than 0.4 in one go
+    const t = createInitialState(4);
+    t.rating = 0.9;
+    t.counter.forEach((c) => (c.servings = 0));
+    catchUpReport(t, 8 * H);
+    expect(0.9 - t.rating).toBeLessThanOrEqual(TUNING.awayRatingCap + 1e-9);
   });
 });

@@ -4,10 +4,10 @@
  * back from a raid KO, a wrecked rival reopening). Pure: the notifier turns `in` (seconds from now)
  * into wall-clock times.
  */
-import { DISH_BY_ID, TUNING } from './data';
+import { DISH_BY_ID } from './data';
 import { RIVAL_BY_ID, rivalName, type RivalId } from './rivals';
 import type { GameState } from './state';
-import { furnById } from './sim';
+import { burnWindow } from './sim';
 
 export type AlertKind = 'dishDone' | 'burnSoon' | 'revived' | 'rivalOpen';
 
@@ -24,12 +24,6 @@ export interface Alert {
 /** Most alerts worth scheduling at once (iOS caps pending local notifications at 64). */
 export const MAX_ALERTS = 12;
 
-/** The burn window of a finished dish (mirrors finishStove: its cook time, at least burnMinSec, heat lamps and frozen variants stretch it). */
-function burnWindow(s: GameState, dishId: string, furnitureId: string): number {
-  const dish = DISH_BY_ID[dishId];
-  const f = furnById(s, furnitureId);
-  return Math.max(TUNING.burnMinSec, dish.cookSec) * (f?.keepWarm ? TUNING.keepWarmFactor : 1) * (dish.burnMult ?? 1);
-}
 
 /** Everything worth a notification, soonest first. */
 export function upcomingAlerts(s: GameState): Alert[] {
@@ -44,7 +38,8 @@ export function upcomingAlerts(s: GameState): Alert[] {
       if (!cook || cook.state !== 'cooking') continue;
       const left = Math.max(0, st.left ?? 0);
       out.push({ id: `done:${st.id}`, kind: 'dishDone', in: left, title: 'Order up!', body: `Your ${name} is done. Get it to the counter before it turns to charcoal.` });
-      warnIn = left + burnWindow(s, st.dish, st.furnitureId) * 0.75;
+      // once it's done the cook steps away and the unattended clock (already ticking from the walk over) runs on
+      warnIn = left + Math.max(0, burnWindow(s, st) * 0.75 - (st.unattended ?? 0));
     } else if (st.status === 'done' && st.burnWarn !== undefined) warnIn = st.burnWarn - s.now;
     if (warnIn !== undefined && warnIn > 0)
       out.push({ id: `burn:${st.id}`, kind: 'burnSoon', in: warnIn, title: 'Something smells smoky…', body: `The ${name} is about to burn. You’ve got minutes, Boss.` });

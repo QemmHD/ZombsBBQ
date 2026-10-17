@@ -18,7 +18,9 @@ import {
   paintWall,
   placeFromStorage,
   ratingBonus,
-  ratingMult,
+  TUNING,
+  decorBonus,
+  shownRating,
   rotateFurniture,
   sellFurniture,
   sellValue,
@@ -73,13 +75,12 @@ describe('placing furniture', () => {
     const s = rich();
     expect(canPlace(s, 'plant_potted', DOOR_X, 0)).toMatch(/door/);
     expect(canPlace(s, 'plant_potted', 9, 9)).toMatch(/inside/);
-    // the cook needs to stand in front of a stove
-    expect(canPlace(s, 'plant_potted', 2, 1)).toMatch(/cook needs room/);
-    // nothing can wall off the sink
-    expect(canPlace(s, 'plant_potted', 1, 4)).toBeNull();
-    s.furniture.push({ id: 'blk1', item: 'plant_potted', x: 1, y: 4 });
-    s.furniture.push({ id: 'blk2', item: 'plant_potted', x: 0, y: 3 });
-    expect(canPlace(s, 'plant_potted', 0, 5)).toMatch(/sink/i);
+    // the stove's front stays free (the cook stands behind it when there's room, else in front)
+    expect(canPlace(s, 'plant_potted', 1, 2)).toMatch(/cook needs room/);
+    // nothing can wall off the sink (at 0,5 on the back-left wall)
+    expect(canPlace(s, 'plant_potted', 0, 4)).toBeNull();
+    s.furniture.push({ id: 'blk1', item: 'plant_potted', x: 0, y: 4 });
+    expect(canPlace(s, 'plant_potted', 1, 5)).toMatch(/sink/i);
   });
 
   it('outdoor items only go on the front lawn', () => {
@@ -118,7 +119,7 @@ describe('walls, floors and grime', () => {
     const b0 = ratingBonus(s);
     expect(b0).toBeLessThan(0); // stains, loose tiles, grimy kit and dirty walls
     expect(grimeCount(s)).toBe(5);
-    expect(paintFloor(s, 1, 4, 'tile')).toBeNull(); // a stained tile
+    expect(paintFloor(s, 1, 5, 'tile')).toBeNull(); // a stained tile
     expect(grimeCount(s)).toBe(4);
     expect(s.stats.floorsFixed).toBe(1);
     expect(ratingBonus(s)).toBeGreaterThan(b0);
@@ -131,11 +132,15 @@ describe('walls, floors and grime', () => {
     expect(grimeCount(s)).toBe(0);
   });
 
-  it('star items make the rating climb faster', () => {
+  it('star items add to the rating customers see, up to +0.20 (original furniture bonus)', () => {
     const s = rich();
-    const m0 = ratingMult(s);
+    const r0 = shownRating(s);
     expect(buyWall(s, 'neon_pig', 'r', 1)).toBeNull();
-    expect(ratingMult(s)).toBeGreaterThan(m0);
+    expect(shownRating(s)).toBeGreaterThan(r0);
+    expect(shownRating(s) - s.rating).toBeCloseTo(decorBonus(s), 9);
+    // however much decor, it's worth at most +0.20
+    for (let i = 0; i < 40; i++) s.furniture.push({ id: `gold${i}`, item: 'gold_record', x: -50 - i, y: -50 });
+    expect(decorBonus(s)).toBe(TUNING.ratingDecorMax);
   });
 
   it('wall items need a free slot, and never go on the door', () => {

@@ -157,9 +157,9 @@ describe('rare dish variants: raids, the fridge, the stove', () => {
       s.chefRank = 10; // keep chef-rank milestone bonuses out of the count
       s.recipes.push(id);
       startCooking(s, s.workers[0].id, s.stoves[0].id, id);
-      const xp0 = s.xp;
       run(s, s.stoves[0].total! + 10);
-      return s.xp - xp0;
+      // what the dish pays when it reaches the counter
+      return s.stoves[0].xp!;
     };
     expect(xpOf('fancy_gumbo')).toBe(Math.round(DISH_BY_ID.gumbo.xp * 1.5));
     expect(xpOf('gumbo')).toBe(DISH_BY_ID.gumbo.xp);
@@ -207,6 +207,6 @@ describe('rare dish variants: raids, the fridge, the stove', () => {
     expect(plain).toBeGreaterThan(0);
     expect(fresh).toBeGreaterThan(plain * 1.4);
     expect(fresh).toBeLessThan(plain * 1.6);
-    expect(TUNING.ratingRate).toBeGreaterThan(0);
+    expect(plain).toBeCloseTo(TUNING.ratingServe, 4);
   });
 });

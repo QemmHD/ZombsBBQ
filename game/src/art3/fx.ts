@@ -4,7 +4,7 @@
  * outlines and one strong accent each so they read over a busy joint.
  *
  * FRAME: every key is FX_W x FX_H (26 x 26), anchor (0.5, 1) = bottom-centre, which sits on the point the
- * scene floats it above. `bubble_think` and `fx_daydream` are BUBBLE_W x BUBBLE_H (34 x 30), same anchor;
+ * scene floats it above. `bubble_think`, `bubble_check` and `fx_daydream` are BUBBLE_W x BUBBLE_H (34 x 30), same anchor;
  * `bubble_think`'s cloud is empty in the middle — the scene draws a dish icon centred at BUBBLE_SLOT.
  */
 import type { ArtAsset } from '../art/types';
@@ -22,7 +22,7 @@ export const BUBBLE_SLOT = { x: 17, y: 11.5, w: 24, h: 15 };
 
 export const FX3_KEYS = [
   'fx_cash', 'fx_full', 'bubble_think', 'face_happy', 'face_angry', 'face_sleep',
-  'fx_skull', 'fx_sweat', 'fx_heart', 'fx_hit', 'fx_lock', 'fx_star', 'fx_stink', 'fx_daydream',
+  'fx_skull', 'fx_sweat', 'fx_heart', 'fx_hit', 'fx_lock', 'fx_star', 'fx_stink', 'fx_daydream', 'bubble_check',
 ] as const;
 export type Fx3Key = (typeof FX3_KEYS)[number];
 
@@ -117,6 +117,16 @@ const BUILD: Record<Fx3Key, () => ArtAsset> = {
       return s;
     }),
   bubble_think: () => asset('bubble_think', BUBBLE_W, BUBBLE_H, 0.5, 1, (d) => bubbleBase(d, 11)),
+  bubble_check: () =>
+    asset('bubble_check', BUBBLE_W, BUBBLE_H, 0.5, 1, (d) => {
+      // a dish is ready: the white bubble with a fat green tick in it
+      let s = bubbleBase(d, 37);
+      const tick = 'M10.2,11.6L15,16.2L24.4,6.4';
+      s += L(tick, 5.4, INK, 'stroke-linejoin="round"');
+      s += L(tick, 3.4, '#5E9A2A', 'stroke-linejoin="round"');
+      s += L('M11.4,11.4L15,14.8L23.6,6.2', 1.1, '#B4DC78', 'stroke-linejoin="round" opacity="0.8"');
+      return s;
+    }),
   fx_daydream: () =>
     asset('fx_daydream', BUBBLE_W, BUBBLE_H, 0.5, 1, (d) => {
       let s = bubbleBase(d, 23);

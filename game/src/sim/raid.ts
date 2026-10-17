@@ -22,7 +22,7 @@
  *
  * Pure and deterministic (own RNG): the scene renders it, tests drive it.
  */
-import { DISHES, DISH_BY_ID, TUNING, variantId, type VariantId } from './data';
+import { DISHES, DISH_BY_ID, TUNING, speedMult, variantId, type VariantId } from './data';
 import { ITEM_BY_ID, type Dir } from './catalog';
 import { DOOR_X, STREET_RUN, findPath, isInside, key, type Pt, type Room } from './grid';
 import { maxEnergy, type Furniture, type GameState, type Worker } from './state';
@@ -35,7 +35,7 @@ export * from './rivals';
 // ---------- the original's numbers ----------
 
 /** Original movement: the speed multiplier is 2 + 0.2·Speed (CharacterData::getSpeedMultiplier). */
-export const speedMult = (speed: number) => 2 + 0.2 * speed;
+export { speedMult };
 /** Tiles a second per point of multiplier: ~94 px a tile at 5.8 / 0.365 ms per px (doc 10 §3.1: Speed 4 walks 1.87 tiles/s). */
 export const TILES_PER_MULT = 0.669;
 /** Zombies move 1.2× slower than the living (original ZOMBIE_SLOWDOWN_MULTIPLIER). */
