@@ -49,13 +49,14 @@ export interface Body {
   hunch: number;
 }
 
-const STD: Body = { s: 1, hipX: 5.8, hipY: -32, legW: 11.4, thighL: 15, shX: 11, shY: -56, armW: 10, upL: 15, foreL: 11.5, neckX: 1, neckY: -59, headS: 1.27, tTop: -62.5, tBot: -27, wTop: 9.4, wBot: 12.4, belly: 0, hunch: 0 };
+// torso half-widths and sleeve width follow the original's measure: the head is ~2.1x the torso width
+const STD: Body = { s: 1, hipX: 5.8, hipY: -32, legW: 11.4, thighL: 15, shX: 11, shY: -56, armW: 8.8, upL: 15, foreL: 11.5, neckX: 1, neckY: -59, headS: 1.27, tTop: -62.5, tBot: -27, wTop: 8.6, wBot: 11.2, belly: 0, hunch: 0 };
 const B = (o: Partial<Body>): Body => ({ ...STD, ...o });
 
 export const BODIES = {
   std: STD,
-  slim: B({ hipX: 5.2, legW: 10, shX: 10.2, armW: 9, wTop: 8.4, wBot: 11, tBot: -27.6 }),
-  stocky: B({ hipX: 6.4, legW: 12.6, shX: 12.2, armW: 10.6, wTop: 10.8, wBot: 14, belly: 1.6 }),
+  slim: B({ hipX: 5.2, legW: 10, shX: 10.2, armW: 7.9, wTop: 7.7, wBot: 9.9, tBot: -27.6 }),
+  stocky: B({ hipX: 6.4, legW: 12.6, shX: 12.2, armW: 9.3, wTop: 9.9, wBot: 12.6, belly: 1.6 }),
   fat: B({ hipX: 6.8, legW: 13, hipY: -31, thighL: 14, shX: 12.6, armW: 11.4, wTop: 11.2, wBot: 15.8, belly: 4, tBot: -26 }),
   muscle: B({ s: 1.04, hipX: 6.4, legW: 12.6, shX: 14, armW: 13.6, wTop: 14.2, wBot: 12.6, upL: 15.5 }),
   sumo: B({ s: 1.05, hipX: 8.4, hipY: -30.6, thighL: 13.8, legW: 15.4, shX: 14.6, armW: 13.6, wTop: 14.4, wBot: 20, belly: 6, tBot: -24 }),
