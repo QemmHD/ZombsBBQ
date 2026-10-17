@@ -192,12 +192,19 @@ function nextTo(s: GameState, from: Pt, target: Pt, blocked = blockedTiles(s)): 
   return best;
 }
 
-/** Follow a moving target (the infect chase, an attack): a fresh path to beside them every 0.3 s. */
-function follow(s: GameState, w: Worker, target: Pt, speed: number, dt: number): boolean {
+/**
+ * Follow a moving target (the infect chase, an attack): a fresh path every 0.3 s, to their own tile when
+ * it's free floor (`onto`, the chase), else to the free tile beside them nearest the follower.
+ */
+function follow(s: GameState, w: Worker, target: Pt, speed: number, dt: number, onto = false): boolean {
   if (!w.path.length || s.now >= (w.repathAt ?? 0)) {
     w.repathAt = s.now + 0.3;
-    const goal = nextTo(s, w, target);
+    const blocked = blockedTiles(s);
+    const t = tileOf(target);
+    const goal = onto && isInside(t.x, t.y, room(s)) && !blocked.has(key(t.x, t.y)) ? t : nextTo(s, w, target, blocked);
     if (!goal || !setPath(s, w, goal, speed)) return false;
+    // already on that tile but not on its centre: finish the step instead of stopping short
+    if (!w.path.length && Math.hypot(w.x - goal.x, w.y - goal.y) > 0.01) w.path = [goal];
   }
   w.speed = speed;
   move(w, dt);
@@ -820,7 +827,8 @@ function resumeCooking(s: GameState, w: Worker) {
   if (st && st.status === 'paused' && !st.cookId) startCooking(s, w.id, st.id);
 }
 
-/** The runner's next stop: the free tile farthest from whoever's chasing them. */
+/** The runner's next stop after the door won't open: a free tile a few steps along, away from whoever's
+ * chasing them (original: they bounce back along the wall). */
 function fleeTile(s: GameState, c: Customer, chaser: Worker): Pt | null {
   const blocked = blockedTiles(s);
   const reach = reachableFloor(s, blocked);
@@ -830,7 +838,8 @@ function fleeTile(s: GameState, c: Customer, chaser: Worker): Pt | null {
   let bestD = Math.hypot(here.x - chaser.x, here.y - chaser.y) + 0.5;
   for (let y = 0; y < r.h; y++)
     for (let x = 0; x < r.w; x++) {
-      if (blocked.has(key(x, y)) || !reach.has(key(x, y))) continue;
+      const steps = Math.abs(x - here.x) + Math.abs(y - here.y);
+      if (steps > TUNING.chaseFleeSteps || blocked.has(key(x, y)) || !reach.has(key(x, y))) continue;
       const d = Math.hypot(x - chaser.x, y - chaser.y);
       if (d > bestD) {
         bestD = d;
@@ -865,12 +874,25 @@ function updateRunner(s: GameState, c: Customer, dt: number) {
     return;
   }
   const pace = Math.min(customerSpeed(c, true), workerSpeed(w, true) * TUNING.chaseRunnerPace);
+  if (c.stage === 'look') {
+    // rattling the door that won't let them out
+    if (s.now < (c.doorUntil ?? 0)) return;
+    c.stage = undefined;
+    c.doorUntil = undefined;
+  }
   if (!c.path.length) {
     const at = tileOf(c);
-    if (c.stage === 'door' && !(at.x === DOOR_X && at.y === 0) && setPath(s, c, { x: DOOR_X, y: 0 }, pace)) {
-      // heading for the door
+    if (c.stage === 'door') {
+      if (!(at.x === DOOR_X && at.y === 0) && setPath(s, c, { x: DOOR_X, y: 0 }, pace) && c.path.length) {
+        // heading for the door
+      } else {
+        // there: it won't open for them
+        c.stage = 'look';
+        c.doorUntil = s.now + TUNING.chaseDoorSec;
+        faceTowards(c, DOOR_X, -1);
+        return;
+      }
     } else {
-      c.stage = undefined;
       const t = fleeTile(s, c, w);
       if (t) setPath(s, c, t, pace);
     }
@@ -1543,7 +1565,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         resumeCooking(s, w);
         break;
       }
-      if (!follow(s, w, c, workerSpeed(w, true), dt)) w.path = [];
+      if (!follow(s, w, c, workerSpeed(w, true), dt, true)) w.path = [];
       if (caught(w, c)) catchCustomer(s, c, w);
       break;
     }

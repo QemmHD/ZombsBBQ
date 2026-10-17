@@ -136,9 +136,18 @@ check(['cooking', 'reserved'].includes(log.afterPick), `stove starts cooking (go
 await ff(25); // the very first dish is quick
 check((await page.evaluate(() => window.zbbq.ctl.state.stoves[0].status)) === 'done', 'first dish finishes');
 await shot('dish-done');
-await tapWorld(sp.x, sp.y - 20); // tap the stove: someone carries it to the counter
+// original: pick a cook, then touch the stove, to carry the food to the counter
+await tapActor(youId);
+await tapWorld(sp.x, sp.y - 20);
 await ff(20);
 check(await page.evaluate(() => window.zbbq.ctl.state.counter.some((c) => c.dish && c.servings > 0)), 'food reaches the counter');
+// a new game starts CLOSED (original): tap the front door to open up
+check(await page.evaluate(() => window.zbbq.ctl.state.closed === true), 'a new game starts closed');
+{
+  const d = await page.evaluate(() => ({ x: (window.zbbq.sim.DOOR_X + 0.5) * 48, y: (window.zbbq.sim.DOOR_X - 0.5) * 30 - 70 }));
+  await tapWorld(d.x, d.y);
+}
+check(await page.evaluate(() => !window.zbbq.ctl.state.closed), 'tapping the door opens up');
 await ff(40);
 await wait(800);
 await shot('serving');

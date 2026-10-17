@@ -59,6 +59,11 @@ interface Actor {
   /** was carrying a plate to a table last frame (to play the serve lean when it's set down) */
   wasServing?: boolean;
   serveAt?: number;
+  /** an infect runner: their zombie art has been asked for */
+  preloaded?: boolean;
+  /** the last swing that landed (attackers) or was taken (victims), for the strike / hit poses */
+  swingAt?: number;
+  hitAt?: number;
 }
 
 interface StoveFx {
@@ -77,7 +82,7 @@ export class JointScene extends Phaser.Scene {
   ready = false;
   private actors = new Map<string, Actor>();
   /** eaten customers: the body lies there while the zombie feasts, then a bone pile (original: 10 s, then a 3 s fade) */
-  private remains: { body: Phaser.GameObjects.Container | null; bones: Phaser.GameObjects.Image; t0: number }[] = [];
+  private remains: { body: Phaser.GameObjects.Container | null; bones: Phaser.GameObjects.Image; t0: number; feast: number }[] = [];
   private bonesN = 0;
   private staticLayer: Phaser.GameObjects.GameObject[] = [];
   private furnViews = new Map<string, Phaser.GameObjects.Image[]>();
@@ -816,16 +821,21 @@ export class JointScene extends Phaser.Scene {
     let pose: Parameters<Puppet['pose']>[0] = 'idle';
     if ((w.state === 'resting' || w.state === 'down') && !moving) pose = 'lie';
     else if (w.state === 'feasting') pose = 'feast';
+    else if (w.state === 'attacking') pose = 'attack';
     else if (serveT < 0.5) pose = 'serve';
-    else if (moving) pose = w.state === 'hunting' ? 'run' : 'walk';
+    // the infect chase: running, arms stretched out after the customer (original)
+    else if (w.state === 'chasing') pose = moving ? 'chase' : 'idle';
+    else if (moving) pose = 'walk';
     else if (w.state === 'cooking') pose = 'cook';
     pup.pose(pose, dt, {
       zombie: zombie && w.state !== 'cooking' && pose !== 'serve',
-      speed: w.state === 'hunting' ? 1.3 : 1,
+      // legs keep time with the ground covered (the sim's pace, tiles/s)
+      speed: Math.max(0.5, (w.speed || 1.2) / 1.35),
       carry: pose !== 'serve' && (w.state === 'carrying' || w.state === 'carryDish' || w.state === 'carryPlate'),
-      attackT: pose === 'serve' ? serveT : undefined,
+      attackT: pose === 'serve' ? serveT : pose === 'attack' ? this.t - (a.swingAt ?? -9) : undefined,
     });
-    const face = this.t < a.faceUntil ? a.face : w.state === 'resting' ? 'sleep' : w.state === 'down' ? 'dazed' : w.state === 'hunting' || w.state === 'feasting' ? 'chomp' : undefined;
+    const face =
+      this.t < a.faceUntil ? a.face : w.state === 'resting' ? 'sleep' : w.state === 'down' ? 'dazed' : w.state === 'hunting' || w.state === 'attacking' || w.state === 'feasting' ? 'chomp' : undefined;
     pup.setFace(face as never);
     a.shadow.setVisible(pose !== 'lie').setScale(1);
     // what they're carrying: a plate of food to a table, a pot from the stove, or dirty plates
@@ -850,7 +860,7 @@ export class JointScene extends Phaser.Scene {
     if (w.state === 'resting') b = 'face_sleep';
     else if (w.state === 'down') b = 'fx_skull';
     else if (w.state === 'daydream') b = 'fx_daydream';
-    else if (w.state === 'hunting') b = 'face_angry';
+    else if (w.state === 'hunting' || w.state === 'attacking') b = 'face_angry';
     const lying = pose === 'lie';
     this.bubble(a, b, lying ? -30 : -pup.height - 14, lying ? 22 : 6);
     this.energyBar(a, w.energy / maxEnergy(w), lying ? -24 : -pup.height - 4);
@@ -946,14 +956,43 @@ export class JointScene extends Phaser.Scene {
     if (!pup) return;
     if (sp) pup.setFacing(sp.facing, sp.back);
     else pup.setFacing(c.facing, !!c.back && c.path.length > 0);
-    const pose = c.state === 'infecting' ? 'shiver' : c.state === 'fleeing' ? 'run' : c.path.length ? 'walk' : c.state === 'eating' ? 'eat' : seated ? 'sit' : 'idle';
-    pup.pose(pose, dt, { speed: c.state === 'fleeing' ? 1.6 : 1, seated, impatient: c.state === 'waiting' && c.waitLeft < 25 });
-    const face =
-      c.state === 'fleeing'
-        ? 'scream'
+    // INFECT: they run for it, arms up; cornered (or a zombie's victim) they cower; each hit snaps them back
+    if (c.state === 'infecting' && !a.preloaded) {
+      // the zombie version is drawn the frame they're caught: have its art ready
+      a.preloaded = true;
+      void loadChar(this, `${c.type}_z`);
+    }
+    const hit = this.t - (a.hitAt ?? -9) < 0.3;
+    const pose =
+      c.state === 'cowering'
+        ? hit
+          ? 'hit'
+          : c.path.length
+            ? 'hit'
+            : 'shiver'
         : c.state === 'infecting'
-          ? 'shock'
-          : c.state === 'eating'
+          ? c.path.length
+            ? 'run'
+            : 'shiver'
+          : c.state === 'fleeing'
+            ? 'run'
+            : c.path.length
+              ? 'walk'
+              : c.state === 'eating'
+                ? 'eat'
+                : seated
+                  ? 'sit'
+                  : 'idle';
+    pup.pose(pose, dt, {
+      speed: Math.max(0.5, (c.speed || 1.1) / 1.35),
+      seated,
+      impatient: c.state === 'waiting' && c.waitLeft < 25,
+      wave: c.state === 'waiting' && seated,
+    });
+    const face =
+      c.state === 'fleeing' || c.state === 'infecting' || c.state === 'cowering'
+        ? 'scream'
+        : c.state === 'eating'
             ? 'eat'
             : c.mood === 'angry' || c.state === 'turnedAway'
               ? 'angry'
@@ -961,21 +1000,13 @@ export class JointScene extends Phaser.Scene {
                 ? 'happy'
                 : undefined;
     pup.setFace(face as never);
+    // no order bubble (original: the diner takes whatever comes); a sweat drop once they've waited long
     let b: string | null = null;
-    let dish: string | undefined;
-    if (c.state === 'fleeing') b = 'fx_full';
-    else if (c.state === 'waiting' && seated) {
-      if (c.waitLeft < 20) b = 'fx_sweat';
-      else {
-        b = 'bubble_think';
-        const slot = s.counter.find((x) => x.dish && x.servings > 0);
-        dish = DISH_BY_ID[slot?.dish ?? 'sliders'].icon;
-      }
-    }
-    this.bubble(a, b, -pup.height - 6, 8, dish);
+    if (c.state === 'fleeing' || c.state === 'cowering') b = 'fx_full';
+    else if (c.state === 'waiting' && seated && c.waitLeft < 20) b = 'fx_sweat';
+    this.bubble(a, b, -pup.height - 6, 8);
     const sel = this.ctl.selection;
-    if (c.state === 'infecting') pup.setTint(Math.sin(this.t * 30) > 0 ? 0x9be36b : 0xffffff);
-    else pup.clearTint();
+    pup.flash(hit);
     this.selRing(a, sel?.kind === 'customer' && sel.id === c.id);
     // a seated diner's ring sits on the chair's floor tile, not up on the seat
     if (a.sel?.visible && sp) a.sel.setPosition(-(sp.x - iso(c.x, c.y).x), -(sp.y - iso(c.x, c.y).y));
@@ -1049,7 +1080,7 @@ export class JointScene extends Phaser.Scene {
 
   /** A customer eaten where they stood: their body drops (dazed, flat on the floor) under the feasting
    * zombie, then gives way to a pile of bones that lies there 10 s and fades over 3 s (original). */
-  private dropRemains(x: number, y: number, charId: string) {
+  private dropRemains(x: number, y: number, charId: string, feast = TUNING.feastSec) {
     const p = iso(x, y);
     // on the floor: under anyone standing on that tile
     const floor = moverDepth(x, y, -2);
@@ -1064,13 +1095,13 @@ export class JointScene extends Phaser.Scene {
       pup.setFace('dazed' as never);
       body = this.add.container(p.x, p.y, [pup.root]).setDepth(floor + 1);
     }
-    this.remains.push({ body, bones, t0: this.t });
+    this.remains.push({ body, bones, t0: this.t, feast });
   }
 
   private updateRemains() {
-    const feast = TUNING.feastSec;
     this.remains = this.remains.filter((r) => {
       const age = this.t - r.t0;
+      const feast = r.feast;
       // the body crossfades into bones as the zombie finishes
       const swap = Phaser.Math.Clamp((age - feast + 0.4) / 0.4, 0, 1);
       if (r.body) {
@@ -1105,14 +1136,15 @@ export class JointScene extends Phaser.Scene {
       } else {
         fx.fx.setVisible(cooking).setScale((1 / TEX_S) * (1 + Math.sin(this.t * 13) * 0.06), 1 / TEX_S);
       }
+      // done: the green-check bubble (original); the "!" only once it's getting close to burning
       const done = st.status === 'done' || burnt;
+      const warn = burnt || (st.status === 'done' && st.burnWarn === undefined);
       fx.dish.setVisible(st.status === 'done');
-      fx.badge.setVisible(done);
+      fx.badge.setVisible(warn);
       if (done) {
         if (st.status === 'done') {
-          const k = DISH_BY_ID[st.dish!].icon;
-          if (fx.dish.texture.key !== k && this.textures.exists(k)) fx.dish.setTexture(k);
-          fx.dish.y = fx.topY - 42 - Math.abs(Math.sin(this.t * 4)) * 4;
+          if (fx.dish.texture.key !== 'bubble_check' && this.textures.exists('bubble_check')) fx.dish.setTexture('bubble_check');
+          fx.dish.y = fx.topY - 34 - Math.abs(Math.sin(this.t * 3)) * 2;
         }
         // the burn warning: the "!" pulses faster as the dish gets close to burning
         const left = (st.burnAt ?? Infinity) - s.now;
@@ -1252,8 +1284,9 @@ export class JointScene extends Phaser.Scene {
     switch (e.t) {
       case 'coin': {
         const p = iso(e.x, e.y);
-        // one popup per customer: the "$" and the amount are a single label
-        this.floatText(p.x, p.y - 96, `${e.amount + e.tip}`, '#E3CB5E', 17, { icon: 'fx_cash', force: true, anchor: `c${Math.round(e.x * 2)},${Math.round(e.y * 2)}` });
+        // original: a small white "$N" rising from the table, and a smiley over the diner
+        this.floatText(p.x, p.y - 96, `$${e.amount + e.tip}`, '#F4F0E4', 16, { force: true, anchor: `c${Math.round(e.x * 2)},${Math.round(e.y * 2)}` });
+        this.popIcon(p.x + 4, p.y - 118, 'face_happy');
         // a tip gets the "cha-ching"; a plain bill just the coin
         sfx(e.tip > 0 ? 'tip' : 'coin', { volume: 0.6, pan: this.panOf(e.x) });
         break;
@@ -1270,14 +1303,30 @@ export class JointScene extends Phaser.Scene {
         break;
       }
       case 'eaten': {
-        // the victim falls out of their seat, onto the floor at the zombie's feet (not hidden under the
-        // table), and that's where the bones end up
+        // the victim drops where the last swing left them, at the zombie's feet, and the bones end up there
         const z = s.workers.find((w) => w.id === e.workerId);
         const k = 0.55;
-        this.dropRemains(z ? z.x + (e.x - z.x) * k : e.x, z ? z.y + (e.y - z.y) * k : e.y, e.type);
+        const feast = e.feastSec ?? TUNING.feastSec;
+        this.dropRemains(z ? z.x + (e.x - z.x) * k : e.x, z ? z.y + (e.y - z.y) * k : e.y, e.type, feast);
         sfx('feast', { volume: 0.8, pan: this.panOf(e.x) });
         // the bones land as the body fades out (see updateRemains)
-        setTimeout(() => sfx('bones', { volume: 0.7, pan: this.panOf(e.x) }), Math.max(0, TUNING.feastSec - 0.2) * 1000);
+        setTimeout(() => sfx('bones', { volume: 0.7, pan: this.panOf(e.x) }), Math.max(0, feast - 0.2) * 1000);
+        break;
+      }
+      case 'hit': {
+        // each swing: the zombie's claw comes round, the victim snaps back (and slides a tile)
+        const z = this.actors.get(e.workerId);
+        if (z) z.swingAt = this.t;
+        const v = this.actors.get(e.customerId);
+        if (v) v.hitAt = this.t;
+        const p = iso(e.x, e.y);
+        this.popIcon(p.x, p.y - 50, 'fx_hit');
+        sfx('hit', { volume: 0.5, pan: this.panOf(e.x), pitch: 0.9 + Math.random() * 0.2 });
+        break;
+      }
+      case 'chase': {
+        const c = s.customers.find((x) => x.id === e.customerId);
+        sfx('scream', { volume: 0.6, pan: c ? this.panOf(c.x) : 0, pitch: 1 + Math.random() * 0.2 });
         break;
       }
       case 'panic':
@@ -1302,9 +1351,9 @@ export class JointScene extends Phaser.Scene {
         if (e.from !== 'down') sfx('refresh', { volume: 0.5 });
         break;
       case 'bite': {
+        // the first hit of an attack: the room panics
         const p = iso(e.x, e.y);
         this.floatText(p.x, p.y - 112, 'CHOMP!', '#D9513E', 20, { force: true, anchor: e.workerId });
-        this.popIcon(p.x, p.y - 50, 'fx_hit');
         this.cameras.main.shake(180, 0.004);
         const a = this.actors.get(e.workerId);
         if (a) {
@@ -1317,25 +1366,12 @@ export class JointScene extends Phaser.Scene {
         break;
       }
       case 'infected': {
+        // original: no bite, no transform clip, no puff: the sprite just swaps to the zombie (the sync
+        // below draws it this same frame; its art was loaded during the chase). Only the sound.
         const w = s.workers.find((x) => x.id === e.workerId);
         if (!w) break;
-        const p = iso(w.x, w.y);
-        this.floatText(p.x, p.y - 120, 'INFECTED!', '#9BD62E', 19, { force: true, anchor: w.id });
-        this.popIcon(p.x, p.y - 40, 'fx_stink');
-        sfx('infect');
-        const a = this.actors.get(w.id);
-        if (a) {
-          a.holder.setScale(0.6, 1.3);
-          this.tweens.add({
-            targets: a.holder,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 450,
-            ease: 'Elastic.Out',
-          });
-          a.face = 'chomp';
-          a.faceUntil = this.t + 1.2;
-        }
+        this.syncWorker(w, 0);
+        sfx('infect', { pan: this.panOf(w.x) });
         break;
       }
       case 'cookStart':

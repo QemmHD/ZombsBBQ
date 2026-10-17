@@ -434,8 +434,11 @@ export const TUNING = {
   wanderRadius: 3,
   /** the infection chase: the runner is held to this share of the chaser's pace, and gives up cornered
    * after chaseMaxSec, so the catch always happens */
-  chaseRunnerPace: 0.95,
+  chaseRunnerPace: 0.97,
   chaseMaxSec: 12,
+  /** the runner rattles the door that won't let them out this long, then darts this many tiles away */
+  chaseDoorSec: 0.5,
+  chaseFleeSteps: 4,
   /** customers turn up every 18 s at zero stars down to every 4.5 s at five, ±1 s (original) */
   arrivalSlowSec: 18,
   arrivalFastSec: 4.5,
