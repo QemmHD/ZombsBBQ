@@ -137,11 +137,11 @@ const joe = mk({
     top: tone('#7E7C70'),
     collar: 'tee',
     untucked: true,
-    pants: C.denim,
+    pants: C.navy,
     extra: (c) => (c.back ? '' : stain(-3, c.b.shY + 10, 1.6, '#7A3A1E', c.seed + 1, 0.7) + stain(6, c.b.tBot - 7, 1.1, '#5A4A2A', c.seed + 2, 0.6)),
   }),
   arm: armPaint({ sleeve: 'short', col: tone('#7E7C70') }),
-  leg: legPaint({ kind: 'pants', col: C.denim, shoe: 'sneaker', shoeCol: tone('#A8A290'), zBareSide: 1 }),
+  leg: legPaint({ kind: 'pants', col: C.navy, shoe: 'sneaker', shoeCol: tone('#A8A290'), zBareSide: 1 }),
 });
 
 const jane = mk({
@@ -152,9 +152,9 @@ const jane = mk({
   hair: HAIR.mouse,
   set: H.bob(HAIR.mouse),
   earHidden: true,
-  torso: jacketTorso({ top: tone('#C8BC9C'), collar: 'scoop', pants: C.grey, untucked: false }, { col: tone('#6A6A44'), open: 6, buttons: 3 }),
+  torso: jacketTorso({ top: C.lilac, collar: 'scoop', pants: C.teal, untucked: false }, { col: tone('#6A6A44'), open: 6, buttons: 3 }),
   arm: armPaint({ sleeve: 'long', col: tone('#6A6A44'), band: true, itemL: PR.purse(tone('#5A3A2A')) }),
-  leg: legPaint({ kind: 'pants', col: C.grey, shoe: 'flat', shoeCol: C.black }),
+  leg: legPaint({ kind: 'pants', col: C.teal, shoe: 'flat', shoeCol: C.black }),
 });
 
 const senior = mk({
@@ -182,9 +182,9 @@ const hipster = mk({
   faceUnder: W.fullBeard(HAIR.dark, 0.3),
   faceOver: W.glasses('round', '#3A2A1E'),
   headBackOver: W.glassesBack('#3A2A1E'),
-  torso: jacketTorso({ top: C.charcoal, collar: 'tee', untucked: true, pants: tone('#3E4A5A'), extra: (c) => (c.back ? '' : outl(`M-1,${f(c.b.shY + 8)}l6,0l-1,5l-5,0Z`, '#8A8270', 0.4) + line(`M0.4,${f(c.b.shY + 10)}h3.6`, 0.5, '#3A3833')) }, { col: tone('#5A6A7E'), open: 6, buttons: 0, pockets: true }),
+  torso: jacketTorso({ top: C.charcoal, collar: 'tee', untucked: true, pants: C.teal, extra: (c) => (c.back ? '' : outl(`M-1,${f(c.b.shY + 8)}l6,0l-1,5l-5,0Z`, '#8A8270', 0.4) + line(`M0.4,${f(c.b.shY + 10)}h3.6`, 0.5, '#3A3833')) }, { col: tone('#5A6A7E'), open: 6, buttons: 0, pockets: true }),
   arm: armPaint({ sleeve: 'rolled', col: tone('#5A6A7E'), itemL: PR.coffeeCup() }),
-  leg: legPaint({ kind: 'pants', col: tone('#3E4A5A'), shoe: 'boot', shoeCol: tone('#6A4A2E'), cuffs: true }),
+  leg: legPaint({ kind: 'pants', col: C.teal, shoe: 'boot', shoeCol: tone('#6A4A2E'), cuffs: true }),
 });
 
 const accountant = mk({
@@ -200,7 +200,7 @@ const accountant = mk({
   torso: shirtTorso({
     top: C.white,
     collar: 'shirt',
-    tie: tone('#6A4A30'),
+    tie: C.royal,
     pants: C.khaki,
     belt: '#4A3424',
     buckle: '#9A8A5A',

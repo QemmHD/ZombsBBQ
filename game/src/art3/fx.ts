@@ -66,13 +66,16 @@ function cloud(cx: number, cy: number, rx: number, ry: number, n: number, seed: 
 
 function bubbleBase(d: Doc, seed: number): string {
   const c = cloud(17, 11.6, 14.4, 9.6, 11, seed);
-  let s = F(c, '#140E08', 0, 'opacity="0.25" transform="translate(0.9 1.1)"');
-  s += F(c, d.linear(4, 2, 30, 24, [[0, '#F0ECDE'], [0.6, '#DCD7C6'], [1, '#B8B2A0']]));
-  s += speckle(d, c, [2, 1, 30, 22], 12, ['#8A7A50', '#A89C74'], seed, 0.2, 0.45, 0.45);
-  s += d.clip(c, F(blob(26, 17, 3.2, 1.6, seed + 4, 6, 0.6), '#8A7A50', 0, 'opacity="0.18"'));
-  s += L(c, 1.1);
+  // the original's thought cloud: clean white with a blue outline
+  const BLUE = '#7799CD';
+  let s = F(c, '#140E08', 0, 'opacity="0.2" transform="translate(0.9 1.1)"');
+  s += F(c, '#FFFFFF');
+  s += d.clip(c, F(blob(24, 18, 7, 4, seed + 4, 8, 0.5), '#DCE6F4', 0, 'opacity="0.6"'));
+  s += L(c, 1.3, BLUE);
   // trailing puffs down to the anchor
-  s += F(rell(14.8, 24.4, 2.3, 1.9, 0, 14), '#DCD7C6', 0.95) + F(rell(16.4, 28, 1.3, 1.1, 0, 12), '#DCD7C6', 0.85);
+  const p1 = rell(14.8, 24.4, 2.3, 1.9, 0, 14);
+  const p2 = rell(16.4, 28, 1.3, 1.1, 0, 12);
+  s += F(p1, '#FFFFFF', 0) + L(p1, 0.95, BLUE) + F(p2, '#FFFFFF', 0) + L(p2, 0.85, BLUE);
   return s;
 }
 
@@ -125,7 +128,7 @@ const BUILD: Record<Fx3Key, () => ArtAsset> = {
   face_happy: () =>
     fx('face_happy', (d) => {
       // a yellow grin: heavy-lidded, gap-toothed, a bit of drool
-      const { s: base, disc } = faceDisc(d, '#E6C450', '#C8A23A', '#8A6A1E', 41);
+      const { s: base, disc } = faceDisc(d, '#FEDE58', '#E8C23E', '#A0801E', 41);
       let s = base;
       let inner = '';
       // eyes: half shut, smug
@@ -153,7 +156,7 @@ const BUILD: Record<Fx3Key, () => ArtAsset> = {
   face_angry: () =>
     fx('face_angry', (d) => {
       // blue, scowling, gritted teeth and a popping vein
-      const { s: base, disc } = faceDisc(d, '#7EA4C0', '#4E7898', '#2A4A66', 43);
+      const { s: base, disc } = faceDisc(d, '#48C2F9', '#2E9AD2', '#1A6494', 43);
       let s = base;
       for (const [x, dir] of [[8.6, 1], [17.4, -1]] as [number, number][]) {
         s += F(rell(x, 11.4, 2.3, 1.5, dir * 8, 14), '#E6E2CC', 0.55);

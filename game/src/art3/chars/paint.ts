@@ -96,8 +96,8 @@ export const C = {
   white: tone('#DAD6C8', '#B4AF9E'),
   oxblood: tone('#691122'),
   slate: tone('#2C6985'),
-  denim: tone('#4C5E72'),
-  navy: tone('#2F3A4C'),
+  denim: tone('#3A6288', '#1F3B55'),
+  navy: tone('#112244'),
   brown: tone('#6A4A30'),
   tan: tone('#9A7A50'),
   mustard: tone('#B09038'),
@@ -105,7 +105,7 @@ export const C = {
   ltgrey: tone('#A8A69C'),
   maroon: tone('#6D1727'),
   rose: tone('#9E6A6E'),
-  teal: tone('#3E6E66'),
+  teal: tone('#336688', '#113344'),
   plum: tone('#5A4560'),
   rust: tone('#A0582E'),
   hivis: tone('#B8B444'),
@@ -116,6 +116,9 @@ export const C = {
   pink: tone('#B07C84'),
   gold: tone('#B8963E'),
   chrome: tone('#A8ACA8', '#7C807C'),
+  // the original's few saturated garments (royal-blue suit, lilac top): one accent piece per character
+  royal: tone('#2222BB'),
+  lilac: tone('#CCAACC', '#886688'),
 };
 
 // ---------------------------------------------------------------- primitive painters

@@ -38,9 +38,9 @@ import {
   unflip,
 } from './p2kit';
 
-const SKIN_Z = '#88BB44';
-const SKIN_ZS = '#427E40';
-const EYE_Z = '#DECC54';
+const SKIN_Z = '#77AA55';
+const SKIN_ZS = '#557733';
+const EYE_Z = '#CCCC44';
 
 // ---------------------------------------------------------------- shared bits
 function leafD(x: number, y: number, len: number, w: number, a: number, bend = 0): string {

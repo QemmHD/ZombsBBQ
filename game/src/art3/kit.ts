@@ -24,7 +24,7 @@ export const INK = '#16120C'; // outlines: warm near-black
 export const LW = 1.8; // prop outline width (world units): ~1.9 % of a tile, like the original's 3-4 px on 164
 export const LW_THIN = 1.0; // interior detail lines
 export const PAL = {
-  grass: ['#577922', '#4A6615', '#3A4F0F', '#6B8A2C', '#7E9A3A'],
+  grass: ['#557722', '#445511', '#446611', '#668822', '#729A2E'], // flat lawn: base ~75 % of the tile, tufts #445511 / #668822
   concrete: '#C6C7C2',
   concreteHi: '#D8D9D4',
   concreteD: '#A6A7A0',
