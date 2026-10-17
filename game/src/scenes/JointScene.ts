@@ -523,11 +523,9 @@ export class JointScene extends Phaser.Scene {
     for (const [fid, b] of this.cashBadges) {
       if (b.visible && Math.abs(wx - b.x) < 18 && wy < b.y + 6 && wy > b.y - 30) return this.game.events.emit('collect', fid);
     }
-    // closed up, the door is what you tap to reopen, even with the crew filing out through it to nap
-    if (s.closed) {
-      const dw = this.wallAt(wx, wy);
-      if (dw && dw.wall === 'r' && dw.index === DOOR_X) return this.ctl.toggleClosed();
-    }
+    // closed up, the door is what you tap to reopen, even with the crew filing out through it to nap;
+    // but someone standing still in the doorway (YOU, at the start of a new game) is what you meant
+    const doorTap = s.closed && ((dw) => !!dw && dw.wall === 'r' && dw.index === DOOR_X)(this.wallAt(wx, wy));
     // characters: whoever's body is closest to the finger wins (front-most only breaks ties), so a
     // zombie half-hidden behind a customer is still easy to grab
     let best: { id: string; kind: 'w' | 'c' | 'p'; score: number } | null = null;
@@ -556,6 +554,11 @@ export class JointScene extends Phaser.Scene {
     for (const w of s.workers) if (w.state !== 'raiding') consider(w.id, 'w');
     for (const c of s.customers) if (c.state !== 'leaving' && c.state !== 'fleeing' && c.state !== 'infecting' && c.state !== 'cowering' && c.state !== 'turnedAway') consider(c.id, 'c');
     for (const p of s.pets) consider(p.id, 'p');
+    if (doorTap) {
+      const b = best as { id: string; kind: 'w' | 'c' | 'p' } | null;
+      const who = b && (b.kind === 'w' ? s.workers.find((x) => x.id === b.id) : b.kind === 'c' ? s.customers.find((x) => x.id === b.id) : undefined);
+      if (!who || who.path.length) return this.ctl.toggleClosed();
+    }
     if (best) {
       const b = best as { id: string; kind: 'w' | 'c' | 'p' };
       if (b.kind === 'w') return this.ctl.tapWorker(b.id);
