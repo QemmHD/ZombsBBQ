@@ -27,6 +27,8 @@ interface UnitView {
   barQ: number;
   shadow: Phaser.GameObjects.Ellipse;
   ring: Phaser.GameObjects.Ellipse;
+  /** the puppet's base scale (pets are drawn at a size that reads next to the people) */
+  ps: number;
   bubble?: Phaser.GameObjects.Image;
 }
 
@@ -34,6 +36,8 @@ interface UnitView {
 const FLOAT_POOL = 24;
 /** Extra rings of ground around a rival's lot, so the closer camera never sees past the grass. */
 const RAID_MARGIN = 3;
+/** Pets' four-legged rigs are drawn small; in a raid they're scaled up to read beside the people. */
+const PET_RAID_SCALE = 1.7;
 
 /** Waitresses (`staff_x_b`) fall back to their waiter's art if they haven't been drawn. */
 function artFor(id: string): string {
@@ -272,7 +276,7 @@ export class RaidScene extends Phaser.Scene {
     for (const u of r.units) {
       const v = this.views.get(u.id);
       if (!v || !v.holder.visible || u.hp <= 0 || u.state === 'gone' || u.state === 'down') continue;
-      const h = (v.puppet?.height ?? 90) * v.holder.scaleY;
+      const h = (v.puppet?.height ?? 90) * v.ps * v.holder.scaleY;
       if (Math.abs(wx - v.holder.x) < 26 && wy < v.holder.y + 10 && wy > v.holder.y - h - 8) {
         const score = (wx - v.holder.x) ** 2 + ((wy - (v.holder.y - h * 0.45)) * 0.7) ** 2;
         if (!best || score < best.score) best = { u, score };
@@ -332,6 +336,7 @@ export class RaidScene extends Phaser.Scene {
       barQ: -1,
       shadow,
       ring,
+      ps: u.kind === 'pet' ? PET_RAID_SCALE : 1,
     };
     if (u.kind === 'summon') holder.setScale(1.15);
     this.views.set(u.id, v);
@@ -415,7 +420,7 @@ export class RaidScene extends Phaser.Scene {
         }
       }
       const down = u.hp <= 0 || u.state === 'down' || corpse;
-      const top = -(v.puppet?.height ?? 90) - 8;
+      const top = -(v.puppet?.height ?? 90) * v.ps - 8;
       this.drawBar(v, u, down ? -30 : top);
       v.shadow.setVisible(!seat && !down);
       v.ring
@@ -462,7 +467,7 @@ export class RaidScene extends Phaser.Scene {
       const hitT = r.t - u.hitAt;
       v.puppet.flash(hitT < 0.06 && !down);
       const k = hitT < 0.16 && !down ? 1 - hitT / 0.16 : 0;
-      v.puppet.root.setScale(1 + k * 0.07, 1 - k * 0.07).setX(-u.facing * 2 * k);
+      v.puppet.root.setScale(v.ps * (1 + k * 0.07), v.ps * (1 - k * 0.07)).setX(-u.facing * 2 * k);
       if (hitT >= 0.06 || down) {
         if (u.side === 'z' && buff) v.puppet.setTint(Math.sin(this.t * 14) > 0 ? (buff === 'str' ? 0xff7a6a : 0x9be36b) : 0xffffff);
         else v.puppet.clearTint();
