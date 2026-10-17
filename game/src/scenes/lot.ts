@@ -49,9 +49,16 @@ export function wallKey(s: GameState, side: 'l' | 'r', i: number): string {
 export function floorKeys(s: GameState, x: number, y: number): string[] {
   const f = s.floors[key(x, y)] ?? 'dirty';
   const ab = (x + y) % 2 ? 'a' : 'b';
-  if (f === 'stain') return [`floor_dirty_${ab}`, `stain_${1 + (h(x, y, 4) % 4)}`];
-  if (f === 'loose') return [`floor_dirty_${ab}`, `floorcrack_${1 + (h(x, y, 4) % 2)}`];
-  if (f === 'dirty') return [`floor_dirty_${ab}`];
+  // the dirty tile comes in four chip patterns, picked from the tile's world position
+  const v = h(x, y, 11) % 4;
+  const dirty = `floor_dirty_${ab}${v ? v + 1 : ''}`;
+  if (f === 'stain') return [dirty, `stain_${1 + (h(x, y, 4) % 4)}`];
+  if (f === 'loose') return [dirty, `floorcrack_${1 + (h(x, y, 4) % 2)}`];
+  if (f === 'dirty') {
+    // and the odd bit of extra muck: a smear or some crumbs
+    const g = h(x, y, 12) % 9;
+    return g === 0 ? [dirty, 'floor_grime_smear'] : g === 1 ? [dirty, 'floor_grime_crumbs'] : [dirty];
+  }
   return [`floor_${f}_${ab}`];
 }
 
@@ -61,12 +68,49 @@ export function wallAnchor(side: 'l' | 'r', i: number) {
   return { x: c.x + (side === 'l' ? -HW / 2 : HW / 2), y: c.y };
 }
 
-/** Street furniture and scenery around the lot, laid out relative to the room size. */
-export function scenery(w: number, hgt: number, rival = false): [string, number, number, boolean?][] {
+/**
+ * Each rival's lot gets a few props in its theme on the front lawn: [key, along, out, side], where
+ * side 'r' is the lawn off the right-hand (north-east) end of the room at (w + out, along) and 'l'
+ * the lawn in front of the left-hand wall at (along, h + out). Kept clear of the HUD gutters.
+ */
+const RIVAL_STREET: Record<string, [string, number, number, 'l' | 'r'][]> = {
+  chuck: [
+    ['hay_bale', 3, 1, 'r'],
+    ['barrel_stack', 5, 2, 'r'],
+    ['hay_bale', 2, 1, 'l'],
+  ],
+  snob: [
+    ['plant_potted', 2, 1, 'r'],
+    ['lamp_floor', 4, 1, 'r'],
+    ['plant_tree', 2, 1, 'l'],
+  ],
+  crunch: [
+    ['traffic_cone', 3, 1, 'r'],
+    ['street_trash', 5, 1, 'r'],
+    ['barrel_stack', 2, 1, 'l'],
+  ],
+  vera: [
+    ['plant_tree', 3, 1, 'r'],
+    ['cactus', 5, 2, 'r'],
+    ['plant_potted', 2, 1, 'l'],
+  ],
+  hank: [
+    ['tombstone_deco_1', 3, 1, 'r'],
+    ['dead_tree', 5, 2, 'r'],
+    ['tombstone_deco_2', 2, 1, 'l'],
+  ],
+};
+
+/**
+ * Street furniture and scenery around the lot, laid out relative to the room size. `rival` is the
+ * rival's id when drawing their lot (or true for a generic rival), false for your own joint.
+ */
+export function scenery(w: number, hgt: number, rival: boolean | string = false): [string, number, number, boolean?][] {
+  const themed = typeof rival === 'string' ? (RIVAL_STREET[rival] ?? []).map(([k, along, out, side]): [string, number, number] => (side === 'r' ? [k, w + out, along] : [k, along, hgt + out])) : [];
   const out: [string, number, number, boolean?][] = [
-    // far sidewalk across the north-east road
+    // far sidewalk across the north-east road (your own bench advertises something else)
     ['street_lamp', 1, -4],
-    ['bus_bench', DOOR_X, -4],
+    [rival ? 'bus_bench' : 'bus_bench_home', DOOR_X, -4],
     ['newsbox', DOOR_X + 1, -4],
     ['street_trash', DOOR_X - 2, -4],
     ['street_lamp', w + 2, -4],
@@ -89,8 +133,10 @@ export function scenery(w: number, hgt: number, rival = false): [string, number,
     ['dead_tree', -6, 3],
     ['bush_2', -5, 6],
     ['bush_1', -6, hgt + 3],
-    // the pole sign on the corner of the lot (yours only), and the far end of the front lawn
-    ...(rival ? [] : ([['sign_pole', w + 4, 0]] as [string, number, number][])),
+    // the pole sign on the corner of the lot (yours only), one tile further out than before so it
+    // isn't cut in half under the right-hand HUD column; and the far end of the front lawn
+    ...(rival ? [] : ([['sign_pole', w + 5, 0]] as [string, number, number][])),
+    ...themed,
     ['bush_2', w + 5, 3],
     ['dead_tree', w + 5, hgt + 4],
     ['bush_1', 2, hgt + 5],
@@ -110,6 +156,13 @@ export interface LotOpts {
   doorSign?: boolean;
   /** street furniture to dress the lot with */
   scenery: [string, number, number, boolean?][];
+  /** extra rings of ground beyond the usual lot (for closer cameras) */
+  margin?: number;
+}
+
+/** The tile range the ground covers (inclusive). */
+export function lotGround(w: number, h: number, margin = 0) {
+  return { x0: -9 - margin, y0: -9 - margin, x1: w + 7 + margin, y1: h + 7 + margin };
 }
 
 export interface LotViews {
@@ -162,8 +215,9 @@ export function drawLot(scene: Phaser.Scene, o: LotOpts): LotViews {
     return i;
   };
   // ground: roads and sidewalks behind both back walls, the floor, grass everywhere else
-  for (let y = -9; y <= H + 7; y++)
-    for (let x = -9; x <= W + 7; x++) {
+  const gr = lotGround(W, H, o.margin);
+  for (let y = gr.y0; y <= gr.y1; y++)
+    for (let x = gr.x0; x <= gr.x1; x++) {
       const p = iso(x, y);
       const base = GROUND + depthOf(x, y) * 4;
       if (isRoad(x, y)) {
@@ -178,7 +232,8 @@ export function drawLot(scene: Phaser.Scene, o: LotOpts): LotViews {
         if (y === -2 && r % 9 === 0 && x > 0) put('drain_ne', p.x, p.y, base + 1);
         if (x === -2 && r % 9 === 0 && y > 0) put('drain_nw', p.x, p.y, base + 1);
       } else if (isSidewalk(x, y)) {
-        put(`sidewalk_${1 + (h(x, y, 3) % 2)}`, p.x, p.y, base);
+        // four slab variants, mirrored at random: about one slab in four has a crack
+        put(`sidewalk_${1 + (h(x, y, 3) % 4)}`, p.x, p.y, base, h(x, y, 8) % 2 === 0);
         if (isRoad(x, y - 1)) put('kerb_ne', p.x, p.y, base + 2);
         if (isRoad(x - 1, y)) put('kerb_nw', p.x, p.y, base + 2);
         if (isRoad(x + 1, y)) put('kerb_se', p.x, p.y, base + 2);
@@ -187,7 +242,7 @@ export function drawLot(scene: Phaser.Scene, o: LotOpts): LotViews {
         const [floor, decal] = o.floorKeys(x, y);
         put(floor, p.x, p.y, base);
         if (decal) put(decal, p.x, p.y, base + 1);
-      } else put(`grass_${1 + (h(x, y, 5) % 4)}`, p.x, p.y, base);
+      } else put(`grass_${1 + (h(x, y, 5) % 6)}`, p.x, p.y, base, h(x, y, 9) % 2 === 0);
     }
   // the two back walls, one segment per tile, each with its own finish
   for (let x = 0; x < W; x++) {

@@ -19,8 +19,11 @@ export const BONES_KEYS = ['bones_pile_0', 'bones_pile_1', 'bones_pile_2'] as co
 const BONE = '#D9CFAF';
 const BONE_S = '#ACA07C';
 const BONE_D = '#7A6E52';
-const GORE = '#5E1A14';
-const GORE_L = '#8A2A1E';
+// goo, not gore (docs/03): the puddle under a skeleton is green zombie goo, and the bone ends are a
+// dried maroon-brown, never a bright red
+const GORE = '#45661A';
+const GORE_L = '#6E9A2A';
+const MARROW = '#5C2A22';
 
 /** A long bone (femur / arm bone) lying on the floor: a shaft with knobbly ends, shaded underneath. */
 function longBone(a: Pt, b: Pt, w: number, chewed: boolean): string {
@@ -43,7 +46,7 @@ function longBone(a: Pt, b: Pt, w: number, chewed: boolean): string {
     // tooth marks and a red-raw end
     const m: Pt = [a[0] + dx * 0.55, a[1] + dy * 0.55];
     s += L(`M${f(m[0] - nx * w * 0.5)},${f(m[1] - ny * w * 0.5)}l${f(dx / len)},${f(dy / len)}M${f(m[0] - nx * w * 0.5 + (dx / len) * 2.2)},${f(m[1] - ny * w * 0.5 + (dy / len) * 2.2)}l${f(dx / len)},${f(dy / len)}`, 0.6, BONE_D);
-    s += dot(b[0], b[1], w * 0.42, GORE_L, 0.85);
+    s += dot(b[0], b[1], w * 0.42, MARROW, 0.85);
   }
   return s;
 }
@@ -86,7 +89,7 @@ function ribs(cx: number, cy: number, sc: number, seed: number): string {
     if (!broken) {
       s += L(`M${f(x)},${f(y + 0.6 * sc)}q${f(-2.4 * sc)},${f(dn * 0.5)} ${f(-0.6 * sc)},${f(dn)}`, 1.6 * sc, INK, 'stroke-linecap="round"');
       s += L(`M${f(x)},${f(y + 0.6 * sc)}q${f(-2.4 * sc)},${f(dn * 0.5)} ${f(-0.6 * sc)},${f(dn)}`, 0.9 * sc, BONE_S, 'stroke-linecap="round"');
-    } else s += dot(x - 1.2 * sc, y + 1.4 * sc, 0.7 * sc, GORE_L);
+    } else s += dot(x - 1.2 * sc, y + 1.4 * sc, 0.7 * sc, MARROW);
   }
   return s;
 }

@@ -36,7 +36,7 @@ const DECOR = [
 ];
 const WALL = ['sign_neon', 'clock', 'bottle_shelf', 'license_plates', 'antlers', 'dartboard', 'wall_guitar', 'poster_bmovie', 'poster_wanted', 'neon_pig', 'skull_longhorn', 'menu_board', 'tv_wall', 'painting_zombie', 'grade_card', 'cleaver_rack', 'jackalope', 'neon_brain', 'gold_record'];
 const SPECIAL = ['vending', 'atm', 'jukebox', 'arcade', 'slot_machine', 'pinball', 'phonebooth', 'comic_rack', 'foosball', 'gumball_eyes', 'claw_machine', 'fortune_teller', 'photo_booth', 'mech_bull'];
-const OUTDOOR = ['tombstone_str', 'tombstone_hp', 'tombstone_revive', 'pethouse_pug', 'pethouse_kennel', 'street_lamp', 'hydrant', 'mailbox', 'bus_bench', 'newsbox', 'street_trash', 'dead_tree', 'bush_1', 'bush_2', 'traffic_cone', 'car_wreck', 'sign_pole'];
+const OUTDOOR = ['tombstone_str', 'tombstone_hp', 'tombstone_revive', 'pethouse_pug', 'pethouse_kennel', 'street_lamp', 'hydrant', 'mailbox', 'bus_bench', 'bus_bench_home', 'newsbox', 'street_trash', 'dead_tree', 'bush_1', 'bush_2', 'traffic_cone', 'car_wreck', 'sign_pole'];
 
 const modules: [string, ArtAsset[], string[]][] = [
   ['decor', buildDecor(), DECOR],

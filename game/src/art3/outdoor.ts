@@ -441,8 +441,12 @@ function mailbox(): ArtAsset {
 }
 
 // ---------------------------------------------------------------- bus bench
-function busBench(): ArtAsset[] {
-  return objPair('bus_bench', 108, (d, t, mir) => {
+/**
+ * `bus_bench` carries an ad for your joint ("2 blocks" away: it stands outside the rivals' places);
+ * `bus_bench_home` stands outside your own joint, so it advertises something else entirely.
+ */
+function busBench(home = false): ArtAsset[] {
+  return objPair(home ? 'bus_bench_home' : 'bus_bench', 108, (d, t, mir) => {
     const X = t.cx;
     const Y = t.cy;
     let s = shadow(d, t, 0, 0, 0.52, 0.24);
@@ -458,10 +462,17 @@ function busBench(): ArtAsset[] {
     const pb = box(t, i0, i1, -0.17, -0.13, 16, 46, '#4A4C46', '#55574F', '#3A3C36');
     s += pb.fills;
     let ad = F(rect(1.4, -28.6, W - 1.4, -1.4), '#C9B88A', 0.7);
-    ad += d.clip(rect(1.4, -28.6, W - 1.4, -1.4), F(rect(1.4, -28.6, 16, -1.4), '#6D1727') + F(rect(16, -28.6, W, -1.4), d.linear(16, 0, W, 0, [[0, '#DAD0A8'], [1, '#B8A878']])));
-    // a cartoon pig chef on the red end
-    ad += F(ell(8.6, -16, 5, 4.6), '#C98A8A', 0.6) + F(ell(10.6, -15, 2, 1.6), '#B87A7A', 0.5) + dot(10, -15, 0.4, INK) + dot(11.2, -15, 0.4, INK) + F(ell(7.4, -17.6, 0.9, 0.7), EYE_Z, 0.3) + F('M5,-20.6C4,-26 13,-26 12,-20.6Z', '#E2DCC6', 0.5);
-    ad += unflip(lettering('ZOMBS', 29.6, -18, 5.4, '#6D1727', 1.1, { anchor: 'middle', gap: 0.25, wide: 0.86 }, 0) + lettering('BBQ', 29.6, -10.6, 5, '#3A4A1E', 1.1, { anchor: 'middle', gap: 0.3 }, 0) + L(textD('2 BLOCKS', 28.6, -4, 2.2, { anchor: 'middle', gap: 0.3 }), 0.45, '#2A2014') + L('M37,-5.2l2,1l-2,1', 0.5, '#2A2014'), mir, 29.6);
+    if (home) {
+      // a bite-injury lawyer: slate blue end with a big set of teeth, "BITTEN? CALL 555-GRAVE"
+      ad += d.clip(rect(1.4, -28.6, W - 1.4, -1.4), F(rect(1.4, -28.6, 16, -1.4), '#2C6985') + F(rect(16, -28.6, W, -1.4), d.linear(16, 0, W, 0, [[0, '#D6D0B4'], [1, '#B4AA86']])));
+      ad += F('M4,-19C4,-23 13,-23 13,-19L13,-15C13,-11 4,-11 4,-15Z', '#E6E0CC', 0.6) + L('M4,-17H13M6.2,-21V-13M8.5,-21.6V-12.4M10.8,-21V-13', 0.45, '#6A6250');
+      ad += unflip(lettering('BITTEN?', 29.8, -16.5, 4.6, '#2C6985', 1.1, { anchor: 'middle', gap: 0.2, wide: 0.82 }, 0) + L(textD('CALL 555-GRAVE', 29.6, -8.5, 2.3, { anchor: 'middle', gap: 0.25 }), 0.5, '#2A2014') + L(textD('NO BRAINS, NO FEE', 29.6, -4, 1.8, { anchor: 'middle', gap: 0.25 }), 0.4, '#5A2A22'), mir, 29.6);
+    } else {
+      ad += d.clip(rect(1.4, -28.6, W - 1.4, -1.4), F(rect(1.4, -28.6, 16, -1.4), '#6D1727') + F(rect(16, -28.6, W, -1.4), d.linear(16, 0, W, 0, [[0, '#DAD0A8'], [1, '#B8A878']])));
+      // a cartoon pig chef on the red end
+      ad += F(ell(8.6, -16, 5, 4.6), '#C98A8A', 0.6) + F(ell(10.6, -15, 2, 1.6), '#B87A7A', 0.5) + dot(10, -15, 0.4, INK) + dot(11.2, -15, 0.4, INK) + F(ell(7.4, -17.6, 0.9, 0.7), EYE_Z, 0.3) + F('M5,-20.6C4,-26 13,-26 12,-20.6Z', '#E2DCC6', 0.5);
+      ad += unflip(lettering('ZOMBS', 29.6, -18, 5.4, '#6D1727', 1.1, { anchor: 'middle', gap: 0.25, wide: 0.86 }, 0) + lettering('BBQ', 29.6, -10.6, 5, '#3A4A1E', 1.1, { anchor: 'middle', gap: 0.3 }, 0) + L(textD('2 BLOCKS', 28.6, -4, 2.2, { anchor: 'middle', gap: 0.3 }), 0.45, '#2A2014') + L('M37,-5.2l2,1l-2,1', 0.5, '#2A2014'), mir, 29.6);
+    }
     // graffiti, gum, a torn strip
     ad += L('M33,-26q3,3 5,0q2,-2 3,1', 0.9, '#2A2620', 'opacity="0.7"') + F('M34,-28.6L40,-28.6L37,-22Z', '#4A4C46', 0.4);
     ad += F(rect(1.4, -28.6, W - 1.4, -1.4), d.linear(0, -29, 0, 0, [[0, '#000', 0], [1, '#3A2A10', 0.3]]));
@@ -840,6 +851,7 @@ export function buildOutdoor(): ArtAsset[] {
     hydrant(),
     mailbox(),
     ...busBench(),
+    ...busBench(true),
     ...newsbox(),
     streetTrash(),
     deadTree(),

@@ -67,7 +67,7 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
               <span class="item-btns"><button class="btn green tiny" data-a="place" data-id="${id}">Place</button><button class="btn red tiny" data-a="sellst" data-id="${id}">Sell</button></span></div>`;
           })
           .join('')
-      : '<p class="empty">Nothing in storage. In Decorate mode, tap a piece and choose Store.</p>';
+      : `<div class="empty empty-state">${icon('ui_storage', 'empty-ico')}<p>Nothing in storage. In Decorate mode, tap a piece and choose Store.</p>${hud.ctl.mode === 'edit' ? '' : `<button class="btn" data-a="decorate">${icon('ui_edit', 'ico-s')} Go decorate</button>`}</div>`;
   } else {
     const items = shopItems.filter((i) => i.tab === tab).sort((a, b) => a.level - b.level);
     if (tab === 'walls') body = finishCards(hud, 'wall') + finishCards(hud, 'floor') + `<h4 class="grid-head">On the walls</h4>`;
@@ -75,7 +75,7 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
     if (tab === 'special') body = expansionCard(hud) + body;
   }
   const m = hud.openModal(
-    `<h2>${icon('ui_shop', 'h-ico')} Shop</h2>
+    `<h2>${icon('ui_shop', 'h-ico')} Shop${hud.ctl.mode === 'edit' ? '' : `<button class="btn small-btn decorate-btn" data-a="decorate">${icon('ui_edit', 'ico-s')} Decorate</button>`}</h2>
     <div class="tabs">${TABS.map((t) => `<button class="tab ${t.id === tab ? 'on' : ''}" data-a="tab" data-id="${t.id}">${icon(t.icon, 'tab-ico')}<span>${t.label}</span></button>`).join('')}</div>
     <div class="grid">${body}</div>`,
     { cls: 'store' },
@@ -91,6 +91,10 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
       hud.closeModal();
       hud.ctl.beginPlace(id, 'buy');
       hud.ctl.info(ITEM_BY_ID[id].kind === 'wall' ? 'Tap a spot on a wall, then ✓' : 'Drag it where you want it, then ✓');
+    } else if (a === 'decorate') {
+      // decorating lives in the shop now (like the original): move, rotate and store what you own
+      hud.closeModal();
+      hud.ctl.enterEdit();
     } else if (a === 'place') {
       hud.closeModal();
       hud.ctl.beginPlace(id, 'storage');

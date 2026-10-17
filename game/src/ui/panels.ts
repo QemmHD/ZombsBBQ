@@ -37,7 +37,7 @@ import { audio, sfx } from '../game/sfx';
 import { headUrl, artUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import type { Hud } from './hud';
-import { bindActions, energyColor, esc, fmtTime, icon, priceHtml, purpleStarsHtml, starsHtml } from './dom';
+import { bindActions, energyColor, esc, fmtTime, icon, priceHtml, purpleStarsHtml, star, starsHtml } from './dom';
 import { dishRow } from './hud';
 import { itemThumb } from './store';
 
@@ -139,7 +139,7 @@ let goalsTab: 'goals' | 'todo' = 'goals';
 function todoHtml(s: Parameters<typeof purpleStars>[0]): string {
   const p = purpleStars(s);
   const timer = p ? `<span class="sub">${p} purple star${p > 1 ? 's' : ''} · ${fmtTime(purpleLeft(s))} left</span>` : '<span class="sub">No purple stars yet</span>';
-  const head = `<div class="purple-head"><span class="purple-row">${purpleStarsHtml(p)}${'<b class="st">★</b>'.repeat(PURPLE.max - p)}</span>${timer}</div>`;
+  const head = `<div class="purple-head"><span class="purple-row">${purpleStarsHtml(p)}${star('off').repeat(PURPLE.max - p)}</span>${timer}</div>`;
   if (s.level < PURPLE.level || !s.todo)
     return `${head}<div class="goal todo-locked"><span class="check">${icon('fx_lock', 'ico')}</span><b>Gus’s to-do list opens at level ${PURPLE.level}.<br/><span class="sub">Four quick jobs. Finish them all and the food critic drops by with a purple bonus star.</span></b></div>`;
   const rows = s.todo.tasks
@@ -157,7 +157,7 @@ function todoHtml(s: Parameters<typeof purpleStars>[0]): string {
 export function openGoals(hud: Hud) {
   const render = () => {
     const s = hud.ctl.state;
-    const tabs = `<div class="tabs"><button class="tab ${goalsTab === 'goals' ? 'on' : ''}" data-a="tab" data-id="goals">${icon('ui_goals', 'tab-ico')}<span>Clipboard</span></button><button class="tab ${goalsTab === 'todo' ? 'on' : ''}" data-a="tab" data-id="todo"><b class="st purple tab-star">★</b><span>To-do${s.level < PURPLE.level ? ` ${icon('fx_lock', 'ico-s')}` : ''}</span></button></div>`;
+    const tabs = `<div class="tabs"><button class="tab ${goalsTab === 'goals' ? 'on' : ''}" data-a="tab" data-id="goals">${icon('ui_goals', 'tab-ico')}<span>Clipboard</span></button><button class="tab ${goalsTab === 'todo' ? 'on' : ''}" data-a="tab" data-id="todo"><span class="tab-star">${star('purple')}</span><span>To-do${s.level < PURPLE.level ? ` ${icon('fx_lock', 'ico-s')}` : ''}</span></button></div>`;
     const goals = activeGoals(s);
     const reward = (r: { cash?: number; sauce?: number; xp?: number }) =>
       [r.cash ? priceHtml({ cash: r.cash }) : '', r.sauce ? priceHtml({ sauce: r.sauce }) : '', r.xp ? `+${r.xp} XP` : ''].filter(Boolean).join(' ');
