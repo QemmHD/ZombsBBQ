@@ -6,6 +6,8 @@ import { join } from 'node:path';
 
 const dist = 'dist';
 let html = await readFile(join(dist, 'index.html'), 'utf8');
+// the page's own markup (game + HUD roots, boot screen, rotate overlay), read before any JS is inlined
+const body = (html.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? '').replace(/<script[\s\S]*?<\/script>/g, '').trim();
 for (const m of [...html.matchAll(/<link rel="stylesheet"[^>]*href="\.\/([^"]+)"[^>]*>/g)]) {
   const css = await readFile(join(dist, m[1]), 'utf8');
   html = html.replace(m[0], () => `<style>${css}</style>`);
@@ -23,7 +25,6 @@ console.log(`dist/zombs-bbq.html ${(html.length / 1024).toFixed(0)} KB`);
 const title = html.match(/<title>[\s\S]*?<\/title>/)?.[0] ?? '<title>Zombs BBQ</title>';
 const styles = [...html.matchAll(/<style>[\s\S]*?<\/style>/g)].map((m) => m[0]).join('\n');
 const scripts = [...html.matchAll(/<script type="module">[\s\S]*?<\/script>/g)].map((m) => m[0]).join('\n');
-const body = (html.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? '<div id="game"></div>\n<div id="hud"></div>').replace(/<script[\s\S]*?<\/script>/g, '').trim();
 for (const id of ['game', 'hud', 'boot', 'rotate']) if (!body.includes(`id="${id}"`)) throw new Error(`embed build: #${id} missing from the page body`);
 const embed = `${title}\n${styles}\n${body}\n${scripts}\n`;
 await writeFile(join(dist, 'zombs-bbq.embed.html'), embed);
