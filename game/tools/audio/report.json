@@ -1,0 +1,169 @@
+{
+ "open": {
+  "status": "ok",
+  "kind": "shot",
+  "file": "sfx/open.ogg",
+  "bytes": 4825,
+  "seconds": 0.24,
+  "prompt": "Sound effect: a quick bubbly cartoon 'bwoop' pop as a menu card swings open, rising pitch, 0.2 seconds, dry, no music.",
+  "picked": "2.wav",
+  "score": 0.623,
+  "parts": {
+   "dur": 0.45,
+   "env": 0.786,
+   "centroid": 0.672,
+   "flatness": 0.56
+  },
+  "candidates": [
+   {
+    "file": "2.wav",
+    "score": 0.623,
+    "dur": 0.18,
+    "centroid": 2180,
+    "flatness": 0.418,
+    "bpm": ""
+   }
+  ],
+  "ref": {
+   "files": [
+    "Select1.caf",
+    "Select2.caf",
+    "Select3.caf",
+    "TextboxPop1.caf"
+   ],
+   "trim_dur": 0.49,
+   "centroid": 1383,
+   "flatness": 0.198,
+   "bpm": null
+  },
+  "got": {
+   "trim_dur": 0.18,
+   "centroid": 2180,
+   "flatness": 0.418,
+   "bpm": ""
+  }
+ },
+ "tip": {
+  "status": "ok",
+  "kind": "shot",
+  "file": "sfx/tip.ogg",
+  "bytes": 7619,
+  "seconds": 0.85,
+  "prompt": "Sound effect: a quick cheerful coin-drop 'cha-ching' with a small bright bell and a couple of coins jingling, 0.6 seconds, dry, no music.",
+  "picked": "9.wav",
+  "score": 0.74,
+  "parts": {
+   "dur": 0.751,
+   "env": 0.766,
+   "centroid": 0.641,
+   "flatness": 0.83
+  },
+  "candidates": [
+   {
+    "file": "9.wav",
+    "score": 0.74,
+    "dur": 0.678,
+    "centroid": 4379,
+    "flatness": 0.419,
+    "bpm": ""
+   }
+  ],
+  "ref": {
+   "files": [
+    "Cash2Tip.caf"
+   ],
+   "trim_dur": 0.51,
+   "centroid": 7207,
+   "flatness": 0.504,
+   "bpm": null
+  },
+  "got": {
+   "trim_dur": 0.678,
+   "centroid": 4379,
+   "flatness": 0.419,
+   "bpm": ""
+  }
+ },
+ "flag": {
+  "status": "ok",
+  "kind": "shot",
+  "file": "sfx/flag.ogg",
+  "bytes": 5099,
+  "seconds": 0.31,
+  "prompt": "Sound effect: a single referee whistle blast 'fweeet', short, 0.4 seconds, dry, no music.",
+  "picked": "1.wav",
+  "score": 0.5,
+  "parts": {
+   "dur": 0.5,
+   "env": 0.5,
+   "centroid": 0.5,
+   "flatness": 0.5
+  },
+  "candidates": [
+   {
+    "file": "1.wav",
+    "score": 0.5,
+    "dur": 0.21,
+    "centroid": 3849,
+    "flatness": 0.606,
+    "bpm": ""
+   },
+   {
+    "file": "0.wav",
+    "score": 0.377,
+    "dur": 4.729,
+    "centroid": 3325,
+    "flatness": 0.507,
+    "bpm": ""
+   }
+  ],
+  "ref": null,
+  "got": {
+   "trim_dur": 0.21,
+   "centroid": 3849,
+   "flatness": 0.606,
+   "bpm": ""
+  }
+ },
+ "joint": {
+  "status": "ok",
+  "kind": "music",
+  "file": "music/joint.ogg",
+  "bytes": 395543,
+  "seconds": 26.56,
+  "prompt": "Instrumental music, loopable: lazy swing jazz at 86 BPM in a minor key, muted trumpet and clarinet trade the melody, walking upright bass, brushed snare shuffle, vibraphone comping, playful spooky cartoon diner lounge mood, constant tempo, 30 seconds, no vocals.",
+  "picked": "9.wav",
+  "score": 0.552,
+  "parts": {
+   "bpm": 0.55,
+   "centroid": 0.589,
+   "flatness": 0.71,
+   "env": 0.344
+  },
+  "candidates": [
+   {
+    "file": "9.wav",
+    "score": 0.552,
+    "dur": 29.982,
+    "centroid": 1158,
+    "flatness": 0.158,
+    "bpm": 72.3
+   }
+  ],
+  "ref": {
+   "files": [
+    "Zombie Jazz.mp3"
+   ],
+   "trim_dur": 130.76,
+   "centroid": 2047,
+   "flatness": 0.303,
+   "bpm": 85.8
+  },
+  "got": {
+   "trim_dur": 29.982,
+   "centroid": 1158,
+   "flatness": 0.158,
+   "bpm": 72.3
+  }
+ }
+}
