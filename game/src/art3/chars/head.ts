@@ -186,8 +186,8 @@ export function earBack(c: Ctx, x = EAR_B[0], y = EAR_B[1]): string {
 }
 
 // ---------------------------------------------------------------- eyes
-export const EYE_N: Pt = [3.4, -76.2];
-export const EYE_F: Pt = [14.6, -76.6];
+export const EYE_N: Pt = [3.2, -75.6];
+export const EYE_F: Pt = [14.2, -76];
 
 interface EyeO {
   lid: number;
@@ -206,19 +206,19 @@ function lidLine(cx: number, cy: number, rx: number, ry: number, lid: number, ti
   return [`M${f(cx - rx - 0.6)},${f(y0 + tilt)}Q${f(cx)},${f(y0 - 0.5)} ${f(cx + rx + 0.6)},${f(y0 - tilt)}`, y0];
 }
 
-/** Human eye: off-white, small dark pupil, heavy upper lid, bags. */
+/** Human eye: a big pure-white oval, a tiny ink pupil, a heavy upper lid cutting it, bags. */
 export function eyeH(c: Ctx, cx: number, cy: number, rx: number, ry: number, o: EyeO): string {
   const { d, sk } = c;
   const e = ellD(cx, cy, rx, ry);
   let s = '';
-  // sunken socket
-  s += fill(ellD(cx + 0.2, cy - 0.4, rx + 1.9, ry + 1.6), spot(d, sk.d, 0.4));
+  // faint socket
+  s += fill(ellD(cx + 0.2, cy - 0.4, rx + 1.9, ry + 1.6), spot(d, sk.d, 0.22));
   if (o.shadow) s += fill(ellD(cx + 0.3, cy - ry * 0.55, rx + 0.9, ry * 0.7), o.shadow, 'opacity="0.32"');
   let inner = fill(e, SCLERA);
-  inner += fill(ellD(cx, cy - ry, rx * 1.3, ry * 0.75), '#A8A28C', 'opacity="0.5"');
+  inner += fill(ellD(cx, cy - ry, rx * 1.3, ry * 0.7), '#A8A28C', 'opacity="0.3"');
   const lk = o.look ?? [0.9, 0.3];
-  const pr = o.pr ?? 1.25;
-  inner += circ(cx + lk[0], cy + lk[1], pr * 1.55, '#4A4434') + circ(cx + lk[0], cy + lk[1], pr, INK);
+  const pr = o.pr ?? 0.95;
+  inner += circ(cx + lk[0], cy + lk[1], pr * 1.3, '#4A4434') + circ(cx + lk[0], cy + lk[1], pr, INK);
   if (o.wide) inner += circ(cx + lk[0] - pr * 0.4, cy + lk[1] - pr * 0.5, pr * 0.32, '#E8E4D2', 0.9);
   const tilt = o.tilt ?? 0;
   const [ld, y0] = lidLine(cx, cy, rx, ry, o.lid, tilt);
@@ -231,9 +231,10 @@ export function eyeH(c: Ctx, cx: number, cy: number, rx: number, ry: number, o: 
     inner += fill(`M${f(cx - rx - 2)},${f(cy + ry + 2)}H${f(cx + rx + 2)}V${f(y1)}Q${f(cx)},${f(y1 - 0.8)} ${f(cx - rx - 2)},${f(y1)}Z`, sk.b);
   }
   s += inside(d, e, inner);
-  s += line(e, 0.75);
-  if (o.lid > 0.02) s += line(ld, 1.15);
-  else s += line(`M${f(cx - rx)},${f(cy - ry * 0.2)}Q${f(cx - rx * 0.6)},${f(cy - ry * 1.05)} ${f(cx + rx * 0.2)},${f(cy - ry)}`, 1.1);
+  s += line(e, 0.8);
+  // the upper lid is the heaviest line on the face
+  if (o.lid > 0.02) s += line(ld, 1.4);
+  else s += line(`M${f(cx - rx)},${f(cy - ry * 0.2)}Q${f(cx - rx * 0.6)},${f(cy - ry * 1.05)} ${f(cx + rx * 0.2)},${f(cy - ry)}`, 1.3);
   // crease above
   s += line(`M${f(cx - rx * 0.9)},${f(cy - ry - 0.7)}Q${f(cx)},${f(cy - ry - 2.1)} ${f(cx + rx * 0.95)},${f(cy - ry - 0.9)}`, 0.5, sk.d, 'opacity="0.85"');
   const bags = o.bags ?? 1;
@@ -243,15 +244,16 @@ export function eyeH(c: Ctx, cx: number, cy: number, rx: number, ry: number, o: 
   return s;
 }
 
-/** Zombie eye: sunken dark socket, yellow ball with NO pupil, heavy dark lid, bloodshot rim. */
+/** Zombie eye: a solid yellow disc with a darker ring and NO pupil, dark socket, heavy lid, bloodshot rim. */
 export function eyeZ(c: Ctx, cx: number, cy: number, rx: number, ry: number, o: EyeO): string {
   const { d, sk } = c;
   const e = ellD(cx, cy, rx, ry);
-  let s = fill(ellD(cx + 0.3, cy - 0.2, rx + 2.4, ry + 2.1), spot(d, sk.d, 0.7));
+  let s = fill(ellD(cx + 0.3, cy - 0.2, rx + 2.4, ry + 2.1), spot(d, sk.d, 0.55));
   s += fill(ellD(cx + 0.4, cy + ry * 0.9, rx * 1.1, ry * 0.45), sk.d, 'opacity="0.35"');
   let inner = fill(e, ZEYE);
-  inner += fill(ellD(cx + rx * 0.3, cy + ry * 0.45, rx * 1.05, ry * 0.75), ZEYE_D, 'opacity="0.6"');
-  inner += fill(ellD(cx - rx * 0.35, cy - ry * 0.2, rx * 0.35, ry * 0.25), '#EFE39A', 'opacity="0.7"');
+  inner += fill(ellD(cx + rx * 0.3, cy + ry * 0.5, rx * 1.05, ry * 0.7), ZEYE_D, 'opacity="0.45"');
+  inner += line(ellD(cx, cy, rx * 0.72, ry * 0.72), 0.9, ZEYE_D, 'opacity="0.95"');
+  inner += fill(ellD(cx - rx * 0.35, cy - ry * 0.25, rx * 0.3, ry * 0.2), '#EFE39A', 'opacity="0.6"');
   // veins
   inner += line(`M${f(cx + rx)},${f(cy + 0.6)}l${f(-rx * 0.45)},-0.4l-0.6,0.6M${f(cx - rx)},${f(cy + 0.4)}l${f(rx * 0.4)},0.5`, 0.3, '#A0522E', 'opacity="0.8"');
   const tilt = o.tilt ?? 0;
@@ -266,8 +268,8 @@ export function eyeZ(c: Ctx, cx: number, cy: number, rx: number, ry: number, o: 
   }
   s += inside(d, e, inner);
   s += line(`M${f(cx - rx * 0.8)},${f(cy + ry * 0.7)}Q${f(cx)},${f(cy + ry * 1.12)} ${f(cx + rx * 0.85)},${f(cy + ry * 0.6)}`, 0.5, '#9A4A2E', 'opacity="0.9"');
-  s += line(e, 0.8);
-  if (o.lid > 0.02) s += line(ld, 1.2);
+  s += line(e, 0.85);
+  if (o.lid > 0.02) s += line(ld, 1.4);
   s += line(`M${f(cx - rx * 0.9)},${f(cy + ry * 1.25)}Q${f(cx)},${f(cy + ry * 1.75)} ${f(cx + rx * 0.9)},${f(cy + ry * 1.1)}`, 0.5, sk.d, 'opacity="0.9"');
   return s;
 }
@@ -328,8 +330,9 @@ export function brows(c: Ctx, pose: BrowPose): string {
   } else if (pose === 'skeptic') {
     fr = [11.6, -86.2, 18.6, -84, 2.4];
   }
-  n = [n[0] - 0.4, n[1] - 1.5, n[2], n[3] - 1.5, n[4]];
-  fr = [fr[0], fr[1] - 1.5, fr[2] + 0.4, fr[3] - 1.5, fr[4]];
+  // brows sit right over the (big) eyes
+  n = [n[0] - 0.4, n[1] - 2.4, n[2], n[3] - 2.4, n[4]];
+  fr = [fr[0], fr[1] - 2.4, fr[2] + 0.4, fr[3] - 2.4, fr[4]];
   let s = '';
   for (const [x1, y1, x2, y2, a] of [n, fr]) {
     const p = browPath(x1, y1, x2, y2, th, th * 0.7, a);
@@ -583,7 +586,8 @@ export interface FaceOut {
 export function face(c: Ctx, e: Expr): string {
   const fc = c.L.face;
   const g = geo(fc.shape, e);
-  const es = (fc.eyeS ?? 1) * 1.16;
+  // big sclera ovals (~15 % larger than the first v3 pass: the original's are the size of a zombie eye)
+  const es = (fc.eyeS ?? 1) * 1.33;
   const [nx, ny] = EYE_N;
   const [fx, fy] = EYE_F;
   const rxN = 4.3 * es;
