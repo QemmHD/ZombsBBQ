@@ -94,6 +94,8 @@ export class Hud {
   /** what the bottom bar is showing: a tutorial step (freezes the sim), a hint, or the guided purchase */
   private bar: { kind: 'tut' | 'hint' | 'guide'; key: string; until?: number } | null = null;
   private guideDismissed = '';
+  /** the HUD button the tutorial or guide is pointing at with a glow */
+  private glowing: HTMLElement | null = null;
   readonly edit: EditBar;
   readonly raid: RaidUi;
   readonly strip: CommandStrip;
@@ -487,17 +489,19 @@ export class Hud {
     // the guided purchase points at the shop
     if (!el && !t && guideStep(ctl.state) && !this.modalOpen && ctl.mode === 'play') el = this.el.shop;
     const r = el?.getBoundingClientRect();
-    if (!el || !r || r.width === 0) {
+    // a button up in the icon column glows instead (an arrow there would sit on its neighbours)
+    const glow = !!el && !!r && r.width > 0 && r.top < 90;
+    if (this.glowing && this.glowing !== el) this.glowing.classList.remove('tut-glow');
+    this.glowing = glow ? el : null;
+    if (glow) el!.classList.add('tut-glow');
+    if (!el || !r || r.width === 0 || glow) {
       a.classList.add('hidden');
       return;
     }
     a.classList.remove('hidden');
-    // above the button; a button up by the awning gets it from the side instead
-    const side = r.top < 90;
-    a.classList.toggle('side', side);
     // a wide row (a dish in the cookbook): point at its picture, not the middle of its text
-    a.style.left = `${side ? r.right + 26 : r.width > 200 ? r.left + 46 : r.left + r.width / 2}px`;
-    a.style.top = `${side ? r.top + r.height / 2 + 17 : r.top - 4}px`;
+    a.style.left = `${r.width > 200 ? r.left + 46 : r.left + r.width / 2}px`;
+    a.style.top = `${r.top - 4}px`;
   }
 
   // ---------- 5 Hz refresh ----------

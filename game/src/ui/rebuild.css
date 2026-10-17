@@ -332,6 +332,11 @@
   font-size: 17px;
   padding: 6px 12px;
 }
+/* #hud > * turns pointer events back on for every HUD child: the arrow and the strip's empty space stay see-through */
+#hud .tut-arrow,
+#hud .strip {
+  pointer-events: none;
+}
 /* while a tutorial step's bar is up the café is frozen: the strip waits underneath */
 .tutbar.freeze:not(.hidden) ~ .strip {
   display: none;
@@ -358,9 +363,18 @@
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-22 -48 44 50'%3E%3Cpath d='M-8-46H8v26h12L0 0-20-20H-8z' fill='%23df1e00' stroke='%2316120c' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M-5-43h4v20h-4z' fill='%23ff6a4a'/%3E%3C/svg%3E");
   animation: tutbob 0.6s ease-in-out infinite alternate;
 }
-.tut-arrow.side {
-  transform: translateY(-100%) rotate(90deg);
-  animation-name: tutbobside;
+.btn-sq.tut-glow {
+  animation: tutglow 0.8s ease-in-out infinite alternate;
+}
+@keyframes tutglow {
+  from {
+    filter: drop-shadow(0 0 0 #df1e00);
+    transform: scale(1);
+  }
+  to {
+    filter: drop-shadow(0 0 6px #ff3a1a) drop-shadow(0 0 2px #df1e00);
+    transform: scale(1.12);
+  }
 }
 .crew-count:empty {
   display: none;
@@ -371,11 +385,6 @@
 @keyframes tutbob {
   to {
     margin-top: -12px;
-  }
-}
-@keyframes tutbobside {
-  to {
-    margin-left: -5px;
   }
 }
 
