@@ -21,7 +21,7 @@ import { DIR_STEP, FLOOR_BY_ID, ITEM_BY_ID, WALL_BY_ID, type ItemDef } from './c
 import { DOOR_X, findPath, isInside, key, reachable, restSpots, streetEnds, walkable, type Pt, type Room } from './grid';
 import { makeWorker, maxEnergy, type Customer, type Furniture, type GameState, type Mover, type Stove, type Worker, type WorkerState } from './state';
 import { updateProgress } from './progress';
-import { stealingRivals } from './rivals';
+import { rivalRatingPenalty, stealingRivals } from './rivals';
 
 // ---------- helpers ----------
 
@@ -229,7 +229,7 @@ export function ratingMult(s: GameState): number {
 
 /** Stars in half steps, 0..5. */
 export function stars(s: GameState): number {
-  return Math.max(0, Math.min(5, Math.floor(s.rating * 10 + 1e-9) / 2));
+  return Math.max(0, Math.min(5, Math.floor((s.rating - rivalRatingPenalty(s)) * 10 + 1e-9) / 2));
 }
 
 /** Purple bonus stars still running (0..3); they all drop when the timer runs out. */
@@ -244,7 +244,7 @@ export function customerStars(s: GameState): number {
 
 /** Seconds between customer arrivals: 18 s at zero stars down to 4.5 s at five, faster with purple stars. */
 export function arrivalGap(s: GameState): number {
-  const gap = TUNING.arrivalSlowSec - (TUNING.arrivalSlowSec - TUNING.arrivalFastSec) * s.rating;
+  const gap = TUNING.arrivalSlowSec - (TUNING.arrivalSlowSec - TUNING.arrivalFastSec) * Math.max(0, s.rating - rivalRatingPenalty(s));
   return gap / (1 + TUNING.purpleArrivalBoost * purpleStars(s));
 }
 

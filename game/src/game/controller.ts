@@ -607,6 +607,7 @@ export class Controller {
     const r = startRaid(this.state, rivalId, workerIds, petIds);
     if (typeof r === 'string') return r;
     if (this.state.fridge.length >= TUNING.fridgeMax) this.info(`The fridge is full (${TUNING.fridgeMax}/${TUNING.fridgeMax}): stolen food will push out the oldest dishes. Bin or serve some first!`);
+    r.hold = true; // the raid scene lifts this once its art has loaded
     this.raid = r;
     this.raidResult = null;
     this.raidSel = null;

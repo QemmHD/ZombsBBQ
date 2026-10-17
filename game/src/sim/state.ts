@@ -19,6 +19,8 @@ export interface Furniture {
   /** raid tombstones: uses left today, refilled 24 h after the first use */
   uses?: number;
   usesResetAt?: number;
+  /** raid tombstones: upgrade level (2 = seven uses a day) */
+  lvl?: number;
 }
 
 export interface WallItem {
@@ -174,6 +176,8 @@ export interface RivalProgress {
   gen?: number;
   /** when you last raided it (rivals left alone too long poach your customers) */
   lastRaid?: number;
+  /** the "stealing your customers" alert has been shown for this stretch of neglect */
+  warned?: boolean;
 }
 
 /** One job on Gus's to-do list. Progress = the matching counter's growth since the list was drawn. */
@@ -258,6 +262,7 @@ export interface GameState {
   seen: Record<string, 'met' | 'infected'>;
   goalsDone: string[];
   rivals: Record<string, RivalProgress>;
+  /** raid consumables: Health Stones (heal the whole squad mid-raid) and Summon Stones */
   inventory: { headstone: number; summon: number };
   spawnCooldown: number;
   /** the Zombie Pug's takings today: { day: floor(now / 1 day), cash } */

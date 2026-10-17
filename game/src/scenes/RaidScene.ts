@@ -11,7 +11,7 @@ import Phaser from 'phaser';
 import { HW, TILE_H, TILE_W, WALL_H } from '../art3/kit';
 import { FURN_META, chairFamilyOf } from '../art3/furniture';
 import { KITCHEN_META } from '../art3/kitchen';
-import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, RIVAL_BY_ID, focusTarget, order, stealDish, worldToIso, type RaidEvent, type RaidState, type RaidUnit } from '../sim';
+import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, RIVAL_BY_ID, feastOn, focusTarget, isBody, order, stealDish, worldToIso, type RaidEvent, type RaidState, type RaidUnit } from '../sim';
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
 import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps } from './assets';
@@ -28,6 +28,9 @@ interface UnitView {
   ring: Phaser.GameObjects.Ellipse;
   bubble?: Phaser.GameObjects.Image;
 }
+
+/** Most floating texts alive at once. */
+const FLOAT_POOL = 24;
 
 /** Waitresses (`staff_x_b`) fall back to their waiter's art if they haven't been drawn. */
 function artFor(id: string): string {
@@ -59,6 +62,7 @@ export class RaidScene extends Phaser.Scene {
   private lastHitText = new Map<string, number>();
   private lastPow = -9;
   private door?: FrontDoor;
+  private textPool: Phaser.GameObjects.Text[] = [];
 
   constructor() {
     super('raid');
@@ -70,6 +74,7 @@ export class RaidScene extends Phaser.Scene {
     this.views.clear();
     this.counterDishes = [];
     this.seenEvents = 0;
+    this.textPool = [];
   }
 
   create() {
@@ -85,15 +90,25 @@ export class RaidScene extends Phaser.Scene {
     for (const c of r.counter) keys.add(DISH_BY_ID[c.dish].icon);
     for (const [k, , , flip] of scenery(r.room.w, r.room.h, true)) keys.add(flip && hasProp(`${k}_se`) ? `${k}_se` : k);
     const chars = new Set(r.units.map((u) => artFor(u.art)));
+    let dead = false;
     void Promise.all([loadProps(this).then(() => ensureProps(this, keys)), ...[...chars].map((id) => loadChar(this, id))]).then(() => {
+      // retreated and went home (or the scene was torn down) while the art was still loading
+      if (dead || this.ctl.raid !== r || !this.sys?.isActive()) return;
       this.buildCafe();
       this.fitCamera();
       this.setupInput();
       this.ready = true;
+      r.hold = false; // the fight (and its clock) starts once there's something to see
       this.game.events.emit('raid-ready');
     });
+    // main.ts removes this scene (DESTROY only, no SHUTDOWN), so unhook on both or rotations pile up listeners
     this.scale.on('resize', this.fitCamera, this);
-    this.events.once('shutdown', () => this.scale.off('resize', this.fitCamera, this));
+    const unhook = () => {
+      dead = true;
+      this.scale.off('resize', this.fitCamera, this);
+    };
+    this.events.once('shutdown', unhook);
+    this.events.once('destroy', unhook);
   }
 
   // ---------- the rival café ----------
@@ -155,9 +170,9 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private fitCamera() {
-    const r = this.ctl.raid;
-    if (!r) return;
-    const cam = this.cameras.main;
+    const r = this.ctl?.raid;
+    const cam = this.cameras?.main;
+    if (!r || !cam || !this.sys?.isActive()) return;
     const dpr = window.devicePixelRatio || 1;
     const cssW = this.scale.width / dpr;
     const cssH = this.scale.height / dpr;
@@ -263,6 +278,21 @@ export class RaidScene extends Phaser.Scene {
       focusTarget(r, u.id);
       sfx('tap');
       this.ctl.info(u.side === 'c' ? 'Dinner time!' : `Everybody on the ${u.name}!`);
+      return;
+    }
+    // a knocked-out waiter lying there: lunch (the picked zombie, or the nearest one)
+    const body = r.units.find((u) => {
+      const v = this.views.get(u.id);
+      return isBody(u) && v && Math.abs(wx - v.holder.x) < 30 && Math.abs(wy - (v.holder.y - 12)) < 22;
+    });
+    if (body) {
+      const err = sel ? order(r, sel, { kind: 'target', id: body.id }) : feastOn(r, body.id);
+      if (err) this.ctl.toast(err, false);
+      else {
+        sfx('tap');
+        this.ctl.info('Waiter for lunch!');
+      }
+      this.ctl.selectRaider(null);
       return;
     }
     // the counter: swipe the food
@@ -437,27 +467,30 @@ export class RaidScene extends Phaser.Scene {
 
   // ---------- juice ----------
 
+  /** Floating combat text, pooled: a brawl throws dozens a second, so reuse a fixed set of Text objects. */
   private floatText(x: number, y: number, text: string, color: string, size = 13) {
-    const t = this.add
-      .text(x, y, text, {
-        fontFamily: 'Arial Black, Arial, sans-serif',
-        fontSize: `${size}px`,
-        color,
-        stroke: '#16120C',
-        strokeThickness: 3,
-      })
-      .setResolution(TEX_S)
-      .setOrigin(0.5)
-      .setDepth(1e6)
-      .setScale(0.4);
-    this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out' });
+    let t = this.textPool.find((p) => !p.visible);
+    if (!t) {
+      if (this.textPool.length < FLOAT_POOL) {
+        t = this.add.text(0, 0, '', { fontFamily: 'Arial Black, Arial, sans-serif', stroke: '#16120C', strokeThickness: 3 }).setResolution(TEX_S).setOrigin(0.5).setDepth(1e6);
+        this.textPool.push(t);
+      } else {
+        // all busy: recycle the oldest
+        t = this.textPool.shift()!;
+        this.textPool.push(t);
+      }
+    }
+    this.tweens.killTweensOf(t);
+    t.setText(text).setColor(color).setFontSize(size).setPosition(x, y).setAlpha(1).setScale(0.4).setVisible(true);
+    const txt = t;
+    this.tweens.add({ targets: txt, scale: 1, duration: 160, ease: 'Back.Out' });
     this.tweens.add({
-      targets: t,
+      targets: txt,
       y: y - 30,
       alpha: 0,
       delay: 400,
       duration: 700,
-      onComplete: () => t.destroy(),
+      onComplete: () => txt.setVisible(false),
     });
   }
 
@@ -521,7 +554,7 @@ export class RaidScene extends Phaser.Scene {
         this.bones.push({ img: propImage(this, `bones_pile_${this.bones.length % 3}`, bp.x, bp.y).setDepth(moverDepth(e.x, e.y, -2)).setAlpha(0).setScale(1.3 / TEX_S), t0: this.t });
         const p = iso(e.x, e.y);
         // the text rides above the head and the cash pops beside the body, so they don't print over each other
-        this.floatText(p.x, p.y - 125, `CHOMP! +$${e.cash}`, '#D9C25A', 14);
+        this.floatText(p.x, p.y - 125, `${e.body ? 'FEAST!' : 'CHOMP!'} +$${e.cash}`, '#D9C25A', 14);
         this.pop('fx_cash', p.x + 26, p.y - 70);
         sfx('chomp');
         setTimeout(() => sfx('scream', { pitch: 1 + Math.random() * 0.3 }), 120);
@@ -529,6 +562,35 @@ export class RaidScene extends Phaser.Scene {
       }
       case 'escape':
         break;
+      case 'arrive': {
+        // a walk-in at the door: a little "+1 diner" over the doorway
+        const p = iso(e.x, e.y);
+        this.floatText(p.x, p.y - 100, '+1 DINER', '#F2E7C4', 11);
+        sfx('tap', { volume: 0.3, pitch: 1.3 });
+        break;
+      }
+      case 'revive': {
+        const p = iso(e.x, e.y);
+        this.floatText(p.x, p.y - 80, 'BACK UP!', '#9BE36B', 15);
+        this.pop('fx_heal', p.x, p.y - 50, 700);
+        sfx('heal');
+        break;
+      }
+      case 'stone':
+        this.cameras.main.flash(260, 120, 220, 90);
+        this.ctl.info('Health Stone: everybody mends!');
+        sfx('heal');
+        break;
+      case 'ability': {
+        const p = iso(e.x, e.y);
+        const label = e.kind === 'slam' ? 'BELLY SLAM!' : e.kind === 'stun' ? 'CUFFED!' : e.kind === 'jab' ? 'ONE-TWO!' : 'HEY! OVER HERE!';
+        if (e.kind !== 'jab' || Math.random() < 0.35) this.floatText(p.x, p.y - 140, label, '#E8B04A', 12);
+        if (e.kind === 'slam') {
+          this.cameras.main.shake(220, 0.006);
+          sfx('stomp', { volume: 0.7 });
+        } else if (e.kind === 'stun') sfx('zap', { volume: 0.5 });
+        break;
+      }
       case 'enter':
         sfx('groan', { pitch: 0.7 + Math.random() * 0.4, volume: 0.6 });
         break;

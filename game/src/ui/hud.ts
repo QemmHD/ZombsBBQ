@@ -43,7 +43,7 @@ import { bindActions, energyColor, esc, fmt, fmtTime, icon, priceHtml, purpleSta
 import { openCookbook, openCrew, openFridge, openGoals, openLevelUp, openOffline, openRating, openSettings, openZombiepedia } from './panels';
 import { openStore } from './store';
 import { EditBar } from './editbar';
-import { RaidUi, openMap } from './raidui';
+import { RaidUi, openMap, tombstoneAction, tombstoneCard, watchRoad } from './raidui';
 
 const WORKER_STATE: Record<Worker['state'], string> = {
   idle: 'Ready to serve',
@@ -264,6 +264,7 @@ export class Hud {
       openOffline(this, this.ctl.offlineReport);
       this.ctl.offlineReport = null;
     }
+    watchRoad(this, this.el.map); // a rival poaching customers: RAID badge + a one-time alert
   }
 
   // ---------- context card ----------
@@ -374,6 +375,7 @@ export class Hud {
         body += `<div class="state" data-live="pay">${priceHtml({ cash: bank })} of ${priceHtml({ cash: def.payout.max })} · earns ${priceHtml({ cash: def.payout.perHour })}/hour${st === 'full' ? ' · FULL, empty it!' : s.closed ? ' · paused while closed' : ''}</div>`;
         if (st !== 'none') body += `<div class="actions"><button class="btn green" data-a="collect">Collect</button></div>`;
       }
+      if (def.kind === 'tombstone') body += tombstoneCard(s, f);
       if (def.kind === 'table') body += `<div class="state">${f.dirty ? 'Dirty plate waiting to be cleared.' : chairTableCount(s, f.id) ? 'Ready for a customer.' : 'Needs a chair facing it to seat anyone.'}</div>`;
       html = `<div class="row"><img class="card-art" src="${artUrl(def.art)}" alt=""/><div class="grow"><h3>${esc(def.name)}</h3><div class="sub">${def.tab}</div></div></div>${body}`;
     }
@@ -495,6 +497,10 @@ export class Hud {
     }
     if (sel?.kind === 'furniture' && a === 'collect') {
       collectPayout(s, sel.id);
+      this.lastStructure = '';
+      this.renderCard();
+    }
+    if (sel?.kind === 'furniture' && tombstoneAction(this.ctl, a, sel.id)) {
       this.lastStructure = '';
       this.renderCard();
     }
