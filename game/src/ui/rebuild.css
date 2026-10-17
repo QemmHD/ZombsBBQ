@@ -368,12 +368,10 @@
 }
 @keyframes tutglow {
   from {
-    filter: drop-shadow(0 0 0 #df1e00);
-    transform: scale(1);
+    filter: drop-shadow(0 0 1px #df1e00);
   }
   to {
-    filter: drop-shadow(0 0 6px #ff3a1a) drop-shadow(0 0 2px #df1e00);
-    transform: scale(1.12);
+    filter: drop-shadow(0 0 7px #ff3a1a) drop-shadow(0 0 3px #df1e00);
   }
 }
 .crew-count:empty {
