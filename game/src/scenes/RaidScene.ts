@@ -11,7 +11,7 @@ import Phaser from 'phaser';
 import { HW, TILE_H, TILE_W, WALL_H } from '../art3/kit';
 import { FURN_META, chairFamilyOf } from '../art3/furniture';
 import { KITCHEN_META } from '../art3/kitchen';
-import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, RIVAL_BY_ID, feastOn, focusTarget, isBody, order, stealDish, worldToIso, type RaidEvent, type RaidState, type RaidUnit } from '../sim';
+import { DISH_BY_ID, DOOR_X, ITEM_BY_ID, RIVAL_BY_ID, order, stealDish, worldToIso, type RaidEvent, type RaidState, type RaidUnit } from '../sim';
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
 import { TEX_S, charArt, charLoaded, ensureProps, hasProp, loadChar, loadProps } from './assets';
@@ -286,32 +286,13 @@ export class RaidScene extends Phaser.Scene {
         sfx('groan', { pitch: 0.8 + Math.random() * 0.4 });
         return;
       }
-      if (sel) {
-        const err = order(r, sel, { kind: 'target', id: u.id });
-        if (err) this.ctl.toast(err, false);
-        else {
-          sfx('tap');
-          this.ctl.info(u.side === 'c' ? 'Lunch!' : `Get the ${u.name}!`);
-        }
-        this.ctl.selectRaider(null);
-        return;
-      }
-      focusTarget(r, u.id);
-      sfx('tap');
-      this.ctl.info(u.side === 'c' ? 'Dinner time!' : `Everybody on the ${u.name}!`);
-      return;
-    }
-    // a knocked-out waiter lying there: lunch (the picked zombie, or the nearest one)
-    const body = r.units.find((u) => {
-      const v = this.views.get(u.id);
-      return isBody(u) && v && Math.abs(wx - v.holder.x) < 30 && Math.abs(wy - (v.holder.y - 12)) < 22;
-    });
-    if (body) {
-      const err = sel ? order(r, sel, { kind: 'target', id: body.id }) : feastOn(r, body.id);
+      // like the original: tap one of your zombies first, then who it should go for
+      if (!sel) return this.ctl.info('Tap one of your zombies first, then who to go for.');
+      const err = order(r, sel, { kind: 'target', id: u.id });
       if (err) this.ctl.toast(err, false);
       else {
         sfx('tap');
-        this.ctl.info('Waiter for lunch!');
+        this.ctl.info(u.side === 'c' ? 'Lunch!' : `Get the ${u.name}!`);
       }
       this.ctl.selectRaider(null);
       return;
@@ -452,7 +433,9 @@ export class RaidScene extends Phaser.Scene {
       else if (u.state === 'grabbed') pose = 'shiver';
       else if (u.state === 'eat') pose = 'feast'; // original: bent over the body, chewing
       else if (u.state === 'steal') pose = 'eat';
-      else if (attackT < 0.5) pose = zombie ? 'attack' : 'punch';
+      else if (u.kind === 'staff' && u.task?.kind === 'home' && r.t < u.busyUntil) pose = 'serve'; // handing a diner their plate
+      else if (u.kind === 'boss' && !r.bossOut && u.state === 'idle' && attackT > 1.5) pose = 'cook'; // at the stove
+      else if (attackT < 0.5) pose = zombie || u.kind === 'pet' ? 'attack' : 'punch';
       else if (r.t - u.hitAt < 0.3) pose = 'hit';
       else if (u.state === 'walk' && u.path.length) pose = 'walk';
       v.puppet.pose(pose, dt, {
@@ -608,7 +591,7 @@ export class RaidScene extends Phaser.Scene {
         this.bones.push({ img: propImage(this, `bones_pile_${this.bones.length % 3}`, bp.x, bp.y).setDepth(moverDepth(e.x, e.y, -2)).setAlpha(0).setScale(1.3 / TEX_S), t0: this.t });
         const p = iso(e.x, e.y);
         // the text rides above the head and the cash pops beside the body, so they don't print over each other
-        this.floatText(p.x, p.y - 118, e.body ? 'FEAST!' : 'CHOMP!', '#E06A55', 18, { anchor: e.customer, force: true });
+        this.floatText(p.x, p.y - 118, 'CHOMP!', '#E06A55', 18, { anchor: e.customer, force: true });
         this.floatText(p.x, p.y - 118, `${e.cash}`, '#E3CB5E', 17, { anchor: e.customer, force: true, icon: 'fx_cash' });
         sfx('chomp');
         setTimeout(() => sfx('scream', { pitch: 1 + Math.random() * 0.3 }), 120);
@@ -637,8 +620,9 @@ export class RaidScene extends Phaser.Scene {
         break;
       case 'ability': {
         const p = iso(e.x, e.y);
-        const label = e.kind === 'slam' ? 'BELLY SLAM!' : e.kind === 'stun' ? 'CUFFED!' : e.kind === 'jab' ? 'ONE-TWO!' : 'HEY! OVER HERE!';
-        if (e.kind !== 'jab' || Math.random() < 0.35) this.floatText(p.x, p.y - 112, label, '#E8B04A', 17, { anchor: e.unit });
+        const label = e.kind === 'slam' ? 'BELLY SLAM!' : e.kind === 'stun' ? 'CUFFED!' : e.kind === 'jab' ? 'ONE-TWO!' : 'CRIT!';
+        if (e.kind !== 'jab' || Math.random() < 0.35) this.floatText(p.x, p.y - 112, label, e.kind === 'crit' ? '#F2D04A' : '#E8B04A', e.kind === 'crit' ? 19 : 17, { anchor: e.unit, force: e.kind === 'crit' });
+        if (e.kind === 'crit') this.pop('fx_hit', p.x, p.y - 60, 260);
         if (e.kind === 'slam') {
           this.cameras.main.shake(220, 0.006);
           sfx('stomp', { volume: 0.7 });
@@ -648,6 +632,11 @@ export class RaidScene extends Phaser.Scene {
       }
       case 'enter':
         sfx('groan', { pitch: 0.7 + Math.random() * 0.4, volume: 0.6 });
+        break;
+      case 'live':
+        // the first zombie is through the door: the raid is on
+        this.ctl.info('They’ve seen you! The waiters are coming. Clear them out and the chef comes out last.');
+        this.cameras.main.shake(180, 0.004);
         break;
       case 'steal': {
         const p = iso(e.x, e.y);

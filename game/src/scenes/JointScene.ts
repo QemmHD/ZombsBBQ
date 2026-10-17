@@ -982,7 +982,7 @@ export class JointScene extends Phaser.Scene {
   }
 
   private syncPet(p: Pet, dt: number) {
-    const a = this.actor(p.id, p.type === 'pug' ? 'pet_pug' : 'pet_rotweiler');
+    const a = this.actor(p.id, `pet_${p.type}`);
     if (!a) return;
     a.holder.setVisible(p.state !== 'raiding');
     const w = iso(p.x, p.y);

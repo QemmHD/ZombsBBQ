@@ -7,7 +7,6 @@
  * - a rival you leave alone too long starts stealing your customers (and dents your rating);
  * - from level 5 a special boss café (a food truck from hell) turns up now and then.
  */
-import { walkSpeed } from './data';
 import type { GameState } from './state';
 
 export type RivalId = 'chuck' | 'hank' | 'vera' | 'crunch' | 'snob' | 'sushi' | 'taco' | 'lab' | 'clown' | 'boss';
@@ -338,25 +337,44 @@ export function rivalCurve(level: number): RivalCurve {
   return { ...base, customers: L >= l1 ? LATE[k + 1][1] : c0, servers: L >= l1 ? LATE[k + 1][2] : s0, serverStr: 7, serverSpd: 8, chefHp: Math.round(h0 + (h1 - h0) * q), chefStr: 8, chefSpd: 8 };
 }
 
-/** Rival stats in our own units: HP and damage on the zombies' energy scale, speeds in tiles/s, payouts in our economy. */
+/**
+ * Rival stats for a raid, straight off the original's curves (doc 10 §2.7): waiters have the waiter
+ * character's 90 energy and hit for the level's server strength; the Head Chef's HP, strength and speed
+ * are the level's chef columns. Speeds are on the 1–10 stat scale (raid.ts turns them into tiles/s and
+ * swing timers). A reopened joint's new management multiplies HP and damage by `genMult` (doc 13 cap).
+ */
 export interface RivalStats {
   level: number;
   /** diners seated when you arrive */
   diners: number;
-  /** cash per diner (and twice that for a knocked-out waiter) */
+  /** cash per customer killed (original CUSTOMER_CASH_AMOUNT) */
   dinerCash: number;
-  staff: { count: number; hp: number; dmg: number; speed: number };
-  chef: { hp: number; dmg: number; speed: number };
+  /** waiters (minions at the boss café): HP, damage per swing (= strength), speed stat */
+  staff: { count: number; hp: number; dmg: number; spd: number };
+  /** the boss café's minions one by one (staff holds their average) */
+  minions?: { hp: number; dmg: number; spd: number }[];
+  chef: { hp: number; dmg: number; spd: number };
   reward: { cash: number; xp: number };
   tables: number;
 }
 
-/** Our scale: waiters 55 HP at strength 1 (~the original's weak staff), +20 HP per point. */
-export const staffHp = (str: number) => 35 + 20 * str;
-export const staffDmg = (str: number) => 3 + 1.6 * str; // the same scale as a zombie of that Power
-/** Chef HP: the original's column ×2.6 (our zombies hit harder per swing than its did). */
-export const CHEF_HP_SCALE = 2.6;
-export const chefDmg = (str: number, level: number) => (3 + 1.6 * str) * 1.4 + 0.3 * level;
+/** A rival waiter's energy: the original's waiter character (doc 17 §2.3, rows 55–63). */
+export const STAFF_HP = 90;
+/** Cash for every customer killed in a raid (original CUSTOMER_CASH_AMOUNT). */
+export const CUSTOMER_CASH = 20;
+/**
+ * The boss café brings four minions (original BOSS_MINIONS, characters 128–131: energy, strength,
+ * speed from doc 17 §2.3). Their energy is multiplied by the boss multiplier (INFERRED: doc 10 says
+ * "the chef's stats × BOSS_MULTIPLIER"; taking the chef's 400–700 HP for every minion made the café
+ * unbeatable, so it is read as the minion characters' own stats, scaled).
+ */
+export const BOSS_MINION_STATS: { hp: number; dmg: number; spd: number }[] = [
+  { hp: 240, dmg: 4, spd: 2 },
+  { hp: 240, dmg: 4, spd: 2 },
+  { hp: 360, dmg: 8, spd: 6 },
+  { hp: 500, dmg: 5, spd: 8 },
+];
+export const BOSS_MINIONS = BOSS_MINION_STATS.length;
 /** Win payout per rival level: the original's 10 cash / 2 XP per level, scaled to our economy. */
 export const CASH_PER_LEVEL = 125;
 export const XP_PER_LEVEL = 30;
@@ -388,30 +406,26 @@ export function rivalLevel(s: GameState, id: RivalId): number {
   return Math.min(RIVAL_LEVEL_CAP, Math.max(def.level, s.level + def.offset));
 }
 
-/** Everything a raid needs to know about a rival at a level (and management), in our units. */
+/** Everything a raid needs to know about a rival at a level (and management). */
 export function rivalStats(id: RivalId, level: number, gen = 0): RivalStats {
   const def = RIVAL_BY_ID[id];
   const c = rivalCurve(level);
   const boss = id === 'boss';
   const g = genMult(gen);
   const r1 = (n: number) => Math.round(n * 10) / 10;
-  // the boss café: four monster minions, ×BOSS_MULTIPLIER on the 1–10 strength scale (so they top out at 10)
-  const sStr = boss ? Math.min(10, Math.round(c.serverStr * bossMultiplier(level))) : c.serverStr;
+  // the boss café: four minions, minions' energy and the chef's HP and strength ×BOSS_MULTIPLIER
+  // (strength stays on the 1–10 stat scale)
+  const m = boss ? bossMultiplier(level) : 1;
+  const chef = { hp: Math.round(c.chefHp * m * g), dmg: r1(Math.min(10, c.chefStr * m) * g), spd: c.chefSpd };
+  const minions = boss ? BOSS_MINION_STATS.map((x) => ({ hp: Math.round(x.hp * m * g), dmg: r1(x.dmg * g), spd: x.spd })) : undefined;
+  const avg = (k: 'hp' | 'dmg' | 'spd') => (minions ? Math.round((minions.reduce((a, x) => a + x[k], 0) / minions.length) * 10) / 10 : 0);
   return {
     level,
     diners: c.customers,
-    dinerCash: Math.round(15 + 2.5 * level),
-    staff: {
-      count: boss ? 4 : c.servers,
-      hp: Math.round(staffHp(sStr) * g),
-      dmg: r1(staffDmg(sStr) * g),
-      speed: Math.round(walkSpeed(c.serverSpd) * 0.85 * 100) / 100,
-    },
-    chef: {
-      hp: Math.round(c.chefHp * CHEF_HP_SCALE * (boss ? 1.4 : 1) * g),
-      dmg: r1(chefDmg(c.chefStr, level) * (boss ? 1.15 : 1) * g),
-      speed: Math.round(walkSpeed(c.chefSpd) * 0.75 * 100) / 100,
-    },
+    dinerCash: CUSTOMER_CASH,
+    staff: minions ? { count: minions.length, hp: Math.round(avg('hp')), dmg: avg('dmg'), spd: avg('spd') } : { count: c.servers, hp: Math.round(STAFF_HP * g), dmg: r1(c.serverStr * g), spd: c.serverSpd },
+    minions,
+    chef,
     reward: { cash: Math.round(c.cash * (CASH_PER_LEVEL / 10) * (boss ? 1.5 : 1) * g), xp: Math.round(c.xp * (XP_PER_LEVEL / 2) * (boss ? 1.5 : 1) * g) },
     tables: Math.min(9, Math.max(def.tables, c.customers + 1)),
   };

@@ -7,6 +7,7 @@ export * from './save';
 export * from './build';
 export * from './progress';
 export * from './raid';
+export * from './petdata';
 export * from './todo';
 export * from './cookbook';
 export * from './hints';
