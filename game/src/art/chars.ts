@@ -26,7 +26,7 @@
  * a limb ±25° never opens a gap. Sitting = hide both legs (the torso hem reads as a seated lap).
  */
 import type { CharArt, CharPart, FaceName, PartName } from './types';
-import { CUSTOMER_IDS, HUMAN_FACES, ZOMBIE_FACES } from './manifest';
+import { V2_CUSTOMER_IDS, HUMAN_FACES, ZOMBIE_FACES } from './manifest';
 import { Doc, OUT, OW, S, P, G, capsule, ell, f, headD, hl, rrect, tornCapsule } from './svg';
 import type { Pt, Tone } from './svg';
 import {
@@ -38,7 +38,7 @@ import { DEF_RIG, HIP_Y, NECK, SH_Y, TORSO_PIV, HCX, HCY, HRX, HRY, neck } from 
 import type { Box, Expr, Look, Rig } from './charbase';
 import { LOOKS } from './charlooks';
 
-export const HUMAN_IDS = CUSTOMER_IDS;
+export const HUMAN_IDS = V2_CUSTOMER_IDS;
 export type HumanId = (typeof HUMAN_IDS)[number];
 export type ZombieId = `${HumanId}_z`;
 export type CharId = HumanId | ZombieId | 'you' | 'gus';

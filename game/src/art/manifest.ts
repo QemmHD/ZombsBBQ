@@ -12,7 +12,8 @@ export const DIRS = ['se', 'sw', 'ne', 'nw'] as const;
 export type Dir = (typeof DIRS)[number];
 
 // ---------- characters (src/art/chars.ts → buildChar) ----------
-export const CUSTOMER_IDS = [
+/** The first 20 customer types: drawn in both the v2 set (src/art/chars.ts) and art v3. */
+export const V2_CUSTOMER_IDS = [
   'accountant',
   'yoga',
   'teen',
@@ -34,10 +35,12 @@ export const CUSTOMER_IDS = [
   'celebrity',
   'champ',
 ] as const;
+/** Every customer type with joint art (v3, src/art3/chars): the v2 twenty plus the late crowd (levels 16-40). */
+export const CUSTOMER_IDS = [...V2_CUSTOMER_IDS, 'trucker', 'biker', 'firefighter', 'bride', 'headbanger', 'surgeon', 'tycoon', 'pitmaster'] as const;
 export type CustomerArtId = (typeof CUSTOMER_IDS)[number];
 
-/** All biped ids buildChar must support: humans, their `_z` zombie forms, the player and Gus. */
-export const JOINT_CHAR_IDS: string[] = [...CUSTOMER_IDS, ...CUSTOMER_IDS.map((c) => `${c}_z`), 'you', 'gus'];
+/** All biped ids the v2 buildChar must support: humans, their `_z` zombie forms, the player and Gus. */
+export const JOINT_CHAR_IDS: string[] = [...V2_CUSTOMER_IDS, ...V2_CUSTOMER_IDS.map((c) => `${c}_z`), 'you', 'gus'];
 
 /** Faces each joint character must provide. */
 export const HUMAN_FACES = ['scream', 'happy', 'shock'] as const;

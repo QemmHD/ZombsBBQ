@@ -5,7 +5,7 @@
 import type { Body, BodyKind, Ctx, Expr, FaceSpec, Look, Paint } from './rig';
 import { BODIES } from './rig';
 import { shirtTorso, jacketTorso, armPaint, legPaint, torsoD } from './body';
-import type { ArmSet, LegSet } from './body';
+import type { ArmSet, HandItem, LegSet } from './body';
 import * as H from './hair';
 import type { HairSet } from './hair';
 import * as W from './wear';
@@ -13,7 +13,7 @@ import { tankTop } from './wear';
 import * as PR from './props';
 import {
   INK, f, ellD, fill, line, outl, circ, inside, shade, hatch, stain, tone,
-  SKIN, SKIN_TAN, SKIN_DARK, SKIN_PALE, ZSKINS, BLOOD, C, fly,
+  SKIN, SKIN_TAN, SKIN_DARK, SKIN_PALE, ZSKINS, BLOOD, C, fly, fold, speck, rip,
 } from './paint';
 import type { Tone, Pt } from './paint';
 
@@ -517,6 +517,215 @@ const champ = mk({
   leg: legPaint({ kind: 'shorts', col: C.mustard, stripe: '#6D1727', shoe: 'boot', shoeCol: tone('#6D1727'), kneepad: '#3A3833' }),
 });
 
+// ---------------------------------------------------------------- the late crowd (levels 16-40)
+const R2 = (h: Pt, dx: number, dy: number) => `${f(h[0] + dx)},${f(h[1] + dy)}`;
+
+/** Wide-brimmed cowboy hat with a pinched crown (oil tycoon). */
+function cowboyHat(col: Tone, band: string): H.HatPaint {
+  const crown = (dx: number) => `M${f(-17 + dx)},-88C${f(-18 + dx)},-100 ${f(-13 + dx)},-110 ${f(-4 + dx)},-108C${f(0 + dx)},-112 ${f(6 + dx)},-112 ${f(9 + dx)},-108C${f(17 + dx)},-110 ${f(22 + dx)},-100 ${f(21 + dx)},-88Z`;
+  const brim = (dx: number) => `M${f(-36 + dx)},-90C${f(-34 + dx)},-84 ${f(-20 + dx)},-82 ${f(2 + dx)},-82C${f(24 + dx)},-82 ${f(38 + dx)},-84 ${f(40 + dx)},-91C${f(36 + dx)},-86 ${f(24 + dx)},-87 ${f(2 + dx)},-87C${f(-20 + dx)},-87 ${f(-32 + dx)},-86 ${f(-36 + dx)},-90Z`;
+  return {
+    front: (c) => {
+      let s = shade(c.d, crown(0), col, { inner: fold('M2,-110Q3,-100 2,-90', col.s, 0.7) + speck([-18, -112, 22, -86], 20, [col.d], c.seed, 0.2, 0.5, 0.5) });
+      s += shade(c.d, `M-17.4,-91.6C-8,-94 12,-94.4 21.4,-91.6L21.4,-87.6C12,-90 -8,-90 -17.6,-87.6Z`, tone(band), { lw: 0.9 }) + circ(14, -89.8, 0.9, '#B8963E');
+      s += shade(c.d, brim(0), { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.5 });
+      if (c.z) s += stain(-4, -100, 1.6, BLOOD, c.seed + 2, 0.6) + line('M12,-109l-2,3l1.6,1.6', 0.6);
+      return s;
+    },
+    back: (c) => shade(c.d, crown(-1), col, { inner: fold('M1,-110Q2,-100 1,-90', col.s, 0.7) }) + shade(c.d, brim(-2), { b: col.s, s: col.d, d: col.d }, { lw: 1.1, k: 0.5 }),
+  };
+}
+
+/** A sparkly tiara with a translucent veil streaming back (bride). */
+function veil(): H.HatPaint {
+  const lace = '#E6E2D6';
+  return {
+    front: (c) => {
+      let s = fill('M-12,-99C-22,-96 -30,-80 -30,-56L-22,-54C-22,-74 -18,-88 -6,-97Z', lace, 'opacity="0.55"') + line('M-12,-99C-22,-96 -30,-80 -30,-56', 0.7, INK, 'opacity="0.7"');
+      s += line('M-24,-80q2,8 0,16M-18,-90q-2,10 -2,20', 0.4, '#A8A496', 'opacity="0.8"');
+      s += outl('M-10,-99L-6,-104L-2,-100L2,-106L6,-100L10,-104L14,-99Z', '#C8C2AE', 0.7) + circ(2, -103.6, 1, '#A8C8D0');
+      if (c.z) s += stain(-24, -66, 1.8, BLOOD, c.seed + 3, 0.6) + rip(-26, -74, 2.4, 1.8, { b: '#5A5650', s: '#3A3632', d: '#2A2622' }, c.seed + 4);
+      return s;
+    },
+    back: (c) => fill('M-22,-102C-28,-82 -26,-64 -22,-54H22C26,-64 28,-82 22,-102Q0,-108 -22,-102Z', lace, 'opacity="0.55"') + line('M-22,-102C-28,-82 -26,-64 -22,-54M22,-102C28,-82 26,-64 22,-54', 0.7, INK, 'opacity="0.6"') + line('M-10,-96q-2,20 0,40M8,-96q2,20 0,40', 0.4, '#A8A496') + (c.z ? stain(6, -70, 1.8, BLOOD, c.seed + 5, 0.6) : ''),
+  };
+}
+
+/** Surgical mask over the nose and mouth, strings to the ear. */
+const surgMask = (c: Ctx) =>
+  outl('M-5,-71C2,-74 14,-74 23,-71L22,-58C15,-53 1,-53 -4,-58Z', '#7E9E96', 0.8) + line('M-3,-67Q9,-69 21,-67M-2,-63Q9,-65 21,-63', 0.45, '#5E7A72') + line('M-5,-69L-17,-72M-4,-60L-16,-68', 0.5, '#DAD6C8') + (c.z ? stain(10, -60, 1.6, BLOOD, c.seed + 6, 0.8) : '');
+
+/** Chef's tongs, open (pitmaster). */
+function tongs(): HandItem {
+  return {
+    fist: true,
+    box: [-2, -16, 7, 4],
+    under: (c, h) => {
+      let s = line(`M${R2(h, 0, 1)}L${R2(h, 2, -14)}M${R2(h, 1, 1)}L${R2(h, 6, -13)}`, 2, INK) + line(`M${R2(h, 0, 1)}L${R2(h, 2, -14)}M${R2(h, 1, 1)}L${R2(h, 6, -13)}`, 1.1, '#A8ACA8');
+      s += line(`M${R2(h, 1.6, -14)}l1,-1.4M${R2(h, 5.6, -13)}l1.2,-1`, 1, '#7F8584');
+      if (c.z) s += stain(h[0] + 3, h[1] - 10, 1, BLOOD, c.seed + 2, 0.8);
+      return s;
+    },
+  };
+}
+/** A scalpel held point-up (surgeon). */
+function scalpel(): HandItem {
+  return {
+    fist: true,
+    box: [-2, -9, 4, 3],
+    under: (c, h) => outl(`M${R2(h, -0.6, 0)}L${R2(h, 0.6, -6)}L${R2(h, 1.6, -5.8)}L${R2(h, 0.6, 0.4)}Z`, '#7F8584', 0.5) + outl(`M${R2(h, 0.6, -6)}C${R2(h, 0, -8)} ${R2(h, 1.6, -9.6)} ${R2(h, 2.4, -8.6)}L${R2(h, 1.6, -5.8)}Z`, '#D8DCD8', 0.5) + (c.z ? circ(h[0] + 1.4, h[1] - 7.6, 0.7, BLOOD, 0.9) : ''),
+  };
+}
+/** A bridal bouquet of droopy roses. */
+function bouquet(): HandItem {
+  const b = PR.pompom(tone('#9E6A6E', '#7A4A50'));
+  return {
+    ...b,
+    over: (c, h) => (b.over ? b.over(c, h) : '') + circ(h[0] - 2, h[1] - 1, 1.4, '#B8848A') + circ(h[0] + 2.4, h[1] + 1.4, 1.2, '#B8848A') + line(`M${R2(h, 0, 6)}l-1,4M${R2(h, 1.6, 6)}l0.6,4`, 0.8, '#55553F'),
+  };
+}
+
+const trucker = mk({
+  body: 'fat',
+  bodyMod: { belly: 5 },
+  height: 104,
+  skin: SKIN_TAN,
+  face: { shape: 'jowl', lid: 0.5, bags: 2, brow: 'bushy', nose: 'bulb', mouth: 'flat', stubble: true, wrinkles: 2, zMouth: 'slack' },
+  hair: HAIR.mouse,
+  set: H.withHat(H.underHat(HAIR.mouse, { shaggy: true }), H.backCap(tone('#8A3A2A'))),
+  facialHair: W.walrus(HAIR.mouse),
+  torso: seq(
+    shirtTorso({ top: tone('#3E5A6E'), collar: 'shirt', buttons: true, untucked: true, pants: C.denim, extra: (c) => W.plaid([-22, c.b.tTop - 2, 28, c.b.tBot - 4], '#22323E', '#9AA8A0', 4.6) + (c.back ? '' : stain(4, c.b.tBot - 10, 2, '#5A4A2A', c.seed + 1, 0.6)) }),
+    W.buttCrack(),
+  ),
+  arm: armPaint({ sleeve: 'rolled', col: tone('#3E5A6E'), itemL: PR.coffeeCup() }),
+  leg: legPaint({ kind: 'pants', col: C.denim, shoe: 'boot', shoeCol: tone('#6A4A2E'), zBareSide: 1 }),
+});
+
+const biker = mk({
+  body: 'stocky',
+  bodyMod: { belly: 2.4 },
+  height: 107,
+  face: { shape: 'square', lid: 0.45, bags: 2, brow: 'thick', browCol: '#8A867C', nose: 'broken', mouth: 'grim', wrinkles: 2, zMouth: 'snarl' },
+  hair: HAIR.grey,
+  set: H.withHat(H.underHat(HAIR.grey, { shaggy: true, nape: -58 }), H.headband(C.black, true)),
+  faceUnder: W.fullBeard(HAIR.grey, 1.2),
+  faceOver: W.glasses('shades', '#1A1814'),
+  headBackOver: W.glassesBack('#1A1814'),
+  torso: jacketTorso({ top: C.charcoal, collar: 'tank', untucked: true, pants: C.black, belt: '#2A2724', buckle: '#A8ACA8' }, { col: tone('#3A2E26', '#24201A'), open: 9, buttons: 0, pockets: true }),
+  arm: armPaint({ sleeve: 'none', col: C.charcoal, wristband: '#2A2724', extra: (c, w) => (c.side < 0 ? line(`M${f(w[0] - 2)},${f(w[1] - 12)}q3,-2 4,2q-2,3 -4,0`, 0.7, '#3E5A6E', 'opacity="0.8"') : '') }),
+  leg: legPaint({ kind: 'pants', col: C.black, shoe: 'boot', shoeCol: C.black, zBareSide: -1 }),
+});
+
+const firefighter = mk({
+  body: 'stocky',
+  bodyMod: { s: 1.03 },
+  height: 108,
+  skin: SKIN_DARK,
+  face: { shape: 'square', lid: 0.45, bags: 1, brow: 'thick', browCol: '#1E1814', nose: 'big', mouth: 'grin', stubble: true, wrinkles: 1, zMouth: 'gape' },
+  hair: HAIR.black,
+  set: H.withHat(H.underHat(HAIR.black), H.hardHat(tone('#8A2A22'))),
+  faceUnder: (c) => (c.z ? '' : fill(ellD(8, -64, 7, 3), '#3A3632', 'opacity="0.35"')), // soot smudge
+  torso: seq(
+    jacketTorso({ top: tone('#8A7A4A'), collar: 'shirt', pants: tone('#7A6A3E') }, { col: tone('#8A7A4A'), open: 3, buttons: 4, pockets: true }),
+    (c) => inside(c.d, torsoD(c.b), line(`M-30,${f(c.b.tBot - 9)}H30M-30,${f(c.b.tBot - 20)}H30`, 2.4, '#B8B444') + line(`M-30,${f(c.b.tBot - 9)}H30M-30,${f(c.b.tBot - 20)}H30`, 0.8, '#D8D8C8')),
+  ),
+  arm: armPaint({ sleeve: 'long', col: tone('#8A7A4A'), glove: tone('#3A3632'), stripes: '#B8B444', itemR: PR.axe() }),
+  leg: legPaint({ kind: 'pants', col: tone('#7A6A3E'), shoe: 'boot', shoeCol: C.black, stripe: '#B8B444' }),
+});
+
+const bride = mk({
+  body: 'slim',
+  height: 106,
+  face: { shape: 'heart', lid: 0.55, bags: 1, brow: 'arched', browCol: '#6A5030', nose: 'small', mouth: 'lips', lips: '#7A3440', lash: true, shadow: '#5A6A80', wrinkles: 0, zMouth: 'crooked' },
+  hair: HAIR.blond,
+  set: H.withHat(H.waves(HAIR.blond), veil()),
+  earHidden: true,
+  faceUnder: W.makeup({ blush: '#9A5A5A' }),
+  torso: seq(W.skirt(tone('#D8D2C0', '#B0A894'), { hem: 13, flare: 4, waist: 8, pleats: 6 }), tankTop(tone('#D8D2C0', '#B0A894'), { scoop: 7 })),
+  torsoBox: [-22, -67, 24, 3],
+  arm: armPaint({ sleeve: 'none', col: tone('#D8D2C0'), forearm: tone('#E2DED2', '#BAB4A4'), itemL: bouquet() }),
+  leg: legPaint({ kind: 'skirtleg', col: C.cream, shoe: 'heel', shoeCol: tone('#D8D2C0') }),
+});
+
+const headbanger = mk({
+  body: 'slim',
+  bodyMod: { hipX: 4.6, legW: 8.6, hunch: 1.6 },
+  height: 106,
+  skin: SKIN_PALE,
+  face: { shape: 'long', lid: 0.6, bags: 2, brow: 'sparse', nose: 'pointy', mouth: 'open', wrinkles: 1, zMouth: 'gape', look: [0.6, -0.6] },
+  hair: HAIR.black,
+  set: H.longHair(HAIR.black, '#3A3632'),
+  earHidden: true,
+  faceUnder: W.goatee(HAIR.black),
+  torso: shirtTorso({
+    top: C.black,
+    collar: 'tee',
+    untucked: true,
+    pants: C.denim,
+    belt: '#1E1C1A',
+    buckle: '#A8ACA8',
+    extra: (c) => (c.back ? '' : fill(ellD(3, c.b.shY + 11, 4.4, 4.6), '#C8C2AE') + circ(1.4, c.b.shY + 10.6, 1.1, INK) + circ(4.8, c.b.shY + 10.6, 1.1, INK) + line(`M1.4,${f(c.b.shY + 14)}h3.6M2.6,${f(c.b.shY + 13.2)}v1.6M3.8,${f(c.b.shY + 13.2)}v1.6`, 0.5)),
+  }),
+  arm: armPaint({ sleeve: 'short', col: C.black, wristband: '#7F8584' }),
+  leg: legPaint({ kind: 'pants', col: C.denim, shoe: 'boot', shoeCol: C.black, kneepad: '#B4AF9E' }),
+});
+
+const surgeon = mk({
+  body: 'std',
+  height: 104,
+  face: { shape: 'egg', lid: 0.55, bags: 2, brow: 'raised', browCol: '#3A2E24', nose: 'pointy', mouth: 'flat', wrinkles: 1, zMouth: 'stitched', look: [0.8, 0.2] },
+  hair: HAIR.dark,
+  set: H.withHat(H.underHat(HAIR.dark), H.beanie(tone('#4E7A78'))),
+  faceOver: seqE((c) => surgMask(c), W.glasses('round', '#5A5650')),
+  headBackOver: W.glassesBack('#5A5650'),
+  torso: seq(shirtTorso({ top: tone('#4E7A78'), collar: 'v', untucked: true, pocket: true, pants: tone('#4E7A78') }), (c) => (c.back ? '' : inside(c.d, torsoD(c.b), stain(-4, c.b.tBot - 12, 2.4, BLOOD, c.seed + 3, 0.7) + stain(6, c.b.shY + 12, 1.4, BLOOD, c.seed + 4, 0.6)))),
+  arm: armPaint({ sleeve: 'short', col: tone('#4E7A78'), glove: tone('#B8C4B0', '#909C88'), itemR: scalpel() }),
+  leg: legPaint({ kind: 'pants', col: tone('#4E7A78'), shoe: 'clog', shoeCol: tone('#C8C4B8'), zBareSide: 1 }),
+});
+
+const tycoon = mk({
+  body: 'fat',
+  bodyMod: { belly: 6 },
+  height: 106,
+  face: { shape: 'jowl', lid: 0.45, bags: 2, brow: 'bushy', browCol: '#C8C4B8', nose: 'bulb', mouth: 'fake', wrinkles: 3, zMouth: 'jaw' },
+  hair: HAIR.white,
+  set: H.withHat(H.underHat(HAIR.white), cowboyHat(tone('#C8B48A', '#9A8660'), '#5A3A24')),
+  facialHair: W.walrus(HAIR.white),
+  faceOver: cigar,
+  torso: jacketTorso(
+    {
+      top: C.white,
+      collar: 'shirt',
+      pants: tone('#C8BC9C'),
+      belt: '#5A3A24',
+      buckle: '#B8963E',
+      over: (c) => (c.back ? '' : line(`M${f(3 + c.b.hunch)},${f(c.b.tTop + 1)}V${f(c.b.shY + 12)}`, 0.8, INK) + outl(ellD(3 + c.b.hunch, c.b.shY + 4, 1.6, 1.4), '#3E6E66', 0.5)),
+    },
+    { col: tone('#C8BC9C', '#A09470'), lapels: true, buttons: 2, pin: '#B8963E', pockets: true, long: 4 },
+  ),
+  torsoBox: [-24, -66, 28, -4],
+  arm: armPaint({ sleeve: 'long', col: tone('#C8BC9C', '#A09470'), cuff: '#D8D4C6', watch: '#B8963E', itemL: PR.briefcase() }),
+  leg: legPaint({ kind: 'pants', col: tone('#C8BC9C'), shoe: 'boot', shoeCol: tone('#6A3A22'), zBareSide: -1 }),
+});
+
+const pitmaster = mk({
+  body: 'fat',
+  bodyMod: { s: 1.04, belly: 5 },
+  height: 108,
+  skin: SKIN_TAN,
+  face: { shape: 'round', lid: 0.45, bags: 2, brow: 'thick', browCol: '#5A5650', nose: 'bulb', mouth: 'grin', wrinkles: 2, zMouth: 'jaw' },
+  hair: HAIR.grey,
+  set: H.withHat(H.baldFringe(HAIR.grey), H.headband(C.oxblood, true)),
+  faceUnder: W.fullBeard(HAIR.grey, 1.6),
+  faceOver: W.glasses('shades', '#2A2420'),
+  headBackOver: W.glassesBack('#2A2420'),
+  torso: seq(shirtTorso({ top: C.charcoal, collar: 'tee', untucked: true, pants: C.denim }), W.apron(tone('#5A3A24', '#3E2618'), { len: 7, stains: 6, pocket: true })),
+  torsoBox: [-24, -66, 28, -2],
+  arm: armPaint({ sleeve: 'none', col: C.charcoal, bulk: 1.1, glove: tone('#2A2724'), itemR: tongs() }),
+  leg: legPaint({ kind: 'pants', col: C.denim, shoe: 'boot', shoeCol: tone('#4A3424') }),
+});
+
 const you = mk({
   body: 'std',
   height: 103,
@@ -551,6 +760,7 @@ const gus = mk({
 
 export const LOOKS: Record<string, Look> = {
   accountant, yoga, teen, politician, construction, nurse, cop, ceo, trafficcop, benchwarmer, lumberjack, cheerleader, critic, boxer, grandma, moviestar, sumo, influencer, celebrity, champ,
+  trucker, biker, firefighter, bride, headbanger, surgeon, tycoon, pitmaster,
   joe, jane, senior, hipster, you, gus,
 };
 export { HAIR, seq, seqE };

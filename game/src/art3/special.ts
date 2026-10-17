@@ -771,7 +771,7 @@ function photoBooth(): ArtAsset {
 }
 
 function mechBull(): ArtAsset {
-  return objAsset('mech_bull', 112, (d, t) => {
+  return objAsset('mech_bull', 122, (d, t) => {
     const X = t.cx;
     const Y = t.cy;
     // padded mat, then the pivot drum, then the bull

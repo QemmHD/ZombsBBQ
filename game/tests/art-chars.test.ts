@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildChar, CHAR_IDS, HUMAN_IDS, BACK_PART_ORDER, PART_ORDER } from '../src/art/chars';
 import type { CharId } from '../src/art/chars';
-import { CUSTOMER_IDS, HUMAN_FACES, JOINT_CHAR_IDS, ZOMBIE_FACES } from '../src/art/manifest';
+import { V2_CUSTOMER_IDS, HUMAN_FACES, JOINT_CHAR_IDS, ZOMBIE_FACES } from '../src/art/manifest';
 import type { CharPart } from '../src/art/types';
 
 const BIPED = ['armL', 'armR', 'head', 'legL', 'legR', 'torso'];
@@ -42,7 +42,7 @@ describe('joint characters', () => {
   });
 
   it('exports all 20 customers as HUMAN_IDS', () => {
-    expect([...HUMAN_IDS]).toEqual([...CUSTOMER_IDS]);
+    expect([...HUMAN_IDS]).toEqual([...V2_CUSTOMER_IDS]);
     expect(HUMAN_IDS.length).toBe(20);
   });
 

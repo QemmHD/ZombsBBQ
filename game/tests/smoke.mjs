@@ -195,6 +195,22 @@ check(await modalOpen(), 'level-up popup shows');
 await shot('levelup');
 while (await modalOpen()) await closeModal();
 
+// ---------- Frequent Fryer: the first dish of the day keeps the cooking streak ----------
+const fryerFresh = await page.evaluate(() => {
+  const { ctl, sim } = window.zbbq;
+  if (ctl.state.fryer) return false;
+  sim.fryerCooked(ctl.state);
+  return true;
+});
+if (fryerFresh) {
+  await ff(0.5);
+  await wait(500);
+  log.fryer = await page.evaluate(() => document.querySelector('.modal h2')?.textContent);
+  check(log.fryer === 'Frequent Fryer', `Frequent Fryer popup shows (got ${log.fryer})`);
+  await shot('fryer');
+}
+while (await modalOpen()) await closeModal();
+
 const panels = [
   ['book', 'cookbook'],
   ['crew', 'crew'],
