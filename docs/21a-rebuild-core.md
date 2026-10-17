@@ -101,8 +101,43 @@ Raids (`raid.ts`, not owned here) still use the old `walkSpeed`; it is left in `
 
 ---
 
+## Implementation notes (as built on `rebuild/core`)
+
+- **Chase tuning.** The runner goes for the door, rattles it for 0.5 s (`chaseDoorSec`), then darts up to
+  4 tiles (`chaseFleeSteps`) to the free tile farthest from the chaser, at 97% of the chaser's run
+  (`chaseRunnerPace`); the chaser follows onto the runner's tile. Measured in the 7×6 start room: YOU
+  from the far corner ≈ 2.7 s, an idle zombie from the far corner ≈ 5.3 s, adjacent < 0.5 s; 12 s cap.
+- **Server spot.** A server stands on the table's far side (the tile furthest from the camera), facing
+  the diner across the table, so the meal stays visible.
+- **Tutorial.** A step was added after plating: "tap the front door to flip the sign to OPEN"
+  (new games start CLOSED). The guided first purchase now counts one starter seat (`hints.ts`).
+- **Plating.** The controller asks for a selected crew member before a finished dish is carried
+  (`controller.tapStove`); `plateDish` without a worker still auto-picks, for scripts and tests.
+- **Sold out** (doc 13 #1) was not in the code before; it is now (`soldOut`, `TUNING.soldOutGapSec`).
+- **Raids** keep the older `walkSpeed` ramp (`raid.ts` is not owned by this branch).
+- **New sim API:** `tilesPerSec`, `speedMult`, `customerSpeed`, `isRestless`, `swingInterval`,
+  `feastLength`, `burnWindow`, `burnLimit`, `decorBonus`, `shownRating`, `soldOut`, `newGame`.
+  `ratingMult` is gone (decor is additive now). New worker states `chasing`, `serving`, `attacking`;
+  new customer state `cowering`; new events `chase`, `hit`.
+
 ## Tests whose numbers changed
 
-Listed in the branch's report and in the test files' comments: start cash/room, patience thresholds,
-FINISH price, burn window, infection timing (chase instead of a 1.6 s shiver), bite timing (60 s check),
-feast energy, rating steps, closed drain, offline rating cap.
+- `sim.test.ts`: start state ($5,000, one table + chair, kitchen on the back-left wall, 0.5 stars);
+  cooking (pot on at once, XP at the counter); burn window max(cook, 10 min) with the walk counted;
+  infection (a chase, up to 15 s, instead of a 2 s shiver); patience line 25% / 7%; attacks (swings,
+  knockback, −0.1) and the feast (+2 per chunk); FINISH priced by the original formula (tacos: 3);
+  v2 migration keeps at least the $5,000 start.
+- `crew.test.ts`: bite timing (the 60 s check, so tests set `nextBiteAt`), feast energy (+20 from
+  chunks, not 20% of max), infected zombie keeps the plain first name, customer pace
+  0.4 × (2 + 0.2·Speed), the cookbook's Cook sets `cooking` (no `reserved`), the closed drain
+  (≈0.08 stars/h away) and the new ±0.4 catch-up cap.
+- `hints.test.ts`: burn warnings shift by the cook's walk; one starter seat.
+- `build.test.ts`: layout coordinates; decor is a ≤ +0.20 bonus (`ratingMult` test replaced).
+- `variants.test.ts`: XP read off the stove (paid at the counter); rating step +0.005.
+- `economy.test.ts`: the first hour is slower (servers wait out the meal; small rating steps):
+  2 h ≥ 1.5 stars and 4 h ≥ 3 replace "1 h ≥ 2 stars"; the $5,000 start allows the first expansion
+  before 2 h.
+- `raid.test.ts`: the stars check counts the decor bonus.
+- `soak.test.ts`: a `cooking` stove may have its cook still walking over.
+- New: `core-rebuild.test.ts` (movement, serving, tips, rating steps, arrivals, sold out, zombie
+  levels, wandering, called-off attacks, the cook who chases).

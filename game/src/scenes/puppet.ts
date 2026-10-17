@@ -286,8 +286,9 @@ export class Puppet {
       case 'run':
         // a human panicking (the infect run, fleeing a bite): both arms flung straight up, flailing;
         // zombies lurch arms-out instead
-        J.armL = zombie ? [-80 * D + s * 0.15, -0.1] : [-165 * D + s * 12 * D, -12 * D];
-        J.armR = zombie ? [-60 * D - s * 0.15, -0.1] : [-150 * D - s * 12 * D, -20 * D];
+        // (a V over the head, wide enough that the hands show past it from behind as well)
+        J.armL = zombie ? [-80 * D + s * 0.15, -0.1] : [-138 * D + s * 12 * D, -14 * D];
+        J.armR = zombie ? [-60 * D - s * 0.15, -0.1] : [148 * D - s * 12 * D, 14 * D];
         headRot = zombie ? 0.1 : -6 * D;
         break;
       case 'chase':

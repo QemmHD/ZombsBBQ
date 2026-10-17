@@ -108,12 +108,20 @@ export function validSeats(s: GameState): Furniture[] {
 /** A free floor tile next to a table, where a server stands (not the chair). */
 export function tableAccess(s: GameState, table: Furniture, blocked = blockedTiles(s)): Pt | null {
   const reach = reachableFloor(s, blocked);
-  for (const d of N4) {
+  // the far side first: a server standing there faces the diner (and the camera) across the table
+  for (const d of N4_FAR_FIRST) {
     const c = { x: table.x + d.x, y: table.y + d.y };
     if (isInside(c.x, c.y, room(s)) && reach.has(key(c.x, c.y))) return c;
   }
   return null;
 }
+
+const N4_FAR_FIRST: Pt[] = [
+  { x: 0, y: -1 },
+  { x: -1, y: 0 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+];
 
 export function setPath(s: GameState, m: Mover, goal: Pt, speed: number): boolean {
   const p = findPath({ x: m.x, y: m.y }, goal, blockedTiles(s), room(s));

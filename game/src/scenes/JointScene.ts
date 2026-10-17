@@ -1006,7 +1006,9 @@ export class JointScene extends Phaser.Scene {
     else if (c.state === 'waiting' && seated && c.waitLeft < 20) b = 'fx_sweat';
     this.bubble(a, b, -pup.height - 6, 8);
     const sel = this.ctl.selection;
-    pup.flash(hit);
+    // a struck victim reddens for a beat (the white raid flash reads as a ghost on a customer)
+    if (this.t - (a.hitAt ?? -9) < 0.15) pup.setTint(0xffa090);
+    else pup.clearTint();
     this.selRing(a, sel?.kind === 'customer' && sel.id === c.id);
     // a seated diner's ring sits on the chair's floor tile, not up on the seat
     if (a.sel?.visible && sp) a.sel.setPosition(-(sp.x - iso(c.x, c.y).x), -(sp.y - iso(c.x, c.y).y));
@@ -1377,12 +1379,10 @@ export class JointScene extends Phaser.Scene {
       case 'cookStart':
         sfx('sizzle', { volume: 0.7 });
         break;
-      case 'dishDone': {
+      case 'dishDone':
+        // the green-check bubble says it (see updateStations); just the ding
         sfx('ding');
-        const fx = this.stoveFx.get(e.stoveId);
-        if (fx) this.popIcon(fx.x, fx.topY - 30, 'fx_star');
         break;
-      }
       case 'burnt':
         sfx('burn');
         break;
