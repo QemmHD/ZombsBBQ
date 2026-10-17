@@ -273,6 +273,8 @@ export class TrackPlayer {
   private tick = 0;
   private nextTime = 0;
   stopAt = Infinity;
+  /** the engine's timer has to keep calling pump() */
+  readonly needsPump = true;
   private seed = 1;
 
   constructor(readonly ctx: BaseAudioContext, readonly song: Song, dest: AudioNode) {
