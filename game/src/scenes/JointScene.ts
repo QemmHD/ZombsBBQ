@@ -554,7 +554,7 @@ export class JointScene extends Phaser.Scene {
       if (!best || score < best.score) best = { id, kind, score };
     };
     for (const w of s.workers) if (w.state !== 'raiding') consider(w.id, 'w');
-    for (const c of s.customers) if (c.state !== 'leaving' && c.state !== 'fleeing' && c.state !== 'infecting' && c.state !== 'turnedAway') consider(c.id, 'c');
+    for (const c of s.customers) if (c.state !== 'leaving' && c.state !== 'fleeing' && c.state !== 'infecting' && c.state !== 'cowering' && c.state !== 'turnedAway') consider(c.id, 'c');
     for (const p of s.pets) consider(p.id, 'p');
     if (best) {
       const b = best as { id: string; kind: 'w' | 'c' | 'p' };
