@@ -590,6 +590,7 @@ export class RaidScene extends Phaser.Scene {
       case 'ko': {
         const p = iso(e.x, e.y);
         this.pop('fx_skull', p.x, p.y - 40, 1500);
+        sfx('knockdown', { volume: 0.7 });
         sfx('ko', { volume: 0.6 });
         if (unitOf(e.unit)?.kind === 'boss') this.cameras.main.shake(400, 0.01);
         break;
@@ -619,14 +620,14 @@ export class RaidScene extends Phaser.Scene {
         // a walk-in at the door: a little "+1 diner" over the doorway
         const p = iso(e.x, e.y);
         this.floatText(p.x, p.y - 112, '+1 DINER', '#F2E7C4', 16, { anchor: 'door' });
-        sfx('tap', { volume: 0.3, pitch: 1.3 });
+        sfx('doorOpen', { volume: 0.5 });
         break;
       }
       case 'revive': {
         const p = iso(e.x, e.y);
         this.floatText(p.x, p.y - 112, 'BACK UP!', '#9BE36B', 18, { anchor: e.unit, force: true });
         this.pop('fx_heal', p.x, p.y - 50, 700);
-        sfx('heal');
+        sfx('revive');
         break;
       }
       case 'stone':
@@ -642,6 +643,7 @@ export class RaidScene extends Phaser.Scene {
           this.cameras.main.shake(220, 0.006);
           sfx('stomp', { volume: 0.7 });
         } else if (e.kind === 'stun') sfx('zap', { volume: 0.5 });
+        else if (e.kind === 'jab') sfx('punch', { volume: 0.6 });
         break;
       }
       case 'enter':
