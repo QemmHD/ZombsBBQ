@@ -464,6 +464,7 @@ export class Controller {
     const r = startRaid(this.state, rivalId, workerIds, petIds);
     if (typeof r === 'string') return r;
     this.save();
+    r.hold = true; // the raid scene lifts this once its art has loaded
     this.raid = r;
     this.raidResult = null;
     this.raidSel = null;

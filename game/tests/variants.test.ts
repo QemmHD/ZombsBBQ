@@ -6,7 +6,7 @@ import {
   TUNING,
   VARIANTS,
   VARIANT_DISHES,
-  VARIANT_DROP_CHANCE,
+  COUNTER_VARIANT_CHANCE,
   baseDishId,
   canStudy,
   createInitialState,
@@ -15,6 +15,7 @@ import {
   makeWorker,
   plateDish,
   retreat,
+  sendAll,
   serveFromFridge,
   startCooking,
   startRaid,
@@ -66,8 +67,9 @@ describe('rare dish variants: the numbers', () => {
 });
 
 describe('rare dish variants: raids, the fridge, the stove', () => {
-  function raidHome(seed: number, stolen: string[]): { s: GameState; dishes: string[] } {
-    const s = createInitialState(5);
+  /** Swipe everything off a rival's counter, then retreat: what comes home? */
+  function raidHome(seed: number): { s: GameState; counter: string[]; dishes: string[] } {
+    const s = createInitialState(seed);
     s.level = 12;
     s.workers.push(makeWorker(s, 'zombie', 'boxer', { x: 4, y: 4 }));
     const r = startRaid(
@@ -75,22 +77,25 @@ describe('rare dish variants: raids, the fridge, the stove', () => {
       'chuck',
       s.workers.filter((w) => w.kind === 'zombie').map((w) => w.id),
     ) as RaidState;
-    r.rng = seed;
-    r.stolen = [...stolen];
+    const counter = r.counter.map((c) => c.dish);
+    for (const c of r.counter) {
+      r.stolen.push(c.dish);
+      r.haul.push({ dish: c.dish, servings: c.servings });
+      c.servings = 0;
+    }
+    sendAll(r); // someone has to go in for it to count as a raid
     retreat(r);
-    return { s, dishes: finishRaid(s, r).dishes };
+    return { s, counter, dishes: finishRaid(s, r).dishes };
   }
 
-  it('a swiped dish sometimes comes home as a variant (seeded, about 30% of the time)', () => {
-    const a = raidHome(42, ['sliders', 'hobodog', 'sliders']);
-    const b = raidHome(42, ['sliders', 'hobodog', 'sliders']);
-    expect(a.dishes).toEqual(b.dishes);
+  it('the rival counter holds a rare variant about 40% of the time, and a swiped one comes home as it was', () => {
+    expect(raidHome(42).dishes).toEqual(raidHome(42).dishes);
     let variants = 0;
     let total = 0;
     const kinds = new Set<string>();
     for (let seed = 1; seed <= 200; seed++) {
-      const { s, dishes } = raidHome(seed, ['sliders', 'hobodog']);
-      expect(dishes.map(baseDishId)).toEqual(['sliders', 'hobodog']);
+      const { s, counter, dishes } = raidHome(seed);
+      expect(dishes).toEqual(counter);
       for (const d of dishes) {
         total++;
         const v = DISH_BY_ID[d].variant;
@@ -102,9 +107,10 @@ describe('rare dish variants: raids, the fridge, the stove', () => {
       // whatever came home is in the fridge
       expect(s.fridge.map((f) => f.dish)).toEqual(dishes);
     }
-    expect(variants / total).toBeGreaterThan(VARIANT_DROP_CHANCE - 0.08);
-    expect(variants / total).toBeLessThan(VARIANT_DROP_CHANCE + 0.08);
+    expect(variants / total).toBeGreaterThan(COUNTER_VARIANT_CHANCE - 0.08);
+    expect(variants / total).toBeLessThan(COUNTER_VARIANT_CHANCE + 0.08);
     expect(kinds.size).toBe(6);
+    void baseDishId;
   });
 
   it('UNLOCK in the fridge learns the variant; then it cooks from the stove', () => {

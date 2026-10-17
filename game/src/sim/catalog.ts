@@ -57,8 +57,8 @@ export interface ItemDef {
   /** money-makers: cash per hour, up to a maximum (original) */
   payout?: { perHour: number; max: number };
   pet?: 'pug' | 'rotweiler';
-  /** tombstones: which raid boost */
-  boost?: 'str' | 'hp';
+  /** tombstones: which raid boost (a 5 s glow, or the revive tombstone's instant get-up) */
+  boost?: 'str' | 'hp' | 'revive';
   max?: number;
   /** only comes with the starting café (not sold) */
   starter?: boolean;
@@ -169,8 +169,9 @@ export const ITEMS: ItemDef[] = [
   // ----- outdoor: pets and raid tombstones live on the front lawn -----
   I({ id: 'pethouse_pug', name: 'Pug House', tab: 'special', kind: 'pethouse', level: 4, cash: 1000, art: 'pethouse_pug', pet: 'pug', outdoor: true, max: 1, blurb: 'Adopt a Zombie Pug. It sniffs out loose change.' }),
   I({ id: 'pethouse_kennel', name: 'Spiked Kennel', tab: 'special', kind: 'pethouse', level: 8, sauce: 10, art: 'pethouse_kennel', pet: 'rotweiler', outdoor: true, max: 1, blurb: 'Adopt a Rot-weiler. It fights in raids.' }),
-  I({ id: 'tombstone_str', name: 'Strength Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_str', outdoor: true, boost: 'str', blurb: 'Raid boost: tap it mid-raid and your horde hits harder for 5 s. 5 uses a day.' }),
-  I({ id: 'tombstone_hp', name: 'Health Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_hp', outdoor: true, boost: 'hp', blurb: 'Raid boost: tap it mid-raid and your horde heals for 5 s. 5 uses a day.' }),
+  I({ id: 'tombstone_str', name: 'Strength Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_str', outdoor: true, boost: 'str', blurb: 'Raid boost: tap it mid-raid and your horde hits twice as hard for 5 s. 5 uses a day.' }),
+  I({ id: 'tombstone_hp', name: 'Health Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_hp', outdoor: true, boost: 'hp', blurb: 'Raid boost: tap it mid-raid and your horde heals +100 over 5 s. 5 uses a day.' }),
+  I({ id: 'tombstone_revive', name: 'Revival Tombstone', tab: 'special', kind: 'tombstone', level: 8, sauce: 40, art: 'tombstone_revive', outdoor: true, boost: 'revive', blurb: 'Raid boost: tap it mid-raid and every knocked-out zombie gets back up. 5 uses a day.' }),
 ];
 
 export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));

@@ -36,6 +36,8 @@ import {
   paintFloor,
   stoveCooks,
   rivalReady,
+  rivalLevel,
+  rivalStats,
   sendAll,
   startCooking,
   startRaid,
@@ -193,7 +195,7 @@ function raidIfReady(s: GameState): RaidState | null {
     if (healthy.length < RAID_CREW[RIVALS.indexOf(rv)]) return null;
     // a sensible player sizes up the joint first: total punch vs. the Head Chef
     const punch = healthy.reduce((a, w) => a + (3 + w.stats.power * 1.6) * (w.energy / 100), 0);
-    if (punch < rv.boss.hp / 9) return null;
+    if (punch < rivalStats(rv.id, rivalLevel(s, rv.id)).chef.hp / 9) return null;
     const r = startRaid(s, rv.id, healthy.map((w) => w.id), s.pets.map((p) => p.id));
     if (typeof r === 'string') return null;
     sendAll(r);
