@@ -83,7 +83,7 @@ export function openStore(hud: Hud, tab: Tab = lastTab) {
   bindActions(m, (a, el) => {
     const id = el.dataset.id!;
     if (a === 'tab') {
-      sfx('tap');
+      sfx('page');
       openStore(hud, id as Tab);
     } else if (a === 'buy') {
       const err = buyCheck(s, id);

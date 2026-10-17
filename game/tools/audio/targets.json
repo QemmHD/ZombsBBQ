@@ -1,0 +1,686 @@
+{
+ "_": "kind: shot (one-shot), loop (seamless loop, len = loop seconds), music (stereo loop). refs = original filenames the prompt was matched to (reference only, never shipped). n = candidates.",
+ "sfx": {
+  "tap": {
+   "kind": "shot",
+   "refs": [
+    "Click1.caf",
+    "Click2.caf",
+    "Click3.caf",
+    "Click5.caf",
+    "Click8.caf"
+   ],
+   "max": 0.25,
+   "n": 3,
+   "prompt": "Sound effect: a single soft user-interface tap, a short dry wooden tick, 0.1 seconds, mono, no reverb, no music."
+  },
+  "open": {
+   "kind": "shot",
+   "refs": [
+    "Select1.caf",
+    "Select2.caf",
+    "Select3.caf",
+    "TextboxPop1.caf"
+   ],
+   "max": 0.4,
+   "n": 3,
+   "prompt": "Sound effect: a quick bubbly cartoon 'bwoop' pop as a menu card swings open, rising pitch, 0.2 seconds, dry, no music."
+  },
+  "close": {
+   "kind": "shot",
+   "refs": [
+    "BookClose1.caf"
+   ],
+   "max": 0.5,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon menu book snapping shut, a soft papery thump with a short descending blip, 0.3 seconds, dry, no music."
+  },
+  "coin": {
+   "kind": "shot",
+   "refs": [
+    "Cash1.caf"
+   ],
+   "max": 0.6,
+   "n": 3,
+   "prompt": "Sound effect: one small coin dropping with a bright two-note cartoon chime, 0.4 seconds, dry, mono, no music."
+  },
+  "cashRegister": {
+   "kind": "shot",
+   "refs": [
+    "Cash3.caf",
+    "Cash2.caf"
+   ],
+   "max": 1.3,
+   "n": 3,
+   "prompt": "Sound effect: an old mechanical cash register: lever clack, the drawer slides open and the bell dings 'ka-ching', 1 second, dry, mono, no music."
+  },
+  "tip": {
+   "kind": "shot",
+   "refs": [
+    "Cash2Tip.caf"
+   ],
+   "max": 0.9,
+   "n": 3,
+   "prompt": "Sound effect: a quick cheerful coin-drop 'cha-ching' with a small bright bell and a couple of coins jingling, 0.6 seconds, dry, no music."
+  },
+  "sizzle": {
+   "kind": "shot",
+   "refs": [
+    "Frying.caf"
+   ],
+   "max": 1.3,
+   "n": 3,
+   "prompt": "Sound effect: raw meat slapped onto a hot grill, a sharp burst of sizzling fat and crackle that settles, 1 second, dry, no music."
+  },
+  "ding": {
+   "kind": "shot",
+   "refs": [
+    "EggTimer1.caf"
+   ],
+   "max": 1.3,
+   "n": 3,
+   "prompt": "Sound effect: a single kitchen counter service bell 'ding', bright metallic ring with a natural one-second decay, dry, no music."
+  },
+  "plate": {
+   "kind": "shot",
+   "refs": [
+    "Dish1.caf",
+    "Dish2.caf",
+    "Dish3.caf",
+    "Dish4.caf",
+    "Dish5.caf"
+   ],
+   "max": 0.6,
+   "n": 3,
+   "prompt": "Sound effect: a ceramic plate set down on a wooden diner table with a short clack and a tiny rattle, 0.3 seconds, dry, no music."
+  },
+  "burn": {
+   "kind": "shot",
+   "refs": [
+    "Spray1.caf"
+   ],
+   "max": 1.3,
+   "n": 3,
+   "prompt": "Sound effect: food burning on a stove: a sputtering hiss and a puff of smoke, then a sad short descending cartoon whistle, 1 second, dry, no music."
+  },
+  "chomp": {
+   "kind": "shot",
+   "refs": [
+    "ZombieEating4.caf",
+    "Hit1.caf"
+   ],
+   "max": 0.8,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon zombie bite: one wet crunchy chomp with a short grunt, 0.5 seconds, dry, mono, no reverb, no music."
+  },
+  "scream": {
+   "kind": "shot",
+   "refs": [
+    "FemaleScream1.caf",
+    "FemaleScream2.caf",
+    "FemaleScream3.caf",
+    "Scream1.caf",
+    "ManScream1.caf"
+   ],
+   "max": 1.2,
+   "n": 3,
+   "prompt": "Sound effect: a single short panicked human scream, a woman's voice, cartoonish and over the top, 0.7 seconds, dry, no music."
+  },
+  "groupScream": {
+   "kind": "shot",
+   "refs": [
+    "GroupScream1.caf",
+    "GroupScream2.caf",
+    "GroupScream3.caf",
+    "GroupScream4.caf",
+    "GroupScream5.caf"
+   ],
+   "max": 2.2,
+   "n": 3,
+   "prompt": "Sound effect: a small crowd of restaurant diners all screaming in panic at once, men and women, cartoonish, 1.5 seconds, dry, no music."
+  },
+  "groan": {
+   "kind": "shot",
+   "refs": [
+    "Groan1.caf",
+    "Groan2.caf",
+    "Groan3.caf",
+    "Groan4.caf",
+    "Groan5.caf"
+   ],
+   "max": 1.8,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon zombie groaning 'braaains', a low gravelly monster voice, 1.2 seconds, dry, no reverb, no music."
+  },
+  "mutter1": {
+   "kind": "shot",
+   "refs": [
+    "Grunt1.caf",
+    "Grunt2.caf",
+    "Grunt3.caf",
+    "Grunt4.caf"
+   ],
+   "max": 1.3,
+   "n": 2,
+   "prompt": "Sound effect: a short grumpy zombie mutter, low mumbled gibberish, 0.8 seconds, dry, no music."
+  },
+  "mutter2": {
+   "kind": "shot",
+   "refs": [
+    "MaleGrunt1.caf",
+    "MaleGrunt4.caf",
+    "MaleGrunt8.caf"
+   ],
+   "max": 1.3,
+   "n": 2,
+   "prompt": "Sound effect: a curious cartoon zombie grunt 'hrrm?', gravelly male monster voice, 0.7 seconds, dry, no music."
+  },
+  "mutter3": {
+   "kind": "shot",
+   "refs": [
+    "FemaleGrunt1.caf",
+    "FemaleGrunt2.caf",
+    "FemaleGrunt3.caf"
+   ],
+   "max": 1.3,
+   "n": 2,
+   "prompt": "Sound effect: a female cartoon zombie moan 'uhhhn', raspy and tired, 0.9 seconds, dry, no music."
+  },
+  "mutter4": {
+   "kind": "shot",
+   "refs": [
+    "Brains1.caf",
+    "Brains2.caf",
+    "Brains3.caf"
+   ],
+   "max": 1.3,
+   "n": 2,
+   "prompt": "Sound effect: a cartoon zombie slurring the word 'brains' in a slow growl, 0.9 seconds, dry, no music."
+  },
+  "infect": {
+   "kind": "shot",
+   "refs": [
+    "HauntedHouseTransformationPoof.caf",
+    "UnlockDialog1.caf"
+   ],
+   "max": 1.6,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon zombie infection: a gooey squelch and bubbling, a magical shimmer, ending in a spooky low sting, 1.2 seconds, dry, no music."
+  },
+  "levelUp": {
+   "kind": "shot",
+   "refs": [
+    "Zombie Sting 2g.mp3",
+    "UnlockDialog1.caf"
+   ],
+   "max": 1.8,
+   "n": 3,
+   "prompt": "Sound effect: a short triumphant cartoon brass fanfare 'ta-ta-ta-TAA' with a cymbal crash, celebratory, 1.3 seconds, no reverb."
+  },
+  "daydream": {
+   "kind": "shot",
+   "refs": [
+    "DaydreamFemale.caf",
+    "DaydreamMale.caf"
+   ],
+   "max": 1.8,
+   "n": 3,
+   "prompt": "Sound effect: a dreamy ascending harp glissando with a soft twinkle, a cartoon character drifting into a daydream, 1.2 seconds, dry."
+  },
+  "snore": {
+   "kind": "shot",
+   "refs": [
+    "AnimalGroan2.caf"
+   ],
+   "max": 1.6,
+   "n": 3,
+   "prompt": "Sound effect: one cartoon snore, a rattling inhale and a whistling exhale, 1.2 seconds, dry, no music."
+  },
+  "error": {
+   "kind": "shot",
+   "refs": [
+    "BuyError1.caf"
+   ],
+   "max": 0.7,
+   "n": 3,
+   "prompt": "Sound effect: a short cartoon error buzz, game-show wrong-answer 'ehh-ehh', 0.4 seconds, dry, no music."
+  },
+  "place": {
+   "kind": "shot",
+   "refs": [
+    "ObjectPlacement1.caf",
+    "ObjectPlacement2.caf",
+    "ObjectPlacement13.caf",
+    "PutDownItem1.caf"
+   ],
+   "max": 0.5,
+   "n": 3,
+   "prompt": "Sound effect: a piece of furniture plopped down onto a floor, a soft thud with a squishy cartoon 'plop', 0.3 seconds, dry, no music."
+  },
+  "rotate": {
+   "kind": "shot",
+   "refs": [
+    "Rotate1.caf",
+    "Rotate2.caf",
+    "Rotate3.caf"
+   ],
+   "max": 0.3,
+   "n": 3,
+   "prompt": "Sound effect: a quick mechanical ratchet 'tk-tk' as a small object turns a quarter turn, 0.15 seconds, dry, no music."
+  },
+  "sell": {
+   "kind": "shot",
+   "refs": [
+    "PickUpItem1.caf"
+   ],
+   "max": 0.6,
+   "n": 3,
+   "prompt": "Sound effect: an item being picked up and whisked away: a short reverse swoosh and a soft coin blip, 0.35 seconds, dry, no music."
+  },
+  "purchase": {
+   "kind": "shot",
+   "refs": [
+    "Cash1.caf",
+    "Cash2.caf"
+   ],
+   "max": 0.9,
+   "n": 3,
+   "prompt": "Sound effect: a quick purchase confirmation: a register clack, a coin chime and a tiny bell, 0.6 seconds, dry, no music."
+  },
+  "expand": {
+   "kind": "shot",
+   "refs": [
+    "UnlockDialog1.caf"
+   ],
+   "max": 1.8,
+   "n": 3,
+   "prompt": "Sound effect: cartoon construction: a quick rattle of hammer taps and a ratchet, then a short 'ta-daa' brass flourish, 1.3 seconds, dry."
+  },
+  "hit": {
+   "kind": "shot",
+   "refs": [
+    "Hit1.caf",
+    "Hit2.caf",
+    "Hit3.caf",
+    "Hit4.caf",
+    "Hit5.caf"
+   ],
+   "max": 0.5,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon punch impact 'pow', a dull thump with a slap, 0.25 seconds, dry, mono, no music."
+  },
+  "punch": {
+   "kind": "shot",
+   "refs": [
+    "YetiPunch.caf",
+    "Impact2.caf",
+    "Impact4.caf"
+   ],
+   "max": 0.7,
+   "n": 3,
+   "prompt": "Sound effect: a heavy cartoon haymaker punch landing, a quick whoosh then a deep meaty thud, 0.4 seconds, dry, no music."
+  },
+  "whack": {
+   "kind": "shot",
+   "refs": [
+    "Impact7.caf",
+    "Impact8.caf",
+    "Impact9.caf"
+   ],
+   "max": 1.1,
+   "n": 3,
+   "prompt": "Sound effect: a frying pan whacking someone on the head, a metallic cartoon 'boinng' that wobbles as it rings out, 0.8 seconds, dry, no music."
+  },
+  "knockdown": {
+   "kind": "shot",
+   "refs": [
+    "YetiSmash.caf",
+    "Impact10.caf",
+    "Impact11.caf",
+    "Impact12.caf"
+   ],
+   "max": 0.9,
+   "n": 3,
+   "prompt": "Sound effect: a body thrown down onto a wooden floor, a heavy cartoon crash-thud with a little debris rattle, 0.5 seconds, dry, no music."
+  },
+  "zap": {
+   "kind": "shot",
+   "refs": [
+    "SignFlicker.caf",
+    "PetRobotAttack.caf"
+   ],
+   "max": 0.8,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon electric zap 'bzzzt', crackling sparks of a bug zapper, 0.5 seconds, dry, no music."
+  },
+  "ko": {
+   "kind": "shot",
+   "refs": [
+    "MaleDying1.caf",
+    "MaleDying2.caf",
+    "ZombieDying.caf"
+   ],
+   "max": 1.8,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon knockout: a falling slide whistle, a thud, and a dizzy 'tweet-tweet' of little birds circling, 1.2 seconds, dry, no music."
+  },
+  "heal": {
+   "kind": "shot",
+   "refs": [
+    "PetRobotRevive.caf",
+    "ZombieRefreshMale1.caf"
+   ],
+   "max": 1.0,
+   "n": 3,
+   "prompt": "Sound effect: a rising magical healing sparkle, a quick glittery arpeggio of soft chimes, 0.7 seconds, dry, no music."
+  },
+  "revive": {
+   "kind": "shot",
+   "refs": [
+    "PetRobotRevive.caf"
+   ],
+   "max": 1.5,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon character revived: a low whoosh rising into a bright shimmering chord with a little bell, 1 second, dry."
+  },
+  "refresh": {
+   "kind": "shot",
+   "refs": [
+    "ZombieRefreshMale1.caf",
+    "ZombieRefreshFemale1.caf",
+    "AnimalRefresh.caf"
+   ],
+   "max": 1.6,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon zombie gulping down a drink and sighing with relief 'ahhh', re-energised, 1 second, dry, no music."
+  },
+  "summon": {
+   "kind": "shot",
+   "refs": [
+    "VoltronTransform.caf",
+    "BigBadWolf_transform.caf"
+   ],
+   "max": 2.6,
+   "n": 3,
+   "prompt": "Sound effect: a monster being summoned: a deep roar with a rumbling whoosh, then a big gong hit, 2.4 seconds, dry, no music."
+  },
+  "raidWin": {
+   "kind": "shot",
+   "refs": [
+    "Zombie Sting 5g.mp3",
+    "Zombie Sting 1g.mp3"
+   ],
+   "max": 2.2,
+   "n": 3,
+   "prompt": "Short victory jingle: twangy surf guitar and drums play an upbeat 'ta-da' fanfare, slightly spooky cartoon, 1.6 seconds, ends cleanly, no vocals."
+  },
+  "raidLose": {
+   "kind": "shot",
+   "refs": [
+    "Zombie Sting 6g.mp3",
+    "Zombie Sting 2g.mp3"
+   ],
+   "max": 2.8,
+   "n": 3,
+   "prompt": "Sound effect: a sad trombone 'wah wah wah waaah' defeat sting, comedic, 2.4 seconds, dry, no other instruments."
+  },
+  "flag": {
+   "kind": "shot",
+   "refs": [],
+   "max": 0.6,
+   "n": 2,
+   "prompt": "Sound effect: a single referee whistle blast 'fweeet', short, 0.4 seconds, dry, no music."
+  },
+  "dogBark": {
+   "kind": "shot",
+   "refs": [
+    "AnimalGrunt.caf",
+    "AnimalGroan.caf"
+   ],
+   "max": 0.7,
+   "n": 3,
+   "prompt": "Sound effect: a small cartoon dog barking twice 'arf arf', 0.4 seconds, dry, no music."
+  },
+  "pugSnort": {
+   "kind": "shot",
+   "refs": [
+    "AnimalGrunt2.caf"
+   ],
+   "max": 0.7,
+   "n": 3,
+   "prompt": "Sound effect: a pug snorting and snuffling twice, cartoon, 0.4 seconds, dry, no music."
+  },
+  "stomp": {
+   "kind": "shot",
+   "refs": [
+    "YetiSmash.caf",
+    "VoltronWalk.caf"
+   ],
+   "max": 0.7,
+   "n": 3,
+   "prompt": "Sound effect: a giant's heavy footstep 'thoom' with a low rumble and a sprinkle of debris, 0.4 seconds, dry, no music."
+  },
+  "chew": {
+   "kind": "shot",
+   "refs": [
+    "AnimalEating.caf",
+    "ZombieEating4.caf"
+   ],
+   "max": 1.6,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon zombie chewing noisily, wet smacking lips and crunching, 1.2 seconds, dry, no music, no voice."
+  },
+  "feast": {
+   "kind": "shot",
+   "refs": [
+    "AnimalEating2.caf",
+    "ZombieEating4.caf"
+   ],
+   "max": 2.8,
+   "n": 3,
+   "prompt": "Sound effect: a cartoon zombie feasting greedily: ripping, wet crunching, slurping and satisfied grunts, 2.5 seconds, dry, no music."
+  },
+  "bones": {
+   "kind": "shot",
+   "refs": [
+    "PutDownItem1.caf",
+    "Dish6.caf",
+    "Dish7.caf"
+   ],
+   "max": 0.9,
+   "n": 3,
+   "prompt": "Sound effect: a small pile of bones dropped onto a floor, a dry hollow clatter and rattle, 0.6 seconds, dry, no music."
+  },
+  "hungry": {
+   "kind": "shot",
+   "refs": [
+    "AnimalGroan.caf",
+    "Groan6.caf",
+    "Groan7.caf"
+   ],
+   "max": 1.6,
+   "n": 3,
+   "prompt": "Sound effect: a hangry cartoon zombie's warning: a low stomach gurgle and a menacing rising moan, 1.2 seconds, dry, no music."
+  },
+  "panic": {
+   "kind": "shot",
+   "refs": [
+    "Zombie Sting 4g.mp3",
+    "Zombie Sting 1g.mp3"
+   ],
+   "max": 2.0,
+   "n": 3,
+   "prompt": "Short horror sting: a sudden dissonant orchestral hit with a shrieking tremolo string stab, cartoon-spooky, 1.5 seconds, ends with a short tail."
+  },
+  "rareArrival": {
+   "kind": "shot",
+   "refs": [
+    "Zombie Stinger 1g - Short.mp3",
+    "UnlockDialog1.caf"
+   ],
+   "max": 2.0,
+   "n": 3,
+   "prompt": "Short mysterious arrival sting: a theremin swoop into a sparkly chime, intriguing and playful, 1.5 seconds, light reverb tail."
+  },
+  "outOfFood": {
+   "kind": "shot",
+   "refs": [
+    "BuyError1.caf",
+    "Pop4.caf"
+   ],
+   "max": 0.9,
+   "n": 3,
+   "prompt": "Sound effect: a hollow empty two-note 'dun-dun' on a muted wooden xylophone, sad and comedic, 0.6 seconds, dry, no music."
+  },
+  "burnSoon": {
+   "kind": "shot",
+   "refs": [
+    "EggTimer1.caf"
+   ],
+   "max": 1.0,
+   "n": 3,
+   "prompt": "Sound effect: an urgent kitchen egg-timer alarm, a quick rattling double ring, 0.7 seconds, dry, no music."
+  },
+  "doorOpen": {
+   "kind": "shot",
+   "refs": [
+    "DoorOpen1.caf"
+   ],
+   "max": 1.0,
+   "n": 3,
+   "prompt": "Sound effect: a diner's front door opening: a small shop bell jingles over the door with a short wooden creak, 0.7 seconds, dry, no music."
+  },
+  "doorClose": {
+   "kind": "shot",
+   "refs": [
+    "DoorOpen1.caf"
+   ],
+   "max": 0.8,
+   "n": 3,
+   "prompt": "Sound effect: a diner's front door swinging shut, a soft wooden thump with a faint bell tinkle, 0.5 seconds, dry, no music."
+  },
+  "page": {
+   "kind": "shot",
+   "refs": [
+    "PageFlip1.caf",
+    "PageFlip2.caf",
+    "PageFlip3.caf",
+    "PageFlip4.caf"
+   ],
+   "max": 0.5,
+   "n": 3,
+   "prompt": "Sound effect: a single crisp paper page flip in a menu, light and quick, 0.3 seconds, dry, no music."
+  },
+  "ambience": {
+   "kind": "loop",
+   "refs": [
+    "DinnerAmbientLoop.caf"
+   ],
+   "len": 12,
+   "n": 3,
+   "prompt": "Ambience, steady and seamless: the inside of a small busy diner, soft indistinct murmur of a few customers, cutlery clinks, an occasional plate, a distant kitchen, no music, no clear words, 20 seconds."
+  },
+  "cookStove": {
+   "kind": "loop",
+   "refs": [
+    "Frying.caf",
+    "LongCook.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: a pan on a kitchen stove, gentle even frying sizzle with occasional soft bubbling, no music, 10 seconds."
+  },
+  "cookGrill": {
+   "kind": "loop",
+   "refs": [
+    "Frying.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: meat on a charcoal barbecue grill, sizzling fat dripping into flames with light crackle, no music, 10 seconds."
+  },
+  "cookSmoker": {
+   "kind": "loop",
+   "refs": [
+    "LongCook.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: a barrel smoker, low smouldering wood crackle, a slow hiss and soft puffs of smoke, no music, 10 seconds."
+  },
+  "cookFryer": {
+   "kind": "loop",
+   "refs": [
+    "Frying.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: a deep fryer, a dense rolling bubbling boil of hot oil with a high fizz, no music, 10 seconds."
+  },
+  "cookCauldron": {
+   "kind": "loop",
+   "refs": [
+    "LongCook.caf",
+    "Blender.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: a witch's cauldron, thick slow bubbling with big glops and a faint low magical hum, no music, 10 seconds."
+  },
+  "cookKiln": {
+   "kind": "loop",
+   "refs": [
+    "LongCook.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: a wood-fired brick pizza oven, a steady fire roar with crackling logs, no music, 10 seconds."
+  },
+  "cookPit": {
+   "kind": "loop",
+   "refs": [
+    "LongCook.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: an underground roasting pit, muffled deep crackling embers and hissing steam under earth, no music, 10 seconds."
+  },
+  "cookTomb": {
+   "kind": "loop",
+   "refs": [
+    "LongCook.caf"
+   ],
+   "len": 6,
+   "n": 2,
+   "prompt": "Sound effect, steady and continuous: a haunted tomb smoker, smouldering crackle with an eerie low moaning draft and faint ghostly whispers, no music, 10 seconds."
+  }
+ },
+ "music": {
+  "joint": {
+   "kind": "music",
+   "refs": [
+    "Zombie Jazz.mp3"
+   ],
+   "n": 3,
+   "prompt": "Instrumental music, loopable: lazy swing jazz at 86 BPM in a minor key, muted trumpet and clarinet trade the melody, walking upright bass, brushed snare shuffle, vibraphone comping, playful spooky cartoon diner lounge mood, constant tempo, 30 seconds, no vocals."
+  },
+  "raid": {
+   "kind": "music",
+   "refs": [
+    "Zombie Cafe Haunted House.mp3",
+    "Zombie Theme V3.mp3"
+   ],
+   "n": 3,
+   "prompt": "Instrumental music, loopable: fast tense surf-rock chase at 156 BPM, twangy tremolo-picked electric guitar, driving bass, pounding drums with tom fills, spooky organ stabs, cartoon monster brawl, constant tempo, 30 seconds, no vocals."
+  },
+  "map": {
+   "kind": "music",
+   "refs": [
+    "Zombie Theme V1.mp3",
+    "Cue Transition Groove gr.mp3"
+   ],
+   "n": 3,
+   "prompt": "Instrumental music, loopable: a relaxed whistled travel tune at 92 BPM, ukulele strums, upright bass, light shaker and rim clicks, cheerful with a slightly macabre twist, cartoon world map, constant tempo, 30 seconds, no vocals."
+  }
+ }
+}

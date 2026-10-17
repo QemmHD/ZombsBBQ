@@ -174,6 +174,7 @@ export function openGoals(hud: Hud) {
     const m = hud.openModal(`<h2>${icon('ui_goals', 'h-ico')} Gus’s Clipboard</h2>${tabs}${body}`);
     bindActions(m, (a, el) => {
       if (a === 'tab') {
+        sfx('page');
         goalsTab = el.dataset.id === 'todo' ? 'todo' : 'goals';
         render();
         return;

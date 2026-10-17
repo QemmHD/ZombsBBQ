@@ -108,6 +108,9 @@ export class JointScene extends Phaser.Scene {
   } | null = null;
   private pinch: { d: number; z: number } | null = null;
   private t = 0;
+  private doorWasNear = false;
+  /** next time (scene seconds) a seated diner may chew / an idle zombie may mutter, per actor id */
+  private readonly nextChatter = new Map<string, number>();
   private floats?: FloatTexts;
 
   constructor() {
@@ -692,6 +695,24 @@ export class JointScene extends Phaser.Scene {
 
   // ---------- characters ----------
 
+  /** -1..1 stereo position of a tile column: diners chew on the side they sit. */
+  private panOf(x: number): number {
+    const w = Math.max(1, this.ctl.state.roomW - 1);
+    return Math.max(-0.6, Math.min(0.6, ((x / w) * 2 - 1) * 0.6));
+  }
+
+  /** Random background chatter for one actor: at most one sound every `min..max` seconds. */
+  private chatter(id: string, name: 'chew' | 'mutter', x: number, min: number, max: number, volume: number) {
+    const next = this.nextChatter.get(id);
+    if (next === undefined) {
+      this.nextChatter.set(id, this.t + min + Math.random() * (max - min));
+      return;
+    }
+    if (this.t < next) return;
+    this.nextChatter.set(id, this.t + min + Math.random() * (max - min));
+    sfx(name, { volume, pan: this.panOf(x), pitch: 0.9 + Math.random() * 0.2 });
+  }
+
   private actor(id: string, charId: string): Actor | null {
     let a = this.actors.get(id);
     if (a && a.charId !== charId) {
@@ -785,6 +806,7 @@ export class JointScene extends Phaser.Scene {
     if (!pup) return;
     const zombie = w.kind === 'zombie';
     const moving = w.path.length > 0;
+    if (zombie && (w.state === 'idle' || w.state === 'daydream' || w.state === 'cooking')) this.chatter(w.id, 'mutter', w.x, 9, 22, 0.5);
     pup.setFacing(w.facing, !!w.back);
     // a server who just set a plate down leans in over the table for a beat (the original's serve clip)
     const serving = w.state === 'carrying' && w.job?.kind === 'serve';
@@ -893,6 +915,7 @@ export class JointScene extends Phaser.Scene {
     const a = this.actor(c.id, c.type);
     if (!a) return;
     const s = this.ctl.state;
+    if (c.state === 'eating') this.chatter(c.id, 'chew', c.x, 2.2, 4.5, 0.45);
     const seated = (c.state === 'waiting' || c.state === 'eating') && c.path.length === 0;
     const sp = seated ? this.seatPose(c) : null;
     const p = sp ?? iso(c.x, c.y);
@@ -992,6 +1015,10 @@ export class JointScene extends Phaser.Scene {
       if (!near) for (const c of s.customers) if (c.x > -999 && nearDoor(c)) near = true;
       if (!near) for (const p of s.pets) if (nearDoor(p)) near = true;
       this.door.update(dt, this.t, near, !!s.closed);
+      if (near !== this.doorWasNear) {
+        this.doorWasNear = near;
+        if (this.t > 1.5) sfx(near ? 'doorOpen' : 'doorClose', { volume: 0.6 });
+      }
     }
     const alive = this.alive;
     alive.clear();
@@ -1011,6 +1038,7 @@ export class JointScene extends Phaser.Scene {
       if (!alive.has(id)) {
         a.holder.destroy();
         this.actors.delete(id);
+        this.nextChatter.delete(id);
         this.tablePlates.get(id)?.destroy();
         this.tablePlates.delete(id);
       }
@@ -1226,7 +1254,8 @@ export class JointScene extends Phaser.Scene {
         const p = iso(e.x, e.y);
         // one popup per customer: the "$" and the amount are a single label
         this.floatText(p.x, p.y - 96, `${e.amount + e.tip}`, '#E3CB5E', 17, { icon: 'fx_cash', force: true, anchor: `c${Math.round(e.x * 2)},${Math.round(e.y * 2)}` });
-        sfx('coin', { volume: 0.6 });
+        // a tip gets the "cha-ching"; a plain bill just the coin
+        sfx(e.tip > 0 ? 'tip' : 'coin', { volume: 0.6, pan: this.panOf(e.x) });
         break;
       }
       case 'face': {
@@ -1246,8 +1275,32 @@ export class JointScene extends Phaser.Scene {
         const z = s.workers.find((w) => w.id === e.workerId);
         const k = 0.55;
         this.dropRemains(z ? z.x + (e.x - z.x) * k : e.x, z ? z.y + (e.y - z.y) * k : e.y, e.type);
+        sfx('feast', { volume: 0.8, pan: this.panOf(e.x) });
+        // the bones land as the body fades out (see updateRemains)
+        setTimeout(() => sfx('bones', { volume: 0.7, pan: this.panOf(e.x) }), Math.max(0, TUNING.feastSec - 0.2) * 1000);
         break;
       }
+      case 'panic':
+        sfx('panic', { volume: 0.7 });
+        setTimeout(() => sfx('groupScream'), 180);
+        break;
+      case 'rareArrival':
+        sfx('rareArrival', { volume: 0.8 });
+        break;
+      case 'hungry': {
+        const w = s.workers.find((x) => x.id === e.workerId);
+        sfx('hungry', { volume: 0.8, pan: w ? this.panOf(w.x) : 0 });
+        break;
+      }
+      case 'outOfFood':
+        sfx('outOfFood', { volume: 0.7 });
+        break;
+      case 'burnSoon':
+        sfx('burnSoon', { volume: 0.6 });
+        break;
+      case 'woke':
+        if (e.from !== 'down') sfx('refresh', { volume: 0.5 });
+        break;
       case 'bite': {
         const p = iso(e.x, e.y);
         this.floatText(p.x, p.y - 112, 'CHOMP!', '#D9513E', 20, { force: true, anchor: e.workerId });

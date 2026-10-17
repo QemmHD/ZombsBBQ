@@ -7,14 +7,37 @@ import {
   shaper, sweep, tone, type Voice,
 } from './synth';
 
-export const SFX_NAMES = [
+/** Sounds with a synth recipe of their own (the original set). */
+export const SYNTH_NAMES = [
   'tap', 'open', 'close', 'coin', 'cashRegister', 'sizzle', 'ding', 'plate', 'burn', 'chomp',
   'scream', 'groan', 'infect', 'levelUp', 'daydream', 'snore', 'error', 'place', 'rotate', 'sell',
   'purchase', 'expand', 'hit', 'whack', 'zap', 'ko', 'heal', 'summon', 'raidWin', 'raidLose',
-  'flag', 'dogBark', 'pugSnort', 'stomp',
+  'flag', 'dogBark', 'pugSnort', 'stomp', 'ambience',
 ] as const;
 
-export type SfxName = (typeof SFX_NAMES)[number];
+/**
+ * Sounds that only exist as samples (public/audio/sfx/*.ogg); without the file they borrow the synth
+ * recipe named here, so every trigger always makes *some* noise.
+ */
+export const SYNTH_ALIAS = {
+  tip: 'coin', doorOpen: 'open', doorClose: 'close', page: 'tap', groupScream: 'scream', chew: 'chomp',
+  mutter: 'groan', refresh: 'heal', panic: 'scream', rareArrival: 'ding', feast: 'chomp', bones: 'plate',
+  punch: 'hit', knockdown: 'stomp', revive: 'heal', hungry: 'groan', outOfFood: 'error', burnSoon: 'burn',
+  cookStove: 'sizzle', cookGrill: 'sizzle', cookSmoker: 'sizzle', cookFryer: 'sizzle', cookCauldron: 'sizzle',
+  cookKiln: 'sizzle', cookPit: 'sizzle', cookTomb: 'sizzle',
+} as const satisfies Record<string, (typeof SYNTH_NAMES)[number]>;
+
+export type SynthName = (typeof SYNTH_NAMES)[number];
+export type AliasName = keyof typeof SYNTH_ALIAS;
+export type SfxName = SynthName | AliasName;
+
+export const SFX_NAMES: readonly SfxName[] = [...SYNTH_NAMES, ...(Object.keys(SYNTH_ALIAS) as AliasName[])];
+
+/** Loops: started with `audio.loop()` and keyed to a station / the room, never one-shots. */
+export const LOOP_NAMES = [
+  'ambience', 'cookStove', 'cookGrill', 'cookSmoker', 'cookFryer', 'cookCauldron', 'cookKiln', 'cookPit', 'cookTomb',
+] as const satisfies readonly SfxName[];
+export type LoopName = (typeof LOOP_NAMES)[number];
 
 export interface SfxDef {
   /** Length of the sound in seconds (voice is freed after this). */
@@ -94,7 +117,7 @@ function squelchFilter(v: Voice, at: number, pts: [number, number][], q: number)
 
 // --- the sounds ------------------------------------------------------------------------------
 
-export const SFX: Record<SfxName, SfxDef> = {
+const SYNTH: Record<SynthName, SfxDef> = {
   // soft wooden "tik" for any button
   tap: {
     dur: 0.06, gain: 0.52, gap: 0.03, max: 3,
@@ -639,4 +662,27 @@ export const SFX: Record<SfxName, SfxDef> = {
       }
     },
   },
+
+  // stand-in diner murmur for when the sampled ambience loop isn't available: a couple of seconds of
+  // low filtered babble with a cutlery tick or two (the loop player just re-triggers it)
+  ambience: {
+    dur: 2.4, gain: 0.5, gap: 1.5, max: 1,
+    build(v) {
+      const r = v.rnd;
+      const out = gainEnv(v, v.out, [[0, 0], [0.4, 0.5], [2.0, 0.5], [2.4, 0]]);
+      const bp = filt(v.ctx, 'bandpass', 420, 1.2, out);
+      noiseHit(v, { dur: 2.4, a: 0.3, vol: 0.5, hold: true, rel: 0.3, dest: bp });
+      for (let i = 0; i < 3; i++) {
+        const at = 0.3 + r() * 1.8;
+        tone(v, { type: 'triangle', at, f: 140 + r() * 60, dur: 0.25, a: 0.03, vol: 0.05, vib: [5, 15] });
+      }
+      noiseHit(v, { at: 0.5 + r() * 1.5, dur: 0.015, vol: 0.12, type: 'bandpass', f: 3800 + r() * 1500, q: 5 });
+    },
+  },
+};
+
+/** Every trigger name's synth recipe: its own, or (sample-only names) the aliased one. */
+export const SFX: Record<SfxName, SfxDef> = {
+  ...SYNTH,
+  ...(Object.fromEntries(Object.entries(SYNTH_ALIAS).map(([k, v]) => [k, SYNTH[v]])) as Record<AliasName, SfxDef>),
 };

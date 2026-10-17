@@ -40,6 +40,7 @@ import {
 } from '../sim';
 import type { Controller } from '../game/controller';
 import { sfx } from '../game/sfx';
+import { applySoundscape } from '../game/soundscape';
 import { headUrl, artUrl } from '../scenes/assets';
 import { charIdFor } from '../scenes/JointScene';
 import { bindActions, energyColor, esc, fmt, fmtTime, icon, priceHtml, purpleStarsHtml, starsHtml } from './dom';
@@ -261,6 +262,7 @@ export class Hud {
       this.el.hint.classList.toggle('hidden', !text);
       if (text) this.el.hinttext.textContent = text;
     }
+    applySoundscape(s, this.ctl.mode, this.modalOpen);
     if (this.ctl.mode === 'play' && this.ctl.selection && this.ctl.selection.kind !== 'dishPicker') this.renderCard();
     if (this.ctl.mode === 'edit') this.edit.refresh();
     if (this.ctl.mode === 'raid') this.raid.refresh();
@@ -447,7 +449,7 @@ export class Hud {
         const err = refill(s, sel.id);
         if (err) this.ctl.toast(err);
         else {
-          sfx('heal');
+          sfx('refresh');
           this.ctl.info('Glug glug… ENERGY!');
         }
       }
