@@ -13,6 +13,17 @@ import {
   TUNING,
   addFurniture,
   binFridge,
+  buyAndPlace,
+  canPlace,
+  cancelCooking,
+  crewCapForLevel,
+  expand,
+  ITEM_BY_ID,
+  itemOf,
+  moveFurniture,
+  onLawn,
+  setPath,
+  storeFurniture,
   catchUpReport,
   cookAnywhere,
   cookAt,
@@ -175,7 +186,7 @@ describe('energy matters for cooks', () => {
     const evs = collect(s, 30, (e) => e.some((x) => x.t === 'eaten'));
     const eaten = evs.find((e) => e.t === 'eaten');
     expect(eaten && eaten.t === 'eaten' && eaten.customerId).toBe(c.id);
-    expect(z.energy).toBeCloseTo(50 + TUNING.biteEnergyGain, 0);
+    expect(z.energy).toBeCloseTo(50 + maxEnergy(z) * TUNING.biteEnergyFrac, 0);
     run(s, TUNING.feastSec + 1);
     const next = seatSomeone(s);
     expect(orderEat(s, z.id, next.id)).toMatch(/digesting/);
@@ -476,13 +487,39 @@ describe('saves never lose the joint (tech audit)', () => {
   it('a throw during the offline fast-forward still loads the joint (without the catch-up)', () => {
     const s = createInitialState(6);
     s.cash = 4321;
+    s.level = 7;
     const raw = JSON.parse(serialize(s, 0));
-    // a customer the fast-forward will choke on (an unknown type), but the save itself is fine
-    raw.state.customers.push({ id: 'cX', type: 'nobody', state: 'eating', x: 3, y: 3, path: [], speed: 0, facing: 1, waitLeft: 1, eatEnd: 1, dish: 'nope', serverId: 'w1' });
+    // something the fast-forward chokes on (a mangled to-do list), in an otherwise fine save
+    raw.state.todo = { n: 0, tasks: null };
     const got = deserialize(JSON.stringify(raw), 2 * H * 1000);
     expect(got.failed).toBeUndefined();
     expect(got.catchUpFailed).toBe(true);
     expect(got.state.cash).toBe(4321);
+    expect(got.state.level).toBe(7);
+  });
+
+  it('dishes, items and customer types a content update removed are cleaned out on load', () => {
+    const s = createInitialState(5);
+    s.level = 25;
+    s.cash = 123456;
+    s.stoves[0].status = 'cooking';
+    s.stoves[0].dish = 'old_dish';
+    s.stoves[0].left = 1;
+    s.stoves[0].total = 10;
+    s.stoves[0].cookId = s.workers[0].id;
+    s.workers[0].state = 'cooking';
+    s.workers[0].stoveId = s.stoves[0].id;
+    s.counter[0].dish = 'old_dish';
+    s.counter[0].servings = 9;
+    s.fridge.push({ dish: 'old_dish', servings: 3 }, { dish: 'chili', servings: 3 });
+    s.furniture.push({ id: 'fOld', item: 'old_sofa', x: 5, y: 5 });
+    const got = deserialize(serialize(s, 0), 600_000);
+    expect(got.failed).toBeUndefined();
+    expect(got.state.level).toBe(25);
+    expect(got.state.stoves[0].dish).not.toBe('old_dish');
+    expect(got.state.counter[0].dish).toBeUndefined();
+    expect(got.state.fridge.map((f) => f.dish)).toEqual(['chili']);
+    expect(got.state.furniture.some((f) => f.item === 'old_sofa')).toBe(false);
   });
 
   it('level-ups earned while away are still announced', () => {
@@ -494,6 +531,119 @@ describe('saves never lose the joint (tech audit)', () => {
     const back = deserialize(serialize(s, 0), 2 * H * 1000).state;
     expect(back.level).toBeGreaterThan(1);
     expect(back.events.some((e) => e.t === 'levelup')).toBe(true);
+  });
+});
+
+describe('bug hunt regressions', () => {
+  const lvl = (s: GameState, level: number) => {
+    s.level = level;
+    s.crewCap = crewCapForLevel(level);
+  };
+
+  it('two quick infects can’t go over the crew cap', () => {
+    const s = createInitialState(3);
+    s.cash = 1e6;
+    s.sauce = 100;
+    s.freeInfects = 0;
+    for (let i = 0; i < 4000 && s.customers.filter((c) => c.state === 'waiting' || c.state === 'entering').length < 2; i++) tick(s, 0.25);
+    const cs = s.customers.filter((c) => ['entering', 'waiting', 'eating'].includes(c.state));
+    expect(infect(s, cs[0].id)).toBeNull();
+    expect(infect(s, cs[1].id)).toMatch(/Crew is full/);
+    run(s, 5);
+    expect(zombies(s).length).toBeLessThanOrEqual(s.crewCap);
+  });
+
+  it('expanding keeps lawn items outside, and the layout check sees them', () => {
+    const s = createInitialState(5);
+    lvl(s, 8);
+    s.cash = 1e7;
+    s.sauce = 1000;
+    expect(buyAndPlace(s, 'pethouse_pug', s.roomW + 1, 3)).toBeNull();
+    expect(buyAndPlace(s, 'tombstone_hp', s.roomW, 2)).toBeNull();
+    expect(buyAndPlace(s, 'tombstone_str', 2, s.roomH + 1)).toBeNull();
+    expect(expand(s)).toBeNull();
+    const r = { w: s.roomW, h: s.roomH };
+    for (const f of s.furniture.filter((x) => ITEM_BY_ID[x.item].outdoor)) expect(onLawn(f.x, f.y, r)).toBe(true);
+    // a stove whose cook spot would be a lawn item's tile is refused
+    const t = s.furniture.find((f) => f.item === 'tombstone_hp')!;
+    expect(canPlace(s, 'stove_plain', t.x - 1, t.y, 'se')).not.toBeNull();
+  });
+
+  it('a placement that would box someone in is refused; a boxed-in cook or hangry zombie never acts from afar', () => {
+    const s = createInitialState(11);
+    s.cash = 10000;
+    const you = s.workers[0];
+    you.x = 6;
+    you.y = 5;
+    you.path = [];
+    expect(buyAndPlace(s, 'plant_potted', 5, 5)).toBeNull();
+    expect(buyAndPlace(s, 'plant_potted', 6, 4)).toMatch(/box in/);
+    // force the pocket anyway (an old save): nothing happens at a distance
+    addFurniture(s, 'plant_potted', 6, 4);
+    expect(startCooking(s, you.id, s.stoves[0].id, 'sliders')).toMatch(/can't get to/);
+    const z = makeWorker(s, 'zombie', 'teen', { x: 6, y: 5 });
+    z.energy = 0;
+    s.workers.push(z);
+    seatSomeone(s);
+    run(s, 10);
+    expect(s.stats.bites).toBe(0);
+  });
+
+  it('a recharging tombstone can’t be stored (it would come back full)', () => {
+    const s = createInitialState(5);
+    lvl(s, 8);
+    s.cash = 1e7;
+    s.sauce = 1000;
+    expect(buyAndPlace(s, 'tombstone_str', s.roomW + 1, 1)).toBeNull();
+    const f = s.furniture.find((x) => x.item === 'tombstone_str')!;
+    f.uses = 0;
+    f.usesResetAt = s.now + 24 * 3600;
+    expect(storeFurniture(s, f.id)).toMatch(/recharging/);
+    f.uses = 5;
+    f.usesResetAt = undefined;
+    expect(storeFurniture(s, f.id)).toBeNull();
+  });
+
+  it('YOU gets raid damage back at home (YOU never tires)', () => {
+    const s = createInitialState(9);
+    s.workers[0].energy = 12;
+    tick(s, 0.1);
+    expect(s.workers[0].energy).toBe(maxEnergy(s.workers[0]));
+  });
+
+  it('cancelling before the cook gets to the stove refunds everything', () => {
+    const s = createInitialState(1);
+    s.cash = 1000;
+    s.workers[0].x = 6;
+    s.workers[0].y = 5;
+    expect(startCooking(s, s.workers[0].id, s.stoves[0].id, 'hobodog')).toBeNull();
+    expect(s.stoves[0].status).toBe('reserved');
+    cancelCooking(s, s.stoves[0].id);
+    expect(s.cash).toBe(1000);
+  });
+
+  it('a bite gives back about 20% of max energy', () => {
+    const { s, z } = withZombie('sumo');
+    const c = seatSomeone(s);
+    z.energy = 10;
+    orderEat(s, z.id, c.id);
+    collect(s, 30, (e) => e.some((x) => x.t === 'eaten'));
+    expect(z.energy).toBeCloseTo(10 + maxEnergy(z) * 0.2, 0);
+  });
+
+  it('moving a piece only drops jobs that involve it', () => {
+    const s = createInitialState(5);
+    s.cash = 1e5;
+    expect(buyAndPlace(s, 'plant_potted', 6, 5)).toBeNull();
+    const plant = s.furniture.find((f) => f.item === 'plant_potted')!;
+    const you = s.workers[0];
+    you.job = { kind: 'dish', stoveId: s.stoves[0].id, dish: 'sliders', servings: 12 };
+    you.state = 'carryDish';
+    you.targetId = s.furniture.find((f) => itemOf(f).kind === 'counter')!.id;
+    setPath(s, you, { x: 1, y: 2 }, 1);
+    expect(moveFurniture(s, plant.id, 6, 4)).toBeNull();
+    expect(you.state).toBe('carryDish');
+    expect(you.path.length).toBeGreaterThan(0);
   });
 });
 

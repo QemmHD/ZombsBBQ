@@ -43,6 +43,8 @@ export const itemOf = (f: Furniture): ItemDef => ITEM_BY_ID[f.item];
 export const furnById = (s: GameState, id: string) => s.furniture.find((f) => f.id === id);
 export const furnAt = (s: GameState, x: number, y: number) => s.furniture.find((f) => f.x === x && f.y === y);
 export const zombies = (s: GameState) => s.workers.filter((w) => w.kind === 'zombie');
+/** Crew slots in use: the zombies, plus customers still turning into one. */
+export const crewCount = (s: GameState) => zombies(s).length + s.customers.filter((c) => c.state === 'infecting').length;
 export const atWork = (w: Worker) => w.state !== 'raiding' && w.state !== 'down';
 
 export function blockedTiles(s: GameState): Set<string> {
@@ -470,7 +472,9 @@ export function finishNow(s: GameState, stoveId: string): string | null {
 export function cancelCooking(s: GameState, stoveId: string): string | null {
   const st = s.stoves.find((x) => x.id === stoveId);
   if (!st || !(st.status === 'cooking' || st.status === 'paused' || st.status === 'reserved') || !st.dish) return 'Nothing cooking there.';
-  s.cash += Math.floor(DISH_BY_ID[st.dish].cost * TUNING.sellBack);
+  // nothing's been cooked yet while the cook is still on the way: all the money back
+  const cost = DISH_BY_ID[st.dish]?.cost ?? 0;
+  s.cash += st.status === 'reserved' && st.left === st.total ? cost : Math.floor(cost * TUNING.sellBack);
   const cook = s.workers.find((w) => w.id === st.cookId);
   if (cook && (cook.state === 'cooking' || cook.state === 'toStove')) {
     cook.state = 'idle';
@@ -531,7 +535,7 @@ export function infectCost(s: GameState, c: Customer): { cash: number; sauce: nu
 export function infect(s: GameState, customerId: string): string | null {
   const c = s.customers.find((x) => x.id === customerId);
   if (!c || !['entering', 'waiting', 'eating'].includes(c.state)) return 'Too late, they left!';
-  if (zombies(s).length >= s.crewCap) return `Crew is full (${s.crewCap}/${s.crewCap}). Level up for more slots!`;
+  if (crewCount(s) >= s.crewCap) return `Crew is full (${s.crewCap}/${s.crewCap}). Level up for more slots!`;
   const cost = infectCost(s, c);
   if (s.cash < cost.cash) return 'Not enough cash!';
   if (s.sauce < cost.sauce) return 'Not enough Brain Sauce!';
@@ -976,6 +980,8 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
   const max = maxEnergy(w);
   const speed = workerSpeed(w);
   const r = room(s);
+  // YOU never tires: any raid knocks wear off once you're home
+  if (w.kind === 'you' && w.energy < max && atWork(w)) w.energy = max;
   // worked down to nothing: they pass out face-down on the spot (original: "…fall asleep")
   if (w.kind === 'zombie' && w.energy <= 0 && WORKING.has(w.state)) {
     fallAsleep(s, w);
@@ -1133,7 +1139,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         t.dirty = false;
         s.events.push({ t: 'cleared', tableId: t.id });
         w.state = 'carryPlate';
-        if (!setPath(s, w, sink, speed)) w.path = [];
+        if (!goTo(s, w, sink, speed, 'the sink')) w.path = [];
       }
       break;
     }
@@ -1177,7 +1183,7 @@ function updateWorker(s: GameState, w: Worker, dt: number) {
         s.events.push({ t: 'bite', x: c.x, y: c.y, workerId: w.id, customerId: c.id });
         s.stats.bites++;
         addRating(s, 0, TUNING.ratingAttackWeight);
-        w.energy = Math.min(max, w.energy + TUNING.biteEnergyGain);
+        w.energy = Math.min(max, w.energy + max * TUNING.biteEnergyFrac);
         w.nextBiteAt = s.now + TUNING.biteCooldownSec;
         w.targetId = undefined;
         // original: the zombie eats them right there (its feast), leaving a pile of bones on the floor

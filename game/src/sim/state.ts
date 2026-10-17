@@ -438,6 +438,50 @@ export function repairRaiders(st: GameState) {
   for (const p of st.pets ?? []) if (p.state === 'raiding') p.state = 'roam';
 }
 
+/**
+ * Dishes, items or customer types a content update renamed or removed: cleared out of stoves, counters,
+ * the fridge, the crew's hands and the dining room, so one stale id can't break the whole save.
+ */
+function dropUnknownContent(st: GameState) {
+  const ok = (d?: string) => !d || !!DISH_BY_ID[d];
+  const gone = new Set(st.furniture.filter((f) => !ITEM_BY_ID[f.item]).map((f) => f.id));
+  st.furniture = st.furniture.filter((f) => !gone.has(f.id));
+  st.stoves = st.stoves.filter((x) => !gone.has(x.furnitureId) && st.furniture.some((f) => f.id === x.furnitureId));
+  st.counter = st.counter.filter((x) => !gone.has(x.furnitureId));
+  for (const x of st.stoves)
+    if (!ok(x.dish)) {
+      x.status = 'empty';
+      x.dish = x.cookId = x.carrierId = undefined;
+      x.left = x.total = x.burnAt = undefined;
+    }
+  for (const c of st.counter)
+    if (!ok(c.dish)) {
+      c.dish = undefined;
+      c.servings = 0;
+    }
+  st.fridge = st.fridge.filter((f) => f && DISH_BY_ID[f.dish]);
+  st.customers = st.customers.filter((c) => CUSTOMER_BY_ID[c.type] && ok(c.dish) && !(c.seatId && gone.has(c.seatId)) && !(c.tableId && gone.has(c.tableId)));
+  for (const w of st.workers) {
+    const j = w.job;
+    const bad =
+      (j?.kind === 'serve' && (!ok(j.dish) || !st.customers.some((c) => c.id === j.customerId))) ||
+      (j?.kind === 'dish' && (!ok(j.dish) || !st.stoves.some((x) => x.id === j.stoveId))) ||
+      (j?.kind === 'plate' && !st.furniture.some((f) => f.id === j.tableId)) ||
+      !ok(w.pendingDish) ||
+      (w.stoveId && !st.stoves.some((x) => x.id === w.stoveId));
+    if (!bad) continue;
+    w.job = undefined;
+    w.pendingDish = undefined;
+    w.stoveId = undefined;
+    w.targetId = undefined;
+    if (w.state !== 'raiding' && w.state !== 'down' && w.state !== 'resting') {
+      w.state = 'idle';
+      w.path = [];
+    }
+  }
+  for (const c of st.customers) if (c.serverId && !st.workers.some((w) => w.id === c.serverId)) c.serverId = undefined;
+}
+
 /** Upgrade older saves in place. Returns null if the save can't be migrated. */
 export function migrate(raw: unknown): GameState | null {
   const st = raw as (GameState & { version?: number }) | null;
@@ -447,6 +491,7 @@ export function migrate(raw: unknown): GameState | null {
     for (const k of ['pets', 'wallItems', 'fridge', 'recipes', 'goalsDone', 'recentTypes'] as const) if (!Array.isArray(st[k])) (st as unknown as Record<string, unknown>)[k] = [];
     for (const k of ['seen', 'rivals', 'storage', 'floors'] as const) if (!st[k] || typeof st[k] !== 'object') (st as unknown as Record<string, unknown>)[k] = {};
     repairRaiders(st);
+    dropUnknownContent(st);
     // newer stat counters (e.g. decor) start at zero on older v3 saves
     st.stats = { ...freshStats(), ...(st.stats ?? {}) };
     // the never-used daily grave counters of earlier builds

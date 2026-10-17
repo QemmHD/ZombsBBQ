@@ -316,7 +316,8 @@ export const TUNING = {
   restRegenPerSec: 1 / 16, // ~3.75/min at average recharge (original ~3/min)
   /** each Toxic Barrel adds this much to the rest recharge rate (they stack; original +10%) */
   kegBonus: 0.1,
-  biteEnergyGain: 20,
+  /** a bite gives back this share of the zombie's max energy (≈20 for an average zombie) */
+  biteEnergyFrac: 0.2,
   /** a hangry zombie slumps and moans this long before it goes for a customer (original 5 s warning) */
   hungrySec: 5,
   /** at most one bite per zombie this often (original ZOMBIE_ATTACK_INTERVAL 60 s) */

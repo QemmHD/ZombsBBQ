@@ -239,7 +239,7 @@ describe('energy, patience, biting, resting outside, levels', () => {
     }
     expect(s.stats.bites).toBe(1);
     expect(s.rating).toBeLessThan(before);
-    expect(z.energy).toBeGreaterThan(TUNING.biteEnergyGain * 0.9);
+    expect(z.energy).toBeGreaterThan(maxEnergy(z) * TUNING.biteEnergyFrac * 0.9);
     expect(s.customers.filter((c) => c.state === 'waiting' || c.state === 'eating')).toHaveLength(0);
   });
 
