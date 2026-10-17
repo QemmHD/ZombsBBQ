@@ -153,7 +153,13 @@ await wait(800);
 await shot('serving');
 
 // ---------- 2. infect a customer ----------
-const custId = await page.evaluate(() => window.zbbq.ctl.state.customers.find((c) => c.state === 'waiting' || c.state === 'eating')?.id);
+const custId = await page.evaluate(() => {
+  const s = window.zbbq.ctl.state;
+  // a diner who won't get up and leave while the card is open (the tutorial's first meal is only 10 s)
+  const c = s.customers.find((c) => c.state === 'waiting') ?? s.customers.find((c) => c.state === 'eating');
+  if (c?.state === 'eating') c.eatEnd = Math.max(c.eatEnd, s.now + 30);
+  return c?.id;
+});
 check(!!custId, 'a customer is seated');
 if (custId) await tapActor(custId);
 await shot('infect-card');
