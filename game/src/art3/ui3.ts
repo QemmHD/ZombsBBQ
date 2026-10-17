@@ -29,9 +29,9 @@ type Box = [number, number, number, number];
 
 // ---------------------------------------------------------------- UI palette (muted; accents small)
 const U = {
-  maroon: '#6D1727',
+  maroon: '#691122',
   maroonD: '#4C0F1B',
-  rose: '#7E454E',
+  rose: '#7A414C',
   roseD: '#5E3138',
   roseHi: '#A26A72',
   olive: '#658433',
@@ -41,10 +41,10 @@ const U = {
   kraft: '#B39566',
   kraftD: '#8C7148',
   kraftDD: '#6A5434',
-  paper: '#DAD6C8',
-  paperD: '#B9B4A3',
-  legal: '#E3D58A',
-  legalD: '#C9B96C',
+  paper: '#F0EFEC',
+  paperD: '#D2D0CA',
+  legal: '#FFEC80',
+  legalD: '#E6CF5E',
   parch: '#CDB98A',
   parchD: '#A8915E',
   steel: '#9A9F9C',
@@ -1223,8 +1223,9 @@ function texChalk(): ArtAsset {
     let s = '';
     // board
     const inner = `M${B},${B}H${W - B}V${H - B}H${B}Z`;
-    s += F(inner, '#2F3B33');
-    s += F(inner, d.radial(W / 2, H / 2, W * 0.55, [[0, '#4A5A4E', 0.55], [1, '#141A16', 0.5]]));
+    // slate: the original's near-black board (#1D1D1D-#222222) with faint scratches
+    s += F(inner, '#1E1E1E');
+    s += F(inner, d.radial(W / 2, H / 2, W * 0.55, [[0, '#2C2C2C', 0.6], [1, '#121212', 0.5]]));
     let ch = '';
     // eraser smears
     for (let k = 0; k < 9; k++) {
@@ -1238,10 +1239,11 @@ function texChalk(): ArtAsset {
     s += d.clip(inner, ch);
     // frame: four mitred boards
     const sides: [string, boolean, Box, string, string][] = [
-      [`M0,0H${W}L${W - B},${B}H${B}Z`, true, [0, 0, W, B], '#8A5E34', '#6A4524'],
-      [`M0,${H}H${W}L${W - B},${H - B}H${B}Z`, true, [0, H - B, W, B], '#74502C', '#58391E'],
-      [`M0,0V${H}L${B},${H - B}V${B}Z`, false, [0, 0, B, H], '#80572F', '#634220'],
-      [`M${W},0V${H}L${W - B},${H - B}V${B}Z`, false, [W - B, 0, B, H], '#6E4A28', '#52361C'],
+      // frame wood around #563F27 (doc 18 §1.3)
+      [`M0,0H${W}L${W - B},${B}H${B}Z`, true, [0, 0, W, B], '#654A2E', '#46311E'],
+      [`M0,${H}H${W}L${W - B},${H - B}H${B}Z`, true, [0, H - B, W, B], '#4A3520', '#3C2918'],
+      [`M0,0V${H}L${B},${H - B}V${B}Z`, false, [0, 0, B, H], '#5C432A', '#42301C'],
+      [`M${W},0V${H}L${W - B},${H - B}V${B}Z`, false, [W - B, 0, B, H], '#503A24', '#3C2918'],
     ];
     sides.forEach(([p, horiz, b, base, sh], k) => {
       s += F(p, base);
@@ -1538,8 +1540,9 @@ export function buildUi3(): ArtAsset[] {
     texChalk(),
     texPaper(),
     texParchment(),
-    button('btn_olive', U.olive, U.oliveD, '#9DB86A', '#2E4508', 41),
-    button('btn_red', '#9A2E2B', U.maroon, '#C9827A', '#3A0812', 43),
+    // sticker buttons in the original's measured colours: olive #486D0D / band #6D8A3D / rim #8BB647, red #DF1E00 / band #E54B33 / shadow #5E1308
+    button('btn_olive', '#6D8A3D', '#486D0D', '#8BB647', '#2E4508', 41),
+    button('btn_red', '#E54B33', '#DF1E00', '#F29A86', '#5E1308', 43),
     texBrick(),
     texCork(),
   ];
