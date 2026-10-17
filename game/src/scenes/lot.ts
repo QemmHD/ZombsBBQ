@@ -25,7 +25,8 @@ export const moverDepth = (x: number, y: number, add: number) => (behindWalls(x,
 /** Deterministic per-tile noise for ground variation and scenery. */
 export const h = (x: number, y: number, k: number) => Math.abs((x * 73856093) ^ (y * 19349663) ^ (k * 83492791)) % 1000;
 
-export const charIdFor = (w: { kind: string; type: string }) => (w.kind === 'you' ? 'you' : `${w.type}_z`);
+/** The art for a worker: YOU wears the chosen chef avatar (`chef_*`, else the default look), zombies their type's zombie form. */
+export const charIdFor = (w: { kind: string; type: string }) => (w.kind === 'you' ? (w.type.startsWith('chef_') ? w.type : 'you') : `${w.type}_z`);
 
 /** Art for a placed item: sw drawings mirror for se; chairs have ne drawings (+ a backrest overlay). */
 export function furnArt(item: string, dir?: Dir): { key: string; flip: boolean; back?: string } {

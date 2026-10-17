@@ -42,7 +42,7 @@ const overlapCheck = () =>
       const st = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none' && Number(st.opacity) > 0.05 ? r : null;
     };
-    const sel = ['.awning', '.side.left', '.side.right', '.hint:not(.hidden)', '.card:not(.hidden)', '.editbar', '.rh-top', '.rh-tray', '.sendall', '.rh-items', '.rh-loot'];
+    const sel = ['.awning', '.side.left', '.side.right', '.tutbar:not(.hidden)', '.strip:not(.hidden)', '.editbar', '.rh-top', '.rh-tray', '.sendall', '.rh-items', '.rh-loot'];
     const boxes = [];
     for (const s of sel) for (const el of document.querySelectorAll(s)) {
       const r = vis(el);
@@ -91,7 +91,8 @@ for (const d of DEVICES) {
     for (const p of await page.evaluate(overlapCheck)) problems.push(`${d.name} ${label}: ${p}`);
   };
   await snap('joint');
-  // a worker card + Gus hint together (the tightest bottom row)
+  // the command strip for YOU (after OK on Gus's first tutorial bar)
+  await page.evaluate(() => document.querySelector('[data-a="tutok"]')?.click());
   await page.evaluate(() => window.zbbq.ctl.tapWorker(window.zbbq.ctl.state.workers[0].id));
   await page.waitForTimeout(700);
   await snap("card");

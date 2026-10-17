@@ -59,7 +59,7 @@ export const HINTS: Record<HintId, string> = {
   noSeat: 'Somebody walked in, saw no free seat and walked right out. More tables, more money.',
   crewSlot: 'There’s a free spot on the crew. Tap a customer and INFECT. The union dues are very reasonable.',
   idleStove: 'A cold stove makes no money. Tap a cook, then the stove, and get something sizzling.',
-  buyStove: 'One stove? That’s a hot plate with ambitions. SHOP → Kitchen has another. Two cooks, twice the grub.',
+  buyStove: 'One stove? That’s a hot plate with ambitions. SHOP → Utility has another. Two cooks, twice the grub.',
   expand: 'You can afford more elbow room. SHOP → Special → Expand. Bigger joint, more seats, more snacks.',
   map: 'The raid map’s open. Chuck’s Chow Hall is down the road with a full counter and a weak door. Tap RAID.',
   closed: 'We’re CLOSED, Boss. The rating sags while the sign’s flipped. Tap the sign when you’re ready.',

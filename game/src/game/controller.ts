@@ -36,6 +36,10 @@ import {
   setClosed,
   FLOOR_BY_ID,
   WALL_BY_ID,
+  DOOR_X,
+  dishAvailable,
+  stoveCooks,
+  isInside,
   type AwayReport,
   type Dir,
   type GameEvent,
@@ -59,6 +63,9 @@ export type Selection =
   | null;
 
 export type Mode = 'play' | 'edit' | 'raid';
+
+/** Something the camera should frame: a world point (scene units), or a thing in the café. */
+export type FocusTarget = { x: number; y: number; zoom?: number } | { thing: import('./tutorial').TutTarget; zoom?: number } | { tile: { x: number; y: number } };
 
 export interface Placement {
   itemId: string;
@@ -129,6 +136,11 @@ export class Controller {
   private saveTimer = 0;
   private hiddenAt = 0;
   private raidAcc = 0;
+  /** reasons the café's clock is stopped (the tutorial bar is up…); empty = running */
+  private holds = new Set<string>();
+  private focusListeners: ((t: FocusTarget) => void)[] = [];
+  /** the last dish cooked on each stove (the stove's ORDER button cooks it again) */
+  lastDish = new Map<string, string>();
 
   constructor() {
     const raw = storageGet();
@@ -140,6 +152,8 @@ export class Controller {
       this.saveBlocked = true;
       this.loadProblem = { backups: this.backupList() };
     }
+    // a brand-new joint starts like the original's: sign on CLOSED, the chef waiting by the front door
+    if (!raw) this.freshStart();
     if (loaded.catchUpFailed) setTimeout(() => this.info('Welcome back! (The time you were away couldn’t be counted this once.)'), 1500);
     if (loaded.report && loaded.offlineSec > 60) this.offlineReport = loaded.report;
     document.addEventListener('visibilitychange', () => {
@@ -201,6 +215,38 @@ export class Controller {
   /** Give up on the broken save and start a new joint (the broken one stays stored as .corrupt). */
   startFresh() {
     this.replaceState(deserialize(null, Date.now()).state);
+    this.freshStart();
+  }
+
+  /** First launch: closed sign, YOU standing just inside the front door. */
+  private freshStart() {
+    const s = this.state;
+    setClosed(s, true);
+    const you = s.workers.find((w) => w.kind === 'you');
+    // one step in from the doorway (standing in it would hold the door open)
+    if (you && isInside(DOOR_X, 1, { w: s.roomW, h: s.roomH }) && !s.furniture.some((f) => f.x === DOOR_X && f.y === 1)) {
+      you.x = DOOR_X;
+      you.y = 1;
+      you.path = [];
+      you.facing = -1;
+    }
+  }
+
+  // ----- the café's clock (the tutorial freezes it, like the original's dialogs) -----
+  get frozen() {
+    return this.holds.size > 0;
+  }
+  hold(reason: string, on: boolean) {
+    if (on) this.holds.add(reason);
+    else this.holds.delete(reason);
+  }
+
+  // ----- camera requests (the tutorial, a selection under the command strip) -----
+  onFocus(l: (t: FocusTarget) => void) {
+    this.focusListeners.push(l);
+  }
+  focus(t: FocusTarget) {
+    for (const l of this.focusListeners) l(t);
   }
 
   private replaceState(st: GameState) {
@@ -267,7 +313,7 @@ export class Controller {
   }
 
   private step(dtSec: number) {
-    tick(this.state, Math.min(dtSec, 0.1));
+    if (!this.frozen || this.mode === 'raid') tick(this.state, Math.min(dtSec, 0.1));
     if (this.raid && this.raid.phase === 'fight') {
       // fixed-step raid for determinism
       this.raidAcc += Math.min(dtSec, 0.1);
@@ -315,6 +361,7 @@ export class Controller {
       /* ignore */
     }
     this.replaceState(deserialize(null, Date.now()).state);
+    this.freshStart();
   }
 
   // ----- play-mode taps -----
@@ -412,10 +459,31 @@ export class Controller {
     const err = cookAt(this.state, sel.stoveId, dishId, sel.workerId);
     if (err) this.toast(err);
     else {
+      this.lastDish.set(sel.stoveId, dishId);
       sfx('purchase');
       this.info(`Cooking ${DISH_BY_ID[dishId].name}!`);
     }
     this.select(err ? sel : null);
+  }
+
+  /** The dish ORDER would cook on this stove (the last one cooked here, if it can still be made). */
+  reorderDish(stoveId: string): string | null {
+    const st = this.state.stoves.find((x) => x.id === stoveId);
+    const id = this.lastDish.get(stoveId);
+    if (!st || !id || !DISH_BY_ID[id] || !stoveCooks(st, DISH_BY_ID[id].station) || !dishAvailable(this.state, id)) return null;
+    return id;
+  }
+
+  /** ORDER on an empty stove: cook the last dish again (the nearest free cook goes). */
+  orderAgain(stoveId: string) {
+    const id = this.reorderDish(stoveId);
+    if (!id) return this.toast('Nothing to repeat yet. Tap COOK and pick a dish.', false);
+    const sel = this.selection;
+    const err = cookAt(this.state, stoveId, id, sel?.kind === 'worker' ? sel.id : undefined);
+    if (err) return this.toast(err);
+    sfx('purchase');
+    this.info(`Cooking ${DISH_BY_ID[id].name} again!`);
+    this.select(null);
   }
 
   tapNothing() {
@@ -454,6 +522,8 @@ export class Controller {
       const dir = dirsFor(def)[0];
       const spot = this.firstFreeTile(itemId, dir) ?? { x: Math.floor(s.roomW / 2), y: Math.floor(s.roomH / 2) };
       this.placing = { itemId, source, x: spot.x, y: spot.y, dir };
+      // bring the ghost into view, above the purchase panel
+      this.focus({ tile: spot });
     }
     this.editSel = null;
     this.emitSel();
@@ -554,6 +624,21 @@ export class Controller {
     this.emitSel();
   }
 
+  /** Every floor tile the piece being placed could go on (the original's glowing green boxes). */
+  placeableTiles(): { x: number; y: number }[] {
+    const p = this.placing;
+    if (!p || p.wall) return [];
+    const s = this.state;
+    const out: { x: number; y: number }[] = [];
+    const outdoor = ITEM_BY_ID[p.itemId]?.outdoor;
+    const x0 = outdoor ? -1 : 0;
+    const x1 = outdoor ? s.roomW + 4 : s.roomW;
+    const y1 = outdoor ? s.roomH + 4 : s.roomH;
+    for (let y = x0; y < y1; y++)
+      for (let x = x0; x < x1; x++) if (!canPlace(s, p.itemId, x, y, p.dir, p.source === 'move' ? p.id : undefined)) out.push({ x, y });
+    return out;
+  }
+
   /** Why the current placement can't be confirmed (null = good to go). */
   placementProblem(): string | null {
     const p = this.placing;
@@ -585,6 +670,9 @@ export class Controller {
     }
     if (err) return this.toast(err);
     sfx(p.source === 'buy' ? 'purchase' : 'place');
+    // buying pays its XP at once, with a float over the new piece (the original's "+2 XP")
+    const xp = ITEM_BY_ID[p.itemId]?.xp ?? 0;
+    if (p.source === 'buy' && xp > 0) s.events.push({ t: 'xp', x: p.wall ? (p.wall.wall === 'r' ? p.wall.index : 0) : p.x, y: p.wall ? (p.wall.wall === 'l' ? p.wall.index : 0) : p.y, amount: xp });
     this.placing = null;
     this.emitSel();
   }

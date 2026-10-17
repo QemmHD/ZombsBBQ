@@ -772,9 +772,171 @@ const gus = mk({
   leg: legPaint({ kind: 'pants', col: tone('#4A4844'), shoe: 'clog', shoeCol: C.black }),
 });
 
+// ---------------------------------------------------------------- chef avatars (the chef picker)
+/** A meat cleaver held blade-up. */
+function cleaver(): HandItem {
+  return {
+    fist: true,
+    box: [-3, -19, 9, 4],
+    under: (c, h) => {
+      let s = outl(`M${R2(h, -0.8, 3)}L${R2(h, 0.8, 3.2)}L${R2(h, 1.4, -6)}L${R2(h, -0.2, -6.2)}Z`, '#4A3424', 0.7);
+      s += outl(`M${R2(h, -1.2, -5.6)}L${R2(h, 7.4, -6.4)}L${R2(h, 8, -17.6)}L${R2(h, -0.6, -17.2)}Z`, '#A8ACA8', 0.9);
+      s += line(`M${R2(h, 7.2, -7)}L${R2(h, 7.8, -17)}`, 0.7, '#E2E4DE') + circ(h[0] + 1.6, h[1] - 15, 0.8, '#5A5A58');
+      if (c.z) s += stain(h[0] + 4, h[1] - 9, 1.6, BLOOD, c.seed + 5, 0.8);
+      return s;
+    },
+  };
+}
+/** A soup ladle, bowl up. */
+function ladle(): HandItem {
+  return {
+    fist: true,
+    box: [-3, -18, 7, 4],
+    under: (c, h) => {
+      let s = line(`M${R2(h, 0, 3)}L${R2(h, 1.4, -12)}`, 2, INK) + line(`M${R2(h, 0, 3)}L${R2(h, 1.4, -12)}`, 1.1, '#A8ACA8');
+      s += outl(ellD(h[0] + 2.2, h[1] - 14.6, 3.6, 2.6), '#8C908C', 0.8) + fill(ellD(h[0] + 2.2, h[1] - 15.4, 2.4, 1.1), '#C8B070', 'opacity="0.9"');
+      if (c.z) s += stain(h[0] + 2, h[1] - 14, 1, BLOOD, c.seed + 6, 0.8);
+      return s;
+    },
+  };
+}
+/** A paper diner cap (the folded garrison kind). */
+function paperCap(col: Tone, stripe: string): H.HatPaint {
+  return {
+    front: () => outl('M-21,-92L-17,-102Q2,-108 22,-101L26,-91Q2,-96 -21,-92Z', col.b, 0.9) + line('M-19,-95Q2,-99 24,-94', 1.2, stripe) + line('M2,-106L4,-97', 0.5, col.s ?? col.b),
+    back: () => outl('M-23,-91L-19,-102Q2,-107 20,-102L24,-92Q0,-96 -23,-91Z', col.b, 0.9) + line('M-21,-95Q0,-99 22,-95', 1.2, stripe),
+  };
+}
+/** Hairnet over the hair (lunch lady). */
+const hairnet: Paint = (c) =>
+  c.back ? '' : line('M-20,-96Q-6,-110 14,-104M-22,-88Q-4,-104 22,-98M-14,-108Q-18,-96 -22,-84M-2,-110Q-6,-96 -10,-86M10,-108Q8,-98 6,-90', 0.35, '#E8E4D8', 'opacity="0.65"');
+
+const chef_pitboss = mk({
+  body: 'fat',
+  bodyMod: { belly: 6 },
+  height: 106,
+  skin: SKIN_DARK,
+  face: { shape: 'round', lid: 0.45, bags: 2, brow: 'thick', browCol: '#1A1714', nose: 'bulb', mouth: 'grin', wrinkles: 1, zMouth: 'jaw' },
+  hair: HAIR.black,
+  set: H.withHat(H.buzz(HAIR.black), H.headband(C.oxblood, true)),
+  facialHair: W.goatee(HAIR.black),
+  torso: seq(shirtTorso({ top: C.black, collar: 'tee', untucked: true, pants: C.charcoal }), W.apron(tone('#6A4A30', '#4A3020'), { len: 8, stains: 6, pocket: true })),
+  torsoBox: [-24, -66, 28, -2],
+  arm: armPaint({ sleeve: 'none', col: C.black, bulk: 1.1, glove: tone('#2A2724'), itemR: tongs() }),
+  leg: legPaint({ kind: 'pants', col: C.charcoal, shoe: 'boot', shoeCol: tone('#3A2A1C') }),
+});
+
+const chef_hash = mk({
+  body: 'slim',
+  height: 102,
+  skin: SKIN_PEACH,
+  face: { shape: 'long', lid: 0.55, bags: 2, brow: 'raised', browCol: '#3A2E24', nose: 'long', mouth: 'smirk', stubble: true, wrinkles: 2, zMouth: 'crooked', look: [0.6, 0] },
+  hair: HAIR.dark,
+  set: H.withHat(H.underHat(HAIR.dark), paperCap(tone('#DAD6C8', '#B4AF9E'), '#8A2A26')),
+  facialHair: W.pencilStache(HAIR.dark),
+  torso: seq(shirtTorso({ top: C.white, collar: 'shirt', buttons: true, pants: C.charcoal, belt: '#2A2420' }), W.apron(tone('#DAD6C8', '#B4AF9E'), { len: 5, stains: 5 })),
+  arm: armPaint({ sleeve: 'rolled', col: C.white, itemR: PR.spatula(), itemL: PR.coffeeCup() }),
+  leg: legPaint({ kind: 'pants', col: C.charcoal, shoe: 'dress', shoeCol: C.black }),
+});
+
+const chef_grill = mk({
+  body: 'muscle',
+  height: 106,
+  skin: SKIN_TAN,
+  face: { shape: 'square', lid: 0.4, bags: 1, brow: 'uni', browCol: '#3A3028', nose: 'broken', mouth: 'grim', wrinkles: 2, zMouth: 'snarl' },
+  hair: HAIR.grey,
+  set: H.withHat(H.buzz(HAIR.grey), H.peakCap(C.olive, tone('#3A3A2C'), '#B8963E')),
+  facialHair: W.horseshoe(HAIR.grey),
+  torso: seq(shirtTorso({ top: C.olive, collar: 'tee', pants: C.khaki, belt: '#2A2420', buckle: '#A8ACA8' }), W.apron(tone('#CFC8B0', '#A8A088'), { len: 4, stains: 3 })),
+  arm: armPaint({ sleeve: 'short', col: C.olive, wristband: '#3A3A2C', itemR: PR.spatula() }),
+  leg: legPaint({ kind: 'pants', col: C.khaki, shoe: 'boot', shoeCol: C.black, cuffs: true }),
+});
+
+const chef_saucy = mk({
+  body: 'stocky',
+  height: 102,
+  skin: SKIN_PEACH,
+  face: { shape: 'heart', lid: 0.45, bags: 1, brow: 'arched', browCol: '#6A3A20', nose: 'small', mouth: 'lips', lips: '#8A2A30', lash: true, wrinkles: 1, zMouth: 'crooked' },
+  hair: HAIR.ginger,
+  set: H.withHat(H.underHat(HAIR.ginger, { shaggy: true }), H.headband(tone('#8A2A26'))),
+  faceUnder: W.makeup({ freckles: true, blush: '#B06A5A' }),
+  torso: seq(shirtTorso({ top: tone('#B07C84'), collar: 'scoop', untucked: true, pants: C.denim }), W.apron(C.oxblood, { len: 7, stains: 4, pocket: true })),
+  arm: armPaint({ sleeve: 'cap', col: tone('#B07C84'), itemR: ladle() }),
+  leg: legPaint({ kind: 'pants', col: C.denim, shoe: 'clog', shoeCol: tone('#8A2A26') }),
+});
+
+const chef_fry = mk({
+  body: 'teen',
+  height: 100,
+  skin: SKIN_PALE,
+  face: { shape: 'small', lid: 0.6, bags: 2, brow: 'sparse', browCol: '#8A7A50', nose: 'pug', mouth: 'gap', wrinkles: 0, zMouth: 'gape', look: [0.3, 1] },
+  hair: HAIR.bleach,
+  set: H.withHat(H.underHat(HAIR.bleach, { shaggy: true }), H.backCap(tone('#B09038'), '#8A2A26')),
+  faceUnder: W.makeup({ acne: true }),
+  torso: seq(shirtTorso({ top: tone('#B09038'), collar: 'polo', untucked: true, pants: C.black, stripes: '#8A2A26' }), W.apron(C.charcoal, { len: 4, stains: 6 })),
+  arm: armPaint({ sleeve: 'short', col: tone('#B09038'), itemR: PR.spatula() }),
+  leg: legPaint({ kind: 'pants', col: C.black, shoe: 'sneaker', shoeCol: tone('#A8A69C'), sole: '#7C7A72' }),
+});
+
+const chef_butcher = mk({
+  body: 'stocky',
+  bodyMod: { belly: 3 },
+  height: 108,
+  skin: SKIN,
+  face: { shape: 'jowl', lid: 0.6, bags: 2, brow: 'bushy', browCol: '#2A2622', nose: 'big', mouth: 'frown', stubble: true, wrinkles: 2, zMouth: 'jaw' },
+  hair: HAIR.black,
+  set: H.baldFringe(HAIR.black),
+  facialHair: W.fullBeard(HAIR.black, 1.2),
+  torso: seq(
+    shirtTorso({ top: C.white, collar: 'tee', pants: C.grey }),
+    W.apron(tone('#DAD6C8', '#B4AF9E'), { len: 9, stains: 9 }),
+    (c) => (c.back ? '' : inside(c.d, torsoD(c.b), stain(-6, c.b.tBot - 16, 2.6, BLOOD, c.seed + 8, 0.7) + stain(5, c.b.tBot - 6, 2, BLOOD, c.seed + 9, 0.6))),
+  ),
+  torsoBox: [-22, -66, 26, -2],
+  arm: armPaint({ sleeve: 'rolled', col: C.white, bulk: 1.1, itemR: cleaver() }),
+  leg: legPaint({ kind: 'pants', col: C.grey, shoe: 'boot', shoeCol: C.black }),
+});
+
+const chef_lunchlady = mk({
+  body: 'granny',
+  height: 100,
+  skin: SKIN_TAN,
+  face: { shape: 'jowl', lid: 0.5, bags: 2, brow: 'thin', browCol: '#5A5650', nose: 'hook', mouth: 'pout', lips: '#7A3A44', wrinkles: 3, zMouth: 'toothless' },
+  hair: HAIR.grey,
+  set: H.bun(HAIR.grey),
+  faceUnder: W.makeup({ mole: [16.4, -62], blush: '#9A5A5A' }),
+  faceOver: W.glasses('cat', '#4A3A2E'),
+  headBackOver: seq(W.glassesBack('#4A3A2E'), hairnet),
+  torso: seq(
+    W.skirt(tone('#7F8C68'), { hem: 8, flare: 2 }),
+    shirtTorso({ top: tone('#7F8C68'), collar: 'v', untucked: true }),
+    W.apron(tone('#CFC4A0', '#A89C78'), { len: 9, stains: 3, pocket: true }),
+    hairnet,
+  ),
+  torsoBox: [-22, -62, 24, 0],
+  arm: armPaint({ sleeve: 'short', col: tone('#7F8C68'), glove: tone('#C8D0B8', '#A0A890'), itemR: ladle() }),
+  leg: legPaint({ kind: 'tights', col: tone('#A89A7A'), shoe: 'clog', shoeCol: C.white }),
+});
+
+const chef_rookie = mk({
+  body: 'teen',
+  height: 102,
+  skin: SKIN_DARK,
+  face: { shape: 'egg', lid: 0.4, bags: 1, brow: 'thin', browCol: '#1A1714', nose: 'small', mouth: 'open', wrinkles: 0, zMouth: 'slack', look: [0.8, 0.4] },
+  hair: HAIR.black,
+  set: H.withHat(H.underHat(HAIR.black), H.toque()),
+  torso: seq(W.chefJacket(tone('#DAD6C8', '#B4AF9E')), W.neckerchief(C.teal)),
+  torsoBox: [-20, -66, 22, -6],
+  arm: armPaint({ sleeve: 'long', col: tone('#DAD6C8', '#B4AF9E'), cuff: '#B4AF9E', itemL: PR.notepad(), itemR: PR.pencil() }),
+  leg: legPaint({ kind: 'pants', col: tone('#4A4844'), shoe: 'clog', shoeCol: C.black }),
+});
+
+export const CHEF_LOOK_IDS = ['chef_pitboss', 'chef_hash', 'chef_grill', 'chef_saucy', 'chef_fry', 'chef_butcher', 'chef_lunchlady', 'chef_rookie'] as const;
+
 export const LOOKS: Record<string, Look> = {
   accountant, yoga, teen, politician, construction, nurse, cop, ceo, trafficcop, benchwarmer, lumberjack, cheerleader, critic, boxer, grandma, moviestar, sumo, influencer, celebrity, champ,
   trucker, biker, firefighter, bride, headbanger, surgeon, tycoon, pitmaster,
   joe, jane, senior, hipster, you, gus,
+  chef_pitboss, chef_hash, chef_grill, chef_saucy, chef_fry, chef_butcher, chef_lunchlady, chef_rookie,
 };
 export { HAIR, seq, seqE };

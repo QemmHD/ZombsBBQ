@@ -1,0 +1,659 @@
+/*
+ * The rebuilt controls (doc 21b): the bottom command strip of green sticker buttons, Gus's chalkboard
+ * bar for the tutorial and hints, the tutorial's red arrow, the one-row store shelf, the purchase panel,
+ * the chef picker and the newly wired cards. Layered after style.css and theme3.css.
+ */
+
+/* ---------- icon column: hidden until the tutorial reaches them; the bouncing "new" marker ---------- */
+.btn-sq.gone {
+  display: none;
+}
+.newb {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--red);
+  border: 2px solid var(--ink);
+  color: #fff;
+  font: 400 13px/16px var(--font);
+  text-align: center;
+  display: none;
+  pointer-events: none;
+}
+.newb.on {
+  display: block;
+  animation: newb 0.9s ease-in-out infinite;
+}
+@keyframes newb {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.locker-btn .gl {
+  width: 34px;
+  height: 34px;
+  margin-top: -6px;
+  fill: #a8646a;
+  stroke: var(--ink);
+  stroke-width: 1.4;
+}
+.locker-btn .gl [fill='none'] {
+  stroke: #9a9c98;
+}
+.locker-btn .gl .cut {
+  fill: #e8d8c0;
+}
+.joint-name b[role='button'],
+.joint-name .stars {
+  cursor: pointer;
+}
+
+/* ---------- glyphs on sticker buttons ---------- */
+.gl {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  overflow: visible;
+  fill: #f0ebdd;
+  stroke: var(--ink);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 0 rgba(22, 18, 12, 0.6));
+}
+.gl [fill='none'] {
+  stroke: #f0ebdd;
+}
+.gl .cut {
+  fill: var(--olive-d, #486d0d);
+  stroke: none;
+}
+.gl .cut-line {
+  stroke: var(--olive-d, #486d0d);
+}
+.sbtn.red .gl .cut {
+  fill: #8a1a10;
+}
+.sbtn.red .gl .cut-line {
+  stroke: #8a1a10;
+}
+
+/* ---------- the command strip ---------- */
+.strip {
+  position: absolute;
+  left: var(--safe-l);
+  right: var(--safe-r);
+  bottom: var(--safe-b);
+  height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  transition: transform 0.2s cubic-bezier(0.2, 1.3, 0.4, 1), opacity 0.15s, visibility 0.15s;
+  z-index: 7;
+}
+.strip > * {
+  pointer-events: auto;
+}
+.strip.hidden {
+  /* a short drop, not off-screen: mid-slide it's still where a finger expects it */
+  transform: translateY(14px);
+  opacity: 0;
+  visibility: hidden;
+}
+.strip.hidden > * {
+  pointer-events: none;
+}
+/* the chalkboard name plate */
+.strip .plate {
+  flex: 0 1 230px;
+  min-width: 150px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 4px;
+  background: var(--chalk-slate);
+  border-style: solid;
+  border-width: 8px;
+  border-image: var(--tex-chalk) 24 fill / 8px stretch;
+  color: var(--chalk);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.strip .pp {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #6a6656, #2a2822 75%);
+  border: 1.5px solid rgba(232, 223, 196, 0.4);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.strip .pp img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  margin-top: 6px;
+}
+.strip .plvl {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--gold);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  font: 400 11px/15px var(--font);
+  font-style: normal;
+  text-align: center;
+}
+.strip .pt {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.strip .pt b {
+  font: 400 15px/1 var(--font);
+  color: #f0e6c8;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.strip .pt .bar {
+  height: 7px;
+  margin: 0;
+}
+.strip .pt small {
+  font: 700 10.5px/1.15 var(--font-body);
+  color: #cfcbb8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* the sticker buttons */
+.strip .sbtns {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 6px 2px;
+}
+.strip .sbtns::-webkit-scrollbar {
+  display: none;
+}
+.sbtn {
+  position: relative;
+  flex: none;
+  min-width: 60px;
+  height: 52px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1px;
+  padding: 0 4px;
+  border-style: solid;
+  border-width: 7px 11px;
+  border-image: var(--btn-olive) 16 24 fill / 7px 11px stretch;
+  background: transparent;
+  color: var(--cream);
+  font-family: var(--font);
+  cursor: pointer;
+  filter: drop-shadow(0 3px 0 rgba(22, 18, 12, 0.55));
+  transition: transform 0.06s;
+}
+.sbtn:active {
+  transform: translateY(2px) scale(0.97);
+}
+.sbtn.red {
+  border-image: var(--btn-red) 16 24 fill / 7px 11px stretch;
+}
+.sbtn[disabled] {
+  filter: grayscale(0.85) brightness(0.75);
+  opacity: 0.75;
+}
+.sbtn label {
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 var(--ink);
+  pointer-events: none;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sbtn .tag {
+  position: absolute;
+  top: -11px;
+  right: -12px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 4px;
+  height: 17px;
+  border-radius: 3px;
+  background: #e3d9b8;
+  border: 1.5px solid var(--ink);
+  color: #2a2418;
+  font: 400 11px/14px var(--font);
+  font-style: normal;
+  transform: rotate(6deg);
+  pointer-events: none;
+}
+.tag-ico {
+  width: 13px;
+  height: 13px;
+}
+.strip .sx {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: radial-gradient(circle at 40% 35%, #ff5a3a, var(--red) 60%, #8a1a10);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(22, 18, 12, 0.5);
+}
+.strip .sx .gl {
+  width: 18px;
+  height: 18px;
+}
+/* ---------- Gus's chalkboard bar (tutorial steps freeze the café; hints don't) ---------- */
+.tutbar {
+  position: absolute;
+  left: var(--safe-l);
+  right: var(--safe-r);
+  bottom: var(--safe-b);
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 4px 6px;
+  background: var(--chalk-slate);
+  border-style: solid;
+  border-width: 12px;
+  border-image: var(--tex-chalk) 24 fill / 12px stretch;
+  color: var(--chalk);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.45);
+  z-index: 6;
+  transition: transform 0.25s cubic-bezier(0.2, 1.2, 0.4, 1), opacity 0.2s, visibility 0.2s;
+}
+.tutbar.hidden {
+  transform: translateY(16px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.tutbar .gus-badge {
+  margin: -22px 0 0;
+  width: 70px;
+  height: 70px;
+}
+.tutbar .gus-badge img {
+  width: 66px;
+  height: 66px;
+  margin-bottom: -8px;
+}
+.tutbar .tb-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.tutbar .tb-text b {
+  font: 400 11px/1 var(--font);
+  letter-spacing: 1px;
+  color: #c9b45a;
+}
+.tutbar .tb-text span {
+  font: 400 16px/1.2 var(--font);
+  color: #f0ebdd;
+  letter-spacing: 0.3px;
+}
+.tutbar .tb-ok {
+  flex: none;
+  min-width: 78px;
+  font-size: 17px;
+  padding: 6px 12px;
+}
+/* #hud > * turns pointer events back on for every HUD child: the arrow and the strip's empty space stay see-through */
+#hud .tut-arrow,
+#hud .strip {
+  pointer-events: none;
+}
+/* while a tutorial step's bar is up the café is frozen: the strip waits underneath */
+.tutbar.freeze:not(.hidden) ~ .strip {
+  display: none;
+}
+.tut-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: transparent;
+}
+.tut-veil.hidden {
+  display: none;
+}
+/* the red arrow over a HUD button */
+.tut-arrow {
+  position: fixed;
+  width: 34px;
+  height: 44px;
+  margin-left: -17px;
+  transform: translateY(-100%);
+  z-index: 35;
+  pointer-events: none;
+  background: no-repeat center / contain
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-22 -48 44 50'%3E%3Cpath d='M-8-46H8v26h12L0 0-20-20H-8z' fill='%23df1e00' stroke='%2316120c' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M-5-43h4v20h-4z' fill='%23ff6a4a'/%3E%3C/svg%3E");
+  animation: tutbob 0.6s ease-in-out infinite alternate;
+}
+.btn-sq.tut-glow {
+  animation: tutglow 0.8s ease-in-out infinite alternate;
+}
+@keyframes tutglow {
+  from {
+    filter: drop-shadow(0 0 1px #df1e00);
+  }
+  to {
+    filter: drop-shadow(0 0 7px #ff3a1a) drop-shadow(0 0 3px #df1e00);
+  }
+}
+.crew-count:empty {
+  display: none;
+}
+.tut-arrow.hidden {
+  display: none;
+}
+@keyframes tutbob {
+  to {
+    margin-top: -12px;
+  }
+}
+
+/* ---------- store: tabs over one horizontal shelf ---------- */
+.modal.store {
+  width: min(900px, 96vw);
+}
+.modal.store .tabs {
+  flex-wrap: nowrap;
+}
+.modal.store .tab {
+  padding: 3px 8px 3px 3px;
+  font-size: 11.5px;
+}
+.modal.store .tab-ico {
+  width: 22px;
+  height: 22px;
+}
+.shelf-wrap {
+  position: relative;
+  margin: 0 -4px;
+}
+.shelf {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 10px 4px 10px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.shelf .item {
+  flex: none;
+  width: 96px;
+  scroll-snap-align: start;
+  padding: 4px 4px 3px;
+}
+.shelf .item .item-art {
+  position: relative;
+  height: 78px;
+}
+.shelf .item .item-art img {
+  max-height: 74px;
+}
+.shelf .item .item-art .decor {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  font-size: 10px;
+}
+.shelf .item.wide-item {
+  width: 150px;
+}
+.shelf .item.wide-item b {
+  font-size: 12px;
+}
+.shelf .item-meta {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.shelf .lvl-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #16120c;
+  color: #e3d9b8;
+  padding: 0 5px;
+  border-radius: 2px;
+  font-size: 11px;
+}
+.shelf .item.stored .item-btns {
+  margin-top: 2px;
+}
+.shelf-head {
+  flex: none;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+  font: 400 11px/1 var(--font);
+  letter-spacing: 1px;
+  color: #c9b45a;
+  text-transform: uppercase;
+  padding: 0 2px;
+}
+.shelf .empty-state {
+  flex: 1;
+  text-align: center;
+}
+.shelf-tip {
+  margin: 0;
+}
+
+/* ---------- decorating: the purchase panel ---------- */
+.editbar {
+  z-index: 3;
+}
+.eb-info span {
+  display: block;
+  line-height: 1.2;
+}
+.eb-cost {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 0 8px;
+  font: 400 13px/1.1 var(--font);
+  color: #f0e6c8;
+  white-space: nowrap;
+  border-left: 1.5px dashed rgba(232, 223, 196, 0.35);
+}
+.eb-cost .xp {
+  color: #a9d3da;
+}
+.eb-btn.purchase {
+  min-width: 86px;
+  border-style: solid;
+  border-width: 7px 11px;
+  border-image: var(--btn-olive) 16 24 fill / 7px 11px stretch;
+}
+.eb-btn.purchase label {
+  font-size: 12px;
+}
+.eb-btn.rot .eb-ico {
+  filter: hue-rotate(60deg) saturate(1.4);
+}
+
+/* ---------- info cards, chef picker, locker, critic, rename, welcome back ---------- */
+.modal.info .row {
+  gap: 10px;
+}
+.chip.perk {
+  background: rgba(155, 214, 46, 0.18);
+  border-color: rgba(155, 214, 46, 0.55);
+}
+.chefs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.chef-card {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 8px 8px;
+  background: #e3d9b8;
+  color: #2a2418;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+.chef-card.on {
+  outline: 3px solid var(--sauce);
+  outline-offset: 1px;
+}
+.chef-card img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.chef-card b {
+  font: 400 14px/1.1 var(--font);
+}
+.chef-card small {
+  font-size: 10px;
+  line-height: 1.2;
+  color: #5a5040;
+  text-align: center;
+}
+.cstat {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px 1fr 22px;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 900;
+}
+.cstat i {
+  font-style: normal;
+  color: #5a5040;
+}
+.cstat .bar {
+  height: 7px;
+  margin: 0;
+}
+.cstat .bar i {
+  background: #658433;
+}
+.cstat b {
+  font: 400 11px/1 var(--font);
+  text-align: right;
+}
+.name-in {
+  width: 100%;
+  font: 400 20px/1.2 var(--font);
+  padding: 8px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  background: #e3d9b8;
+  color: #2a2418;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.away {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 6px;
+}
+.away-row {
+  font-size: 13px;
+}
+.away-row b {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 15px;
+  color: #f0e6c8;
+  margin-right: 4px;
+}
+.alert-row {
+  display: grid;
+  gap: 1px;
+  padding: 4px 8px;
+  background: rgba(232, 223, 196, 0.08);
+  border: 1px solid rgba(232, 223, 196, 0.25);
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+.modal.critic .paper {
+  background: #e8e2cc;
+  color: #2a2418;
+  padding: 10px 14px 12px;
+  border: 1.5px solid var(--ink);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4);
+  transform: rotate(-0.6deg);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+.modal.critic .masthead {
+  font: 700 18px/1 Georgia, serif;
+  text-align: center;
+  border-bottom: 3px double #2a2418;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+.modal.critic .paper h2 {
+  color: #2a2418;
+  font: 700 17px/1.15 Georgia, serif;
+  text-shadow: none;
+  margin: 0 0 2px;
+}
+.modal.critic .byline {
+  font-style: italic;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.modal.critic .paper p {
+  color: #2a2418;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.modal.critic .verdict {
+  font-weight: 700;
+}
+.set-row input[type='checkbox'] {
+  width: 26px;
+  height: 26px;
+  accent-color: #658433;
+}

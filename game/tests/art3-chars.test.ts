@@ -10,6 +10,7 @@ import {
 } from '../src/art3/chars';
 import { CUSTOMER_IDS } from '../src/art/manifest';
 import { CUSTOMERS } from '../src/sim/data';
+import { CHEFS } from '../src/sim/chefs';
 import type { CharArt, CharPart } from '../src/art/types';
 
 const isZombie = (id: string) => id.endsWith('_z') || id === 'gus';
@@ -46,9 +47,10 @@ function checkSvg(p: CharPart): void {
 }
 
 describe('art v3 joint characters (C1)', () => {
-  it('lists every customer + 4 walk-ins, each with a zombie form, plus you and gus', () => {
+  it('lists every customer + 4 walk-ins, each with a zombie form, plus you, gus and the 8 extra chef avatars', () => {
     expect([...CHAR3_BASE_IDS]).toEqual([...CUSTOMER_IDS, 'joe', 'jane', 'senior', 'hipster']);
-    expect(CHAR3_IDS.length).toBe((CUSTOMER_IDS.length + 4) * 2 + 2);
+    expect(CHAR3_IDS.length).toBe((CUSTOMER_IDS.length + 4) * 2 + 2 + 8);
+    for (const c of CHEFS) expect(CHAR3_IDS, c.id).toContain(c.id);
     expect(new Set(CHAR3_IDS).size).toBe(CHAR3_IDS.length);
     // every customer type the sim can spawn has art
     for (const c of CUSTOMERS) expect(CHAR3_IDS, c.id).toContain(c.id);

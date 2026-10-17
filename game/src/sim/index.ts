@@ -12,3 +12,5 @@ export * from './todo';
 export * from './cookbook';
 export * from './hints';
 export * from './alerts';
+export * from './chefs';
+export * from './locker';
