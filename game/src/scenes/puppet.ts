@@ -117,7 +117,7 @@ export class Puppet {
     for (const v of [this.front, this.back])
       if (v)
         for (const p of Object.values(v.parts)) {
-          if (on) p.setTint(0xc8c8c8).setTintMode(Phaser.TintModes.ADD);
+          if (on) p.setTint(0x5a4a40).setTintMode(Phaser.TintModes.ADD);
           else p.setTintMode(Phaser.TintModes.MULTIPLY).clearTint();
         }
   }
