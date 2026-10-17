@@ -531,7 +531,7 @@ export class JointScene extends Phaser.Scene {
     let best: { id: string; kind: 'w' | 'c' | 'p'; score: number } | null = null;
     // hit-test against each puppet's drawn bounds (standing, seated or lying), so a seated diner's
     // folded body and a taller standing figure in front of them are judged by what's actually on screen
-    const consider = (id: string, kind: 'w' | 'c' | 'p') => {
+    const consider = (id: string, kind: 'w' | 'c' | 'p', moving = false) => {
       const a = this.actors.get(id);
       if (!a?.puppet || !a.holder.visible) return;
       // the part images carry transparent padding, so judge by a body-sized box: a narrow column up the
@@ -548,11 +548,12 @@ export class JointScene extends Phaser.Scene {
       // seated figure beats grazing the edge of a big one standing in front
       const nx = (wx - b.centerX) / Math.max(12, b.width / 2);
       const ny = (wy - b.centerY) / Math.max(12, b.height / 2);
-      const score = nx * nx * 1.6 + ny * ny - a.holder.depth * 1e-7;
+      // someone just walking past (a server carrying a plate behind a diner) gives way to whoever's standing still
+      const score = nx * nx * 1.6 + ny * ny + (moving ? 0.6 : 0) - a.holder.depth * 1e-7;
       if (!best || score < best.score) best = { id, kind, score };
     };
-    for (const w of s.workers) if (w.state !== 'raiding') consider(w.id, 'w');
-    for (const c of s.customers) if (c.state !== 'leaving' && c.state !== 'fleeing' && c.state !== 'infecting' && c.state !== 'cowering' && c.state !== 'turnedAway') consider(c.id, 'c');
+    for (const w of s.workers) if (w.state !== 'raiding') consider(w.id, 'w', w.path.length > 0);
+    for (const c of s.customers) if (c.state !== 'leaving' && c.state !== 'fleeing' && c.state !== 'infecting' && c.state !== 'cowering' && c.state !== 'turnedAway') consider(c.id, 'c', c.path.length > 0);
     for (const p of s.pets) consider(p.id, 'p');
     if (doorTap) {
       const b = best as { id: string; kind: 'w' | 'c' | 'p' } | null;

@@ -57,6 +57,9 @@ const ff = (sec) =>
 const tapSel = async (sel, name) => {
   const l = page.locator(sel).first();
   if (!(await l.count())) return check(false, `missing ${name ?? sel}`);
+  // a popup that came up on its own (a level-up when a dish reaches the counter, a hint) would swallow
+  // the tap: close it first, as a player would
+  for (let i = 0; i < 3 && (await modalOpen()) && !(await l.evaluate((el) => !!el.closest('.modal-root'))); i++) await closeModal();
   await l.tap();
   await wait(300);
 };
@@ -141,18 +144,18 @@ await tapActor(youId);
 await tapWorld(sp.x, sp.y - 20);
 await ff(20);
 check(await page.evaluate(() => window.zbbq.ctl.state.counter.some((c) => c.dish && c.servings > 0)), 'food reaches the counter');
-// a new game starts CLOSED (original): tap the front door to open up
+// a new game starts CLOSED (original): flip the sign to open up (tapping the door itself is checked in 4b)
 check(await page.evaluate(() => window.zbbq.ctl.state.closed === true), 'a new game starts closed');
-{
-  const d = await page.evaluate(() => ({ x: (window.zbbq.sim.DOOR_X + 0.5) * 48, y: (window.zbbq.sim.DOOR_X - 0.5) * 30 - 70 }));
-  await tapWorld(d.x, d.y);
-}
-check(await page.evaluate(() => !window.zbbq.ctl.state.closed), 'tapping the door opens up');
+await tapSel('[data-k="sign"]', 'open sign');
+check(await page.evaluate(() => !window.zbbq.ctl.state.closed), 'the sign opens up');
 await ff(40);
 await wait(800);
 await shot('serving');
 
 // ---------- 2. infect a customer ----------
+// (one table: the first diner may already have eaten and gone; wait for the next to sit down)
+for (let i = 0; i < 120 && !(await page.evaluate(() => window.zbbq.ctl.state.customers.some((c) => c.state === 'waiting' || c.state === 'eating'))); i++) await ff(1);
+await wait(800);
 const custId = await page.evaluate(() => {
   const s = window.zbbq.ctl.state;
   // a diner who won't get up and leave while the card is open (the tutorial's first meal is only 10 s)
