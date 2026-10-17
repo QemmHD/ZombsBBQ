@@ -23,6 +23,7 @@ are taken from the original and reimplemented in our own code.
 
 Original-game reference material (outside the repo, never commit):
 - Correct-colour decoded sprites and UI of the original: `C:\Downloads\zombiecafe-reference\` (decoder: scratchpad `art\cct_decode.py`; `.cct` = 28-byte "CCTX" header + zlib; fmt 2 = RGBA4444 little-endian u16, fmt 1 = RGBA8888).
+- **Resume the original:** read `C:\Downloads\zombiecafe-reference\server\README.md` (run `server.exe` from that folder, launch the app, short-press taps). Progress lives in the BlueStacks instance (never delete/reset it); a second copy is `server\zombiecafe-appdata.ab` (adb backup, restore command in the README).
 - The original running in BlueStacks: package `com.capcom.zombiecafeandroid`, instance `emulator-5554`, 1920×1080. Backend: `server.exe` from the `QemmHD/zombie-cafe-revival` v2.0.0 release (`gh release download v2.0.0 -R QemmHD/zombie-cafe-revival`), run it from any folder; it listens on :8080 and the APK talks to 10.0.2.2:8080. Taps need a short press: `adb shell input swipe X Y X+1 Y+1 120` (plain `input tap` is ignored). Use `"C:\Program Files\BlueStacks_nxt\HD-Adb.exe" -s emulator-5554`.
 - Screenshots and recordings from the play-through: scratchpad `zc-release\shots\` (session-specific temp dir; copy anything worth keeping to `C:\Downloads\zombiecafe-reference\play\`).
 
