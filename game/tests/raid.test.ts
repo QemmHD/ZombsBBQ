@@ -55,6 +55,7 @@ import {
   startRaid,
   startingDiners,
   stars,
+  decorBonus,
   stealDish,
   stealingRivals,
   stepRaid,
@@ -708,7 +709,8 @@ describe('the road changes over time', () => {
 
   it('a rival you leave alone too long poaches your customers and costs you half a star until you raid it', () => {
     const s = withCrew(['boxer', 'boxer', 'boxer']);
-    s.rating = 0.6; // three stars
+    const pop = 0.6 - decorBonus(s); // three stars once the decor (here: grime) is counted in
+    s.rating = pop;
     s.rivals.chuck = { stars: 1, wins: 1, nextAt: 0, lastRaid: 0 };
     s.now = NEGLECT_SEC - 10;
     expect(stealingRivals(s)).toEqual([]);
@@ -717,7 +719,7 @@ describe('the road changes over time', () => {
     expect(stealingRivals(s)).toEqual(['chuck']);
     expect(stars(s)).toBe(3 - ENEMY_RATING_MODIFIER * 5);
     // the stored rating isn't touched: it's a penalty while they're at it
-    expect(s.rating).toBe(0.6);
+    expect(s.rating).toBe(pop);
     // a second thief doesn't stack it
     s.rivals.hank = { stars: 1, wins: 1, nextAt: 0, lastRaid: 0 };
     expect(stars(s)).toBe(2.5);

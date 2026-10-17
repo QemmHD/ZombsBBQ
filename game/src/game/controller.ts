@@ -370,7 +370,13 @@ export class Controller {
     if (!st) return;
     if (st.status === 'done' || st.status === 'burnt') {
       const wasBurnt = st.status === 'burnt';
-      const err = plateDish(this.state, stoveId);
+      // original: a finished dish goes to the counter only when you pick someone, then touch the stove
+      const sel = this.selection;
+      if (!wasBurnt && sel?.kind !== 'worker') {
+        this.toast('Order up! Tap YOU or a zombie, then the stove, to carry it to the counter.', false);
+        return;
+      }
+      const err = plateDish(this.state, stoveId, sel?.kind === 'worker' ? sel.id : undefined);
       if (err) this.toast(err);
       else {
         sfx(wasBurnt ? 'sell' : 'plate');

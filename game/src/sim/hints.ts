@@ -176,15 +176,18 @@ function lonelyTables(s: GameState): Furniture[] {
   return s.furniture.filter((f) => itemOf(f).kind === 'table' && !seated.has(f.id));
 }
 
+/** Seats the starting café comes with (one table, one chair). */
+const STARTER_SEATS = 1;
+
 function updateGuide(s: GameState) {
   const h = hintState(s);
   if (h.guide === undefined) {
     if (!tutorialDone(s)) return;
-    // only joints still on the two starter seats get walked through it
-    h.guide = validSeats(s).length > 2 ? 2 : 0;
+    // only joints still on the one starter seat get walked through it (original: the tutorial buys a table and a chair)
+    h.guide = validSeats(s).length > STARTER_SEATS ? 2 : 0;
   }
   if (h.guide >= 2) return;
-  if (validSeats(s).length > 2) h.guide = 2;
+  if (validSeats(s).length > STARTER_SEATS) h.guide = 2;
   else if (h.guide === 0 && lonelyTables(s).length) h.guide = 1;
 }
 

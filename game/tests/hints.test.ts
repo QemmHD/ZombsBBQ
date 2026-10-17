@@ -78,15 +78,20 @@ describe('new sim events', () => {
     let doneAt = -1;
     let warnAt = -1;
     let burntAt = -1;
+    let walk = 0;
     run(s, 900, 0.25, (e) => {
-      if (e.t === 'dishDone') doneAt = s.now;
+      if (e.t === 'dishDone') {
+        doneAt = s.now;
+        walk = s.stoves[0].unattended ?? 0; // the cook's walk over counts as unattended time (original)
+      }
       if (e.t === 'burnSoon') warnAt = s.now;
       if (e.t === 'burnt') burntAt = s.now;
     });
     expect(doneAt).toBeGreaterThan(0);
+    // a 2 min dish can wait max(cook, 10 min) unattended
     const window = Math.max(TUNING.burnMinSec, 120);
-    expect(warnAt - doneAt).toBeCloseTo(window * 0.75, 0);
-    expect(burntAt - doneAt).toBeCloseTo(window, 0);
+    expect(warnAt - doneAt).toBeCloseTo(window * 0.75 - walk, 0);
+    expect(burntAt - doneAt).toBeCloseTo(window - walk, 0);
     expect(s.stoves[0].burnWarn).toBeUndefined();
   });
 
@@ -270,7 +275,7 @@ describe('the guided first table and chair', () => {
     expect(guideStep(s)).toBe('chair');
     expect(buyAndPlace(s, chair!.id, at.x, at.y + 1, 'ne')).toBeNull();
     hintTick(s);
-    expect(validSeats(s)).toHaveLength(3);
+    expect(validSeats(s)).toHaveLength(2);
     expect(guideStep(s)).toBeNull();
     expect(hintState(s).guide).toBe(2);
     expect(nextHint(s)).toBe('outOfFood');
@@ -348,7 +353,7 @@ describe('check-in alerts (for local notifications)', () => {
     const done = a.find((x) => x.kind === 'dishDone')!;
     const burn = a.find((x) => x.kind === 'burnSoon')!;
     expect(done.in).toBeCloseTo(st.left!, 3);
-    expect(burn.in).toBeCloseTo(st.left! + TUNING.burnMinSec * 0.75, 3);
+    expect(burn.in).toBeCloseTo(st.left! + TUNING.burnMinSec * 0.75 - st.unattended!, 3);
     expect(done.body).toMatch(/Hobo Hot Dog/);
     expect(a.map((x) => x.in)).toEqual([...a.map((x) => x.in)].sort((p, q) => p - q));
   });

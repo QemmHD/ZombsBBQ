@@ -102,7 +102,8 @@ function checkInvariants(s: GameState, where: string) {
     if (!s.furniture.some((f) => f.id === st.furnitureId)) fail('orphan stove');
     if ((st.status === 'cooking' || st.status === 'paused') && !Number.isFinite(st.left)) fail('cooking without a timer');
     if ((st.status === 'cooking' || st.status === 'done' || st.status === 'reserved' || st.status === 'paused') && !st.dish) fail(`stove ${st.status} without dish`);
-    if (st.status === 'cooking' && !s.workers.some((w) => w.id === st.cookId && w.state === 'cooking')) fail('cooking with nobody at the stove');
+    // a cooking stove has its cook at it or on the way (COOK puts the pot on at once, original)
+    if (st.status === 'cooking' && !s.workers.some((w) => w.id === st.cookId && w.stoveId === st.id && (w.state === 'cooking' || w.state === 'toStove'))) fail('cooking with nobody at the stove');
   }
   for (const w of s.workers) {
     if (!Number.isFinite(w.x) || !Number.isFinite(w.y) || !Number.isFinite(w.energy)) fail(`bad worker ${w.id}`);

@@ -3,7 +3,7 @@ import { GOALS, type GoalDef } from './catalog';
 import { DOOR_X, isInside, key } from './grid';
 import { grimeCount } from './build';
 import type { GameState, Pet } from './state';
-import { addToCounter, addXp, blockedTiles, chairTable, furnById, itemOf, move, rand, room, setPath, stars, zombies } from './sim';
+import { TUTORIAL, addToCounter, addXp, blockedTiles, chairTable, furnById, itemOf, move, rand, room, setPath, stars, zombies } from './sim';
 import { updateTodo } from './todo';
 import { freeMeal, freeRareRecipe, updateCookbook } from './cookbook';
 
@@ -241,7 +241,7 @@ export function nextDay(day: string): string {
 
 /** The first dish cooked on a calendar day keeps the streak going (or starts a new one) and pays out. */
 export function fryerCooked(s: GameState, day = today()) {
-  if (s.tut < 8 || s.fryer?.day === day) return; // the streak starts once the tutorial is done
+  if (s.tut < TUTORIAL.length || s.fryer?.day === day) return; // the streak starts once the tutorial is done
   const streak = s.fryer && nextDay(s.fryer.day) === day ? s.fryer.streak + 1 : 1;
   s.fryer = { day, streak, best: Math.max(streak, s.fryer?.best ?? 0) };
   const r = FRYER_REWARDS[(streak - 1) % FRYER_REWARDS.length];

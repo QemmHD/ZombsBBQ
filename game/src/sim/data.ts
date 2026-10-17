@@ -166,7 +166,7 @@ export const VARIANTS: VariantDef[] = [
   { id: 'spicy', name: 'Spicy', effect: '+50% cash per serving' },
   { id: 'fancy', name: 'Fancy', effect: '+50% XP' },
   { id: 'frozen', name: 'Frozen', effect: 'takes 3x longer to burn' },
-  { id: 'fresh', name: 'Fresh', effect: 'happy diners boost the rating 1.5x' },
+  { id: 'fresh', name: 'Fresh', effect: 'happy diners boost the rating 1.5x; slow to burn' },
 ];
 
 export const VERY_MULT = 2;
@@ -405,7 +405,7 @@ export const YOU_STATS: ZombieStats = { energy: 100, speed: 5, power: 3, tips: 4
 
 /** Tuning knobs, gathered in one place for balancing. */
 export const TUNING = {
-  startCash: 300,
+  startCash: 5000, // original: $5,000 and 5 toxin
   startSauce: 5, // the original also started you with 5 Toxin vials
   /** how long a seated customer waits for food before leaving unhappy */
   customerWaitSec: 60, // original: a minute, then they storm off
@@ -413,13 +413,37 @@ export const TUNING = {
   /** the tutorial's very first diner eats in 10 s (original: TUTORIAL_CUSTOMER_EAT_TIME) */
   tutorialEatSec: 10,
   fleeSpeed: 3.0,
-  baseWalkSpeed: 1.4, // tiles/sec at speed 0 (original: an average person walks ~1.9 tiles/s)
+  /** raids still walk on this older ramp (raid.ts): tiles/sec at speed 0, + per Speed point */
+  baseWalkSpeed: 1.4,
   walkSpeedPerStat: 0.125,
-  /** zombies shuffle ~20% slower than the living (original) */
+  /**
+   * In the joint everyone moves like the original: speed multiplier 2 + 0.2 x Speed (doc 16 D), at this many
+   * tiles/s per unit. 0.4 matches the play-through: the chef (Speed 5) walks ~1.2 tiles/s and a chase runs
+   * ~2 tiles/s (doc 19 §4-5).
+   */
+  tilesPerSpeedUnit: 0.4,
+  /** zombies take 1.2x as long per tile (original ZOMBIE_SLOWDOWN_MULTIPLIER) */
+  zombieSlowdown: 1.2,
+  /** running (panic, fleeing, fired, the infect chase) takes 0.6x the time per tile (original "hurry") */
+  runTimeFactor: 0.6,
+  /** zombies shuffle ~20% slower than the living (raids) */
   zombieWalkMult: 0.8,
-  /** customers turn up every 18 s at zero stars down to every 4.5 s at five (original) */
+  /** idle zombies stroll to a nearby tile every this-many seconds (min..max), up to wanderRadius tiles */
+  wanderMinSec: 6,
+  wanderMaxSec: 14,
+  wanderRadius: 3,
+  /** the infection chase: the runner is held to this share of the chaser's pace, and gives up cornered
+   * after chaseMaxSec, so the catch always happens */
+  chaseRunnerPace: 0.95,
+  chaseMaxSec: 12,
+  /** customers turn up every 18 s at zero stars down to every 4.5 s at five, ±1 s (original) */
   arrivalSlowSec: 18,
   arrivalFastSec: 4.5,
+  arrivalJitterSec: 1,
+  /** each arrival roll passes this chance (out of 256) at 0 rating … at full rating (original 211-238) */
+  visitChance: [211, 238] as [number, number],
+  /** sold out (doc 13 #1, ours): with no food anywhere, at most one customer per this many seconds looks in */
+  soldOutGapSec: 300,
   energyPerServe: 1.5,
   energyPerClear: 0.6,
   energyCookPerSec: 1 / 20, // original: cooks burn 1 energy / 20 s
@@ -429,12 +453,22 @@ export const TUNING = {
   restRegenPerSec: 1 / 16, // ~3.75/min at average recharge (original ~3/min)
   /** each Toxic Barrel adds this much to the rest recharge rate (they stack; original +10%) */
   kegBonus: 0.1,
-  /** a bite gives back this share of the zombie's max energy (≈20 for an average zombie) */
-  biteEnergyFrac: 0.2,
-  /** a hangry zombie slumps and moans this long before it goes for a customer (original 5 s warning) */
+  /** feast: this many flesh chunks (count not traced in the original), +2 energy each, one every
+   * 0.5 s / speed multiplier, after a crouch and before the mouth-wipe (original FeastTask) */
+  fleshChunks: 10,
+  fleshEnergy: 2,
+  fleshChunkSec: 0.5,
+  feastCrouchSec: 0.6,
+  feastWipeSec: 0.8,
+  /** a hangry zombie slumps and moans this long before it goes for a customer (ours: the original's
+   * ZOMBIE_ATTACK_WARNING constant has no call site, but the warning lets you Rest them) */
   hungrySec: 5,
-  /** at most one bite per zombie this often (original ZOMBIE_ATTACK_INTERVAL 60 s) */
-  biteCooldownSec: 60,
+  /** each zombie rolls for a bite once every this-many seconds (original ZOMBIE_ATTACK_INTERVAL 60 s) */
+  biteCheckSec: 60,
+  /** the restless roll's base chance (original ATTACK_PROBABILITY_PER_MINUTE) */
+  biteBaseChance: 0.019,
+  /** one swing every swingSec / speed multiplier (original MAX_ATTACK_TIME 1000 ms) */
+  swingSec: 1,
   /** a zombie that can't get to its snack tries again after this long */
   huntRetrySec: 10,
   /** a zombie that works itself down to 0 energy passes out face-down; lying there it recovers at this
@@ -464,29 +498,41 @@ export const TUNING = {
   pugFindMin: 5,
   pugFindMax: 15,
   pugDailyMax: 600,
-  /** a zombie who catches a customer eats them on the spot for this long before getting back to work */
-  feastSec: 3,
+  /** how long a feast lasts at speed multiplier 3 (the scene's fallback; the real length rides on the event) */
+  feastSec: 3.1,
   daydreamBaseSec: 100, // original: focus 1 ~ every 100 s
   daydreamMaxSec: 25,
   offlineCapSec: 8 * 3600,
-  /** a finished dish burns once it has waited as long as it took to cook (original), never sooner than this */
-  burnMinSec: 5 * 60,
+  /**
+   * burning (original): only unattended time counts. Burn time = max(burnCookMult x cook, cook + burnMinSec)
+   * (3x for Fresh), so a dish can wait max(cook, 10 min) unattended; a cook or carrier on it adds burnGraceSec.
+   */
+  burnMinSec: 10 * 60,
+  burnCookMult: 2,
+  freshBurnCookMult: 3,
+  burnGraceSec: 120,
   keepWarmFactor: 1.5,
-  /** rating: popularity 0..1 (= 0..5 stars) drifts toward each customer's verdict */
+  /** rating: popularity 0..1 (= 0..5 stars). 0.3 less the starting grime ≈ the original's 0.185 */
   ratingStart: 0.3,
-  ratingRate: 0.03,
-  /** star items: rating rises (1 + bonus*K)x faster and falls that much slower */
-  ratingDecorK: 8,
-  /** a bite counts as this many angry customers */
-  ratingAttackWeight: 3,
-  /** a closed café's rating slowly sags (per second) */
-  closedDriftPerSec: 0.000003,
+  /** original steps: +0.005 per paid customer, -0.006 per unhappy one, -0.1 per attack */
+  ratingServe: 0.005,
+  ratingUnhappy: 0.006,
+  ratingAttack: 0.1,
+  /** star items add to the rating, up to this much (grime takes off up to the same) */
+  ratingDecorMax: 0.2,
+  /** a closed café's rating sags (per second; original 1.852e-8 per ms) */
+  closedDriftPerSec: 1.852e-5,
+  /** while away the joint runs at a quarter speed (original TIME_SCALE_FACTOR), and one catch-up moves
+   * the rating at most this far either way (original MAX_RATING_INCREASE) */
+  awayTimeScale: 0.25,
+  awayRatingCap: 0.4,
   reanimateSec: 60 * 60, // raid KO (original went from 8 h to 1 h)
   reanimateEnergy: 20, // comes back with 20 energy (original)
   sellBack: 0.5,
-  /** zombie levels: XP needed for each level; every level adds 5% max energy */
+  /** zombie levels: XP needed for each level (ours, quicker than the original's); every level multiplies
+   * max energy by 1.03 (original ZOMBIE_LEVEL_ENERGY_MULTIPLIER) */
   zombieLevelXp: [0, 20, 50, 100, 170, 260, 380, 530, 720, 950],
-  zombieLevelEnergy: 0.05,
+  zombieLevelEnergy: 1.03,
   /**
    * purple bonus stars (Gus's to-do list, see PURPLE): each active one makes customers arrive 15%
    * more often and lets one more diner in at a time, adds 15% to tips, and counts as half a star when
@@ -511,11 +557,23 @@ export const PURPLE = {
   bribeSauce: 2,
 };
 
-/** Patience 1 attacks at ~20% energy, patience 10 holds out until ~2% (original game). */
+/** Share of max energy below which a zombie may bite (original isRestless): patience (self-control) 10 → 7%,
+ * patience 1 → 25%. */
 export function attackThreshold(patience: number): number {
-  return Math.max(0.02, 0.2 - (patience - 1) * 0.02);
+  return 0.05 + (0.2 * (11 - patience)) / 10;
 }
 
+/** The original's speed multiplier: 2 + 0.2 x Speed (2.2 … 4.0). Also sets the swing and feast rates. */
+export function speedMult(speedStat: number): number {
+  return 2 + 0.2 * speedStat;
+}
+
+/** Tiles per second in the joint: walking, or running (x1/0.6); zombies take 1.2x as long. */
+export function tilesPerSec(speedStat: number, opts: { zombie?: boolean; run?: boolean } = {}): number {
+  return (TUNING.tilesPerSpeedUnit * speedMult(speedStat)) / (opts.zombie ? TUNING.zombieSlowdown : 1) / (opts.run ? TUNING.runTimeFactor : 1);
+}
+
+/** The older walking ramp, still used by raids (raid.ts). */
 export function walkSpeed(speedStat: number): number {
   return TUNING.baseWalkSpeed + speedStat * TUNING.walkSpeedPerStat;
 }

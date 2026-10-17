@@ -241,15 +241,19 @@ describe('economy pacing (engaged player)', () => {
     expect(marks['30m'].level).toBeGreaterThanOrEqual(3);
     // the retuned dish ladder (first dishes earn less, so the first dish isn't the best forever) buys the 4th seat a bit later
     expect(marks['30m'].seats).toBeGreaterThanOrEqual(3);
-    expect(marks['60m'].stars).toBeGreaterThanOrEqual(2);
+    // the original's rating steps (+0.005 a meal, -0.006 a walk-out) and servers who stand by the table
+    // for the whole meal make the first hour slow; by two hours the stars are coming, by four they're high
+    expect(marks['120m'].stars).toBeGreaterThanOrEqual(1.5);
+    expect(marks['240m'].stars).toBeGreaterThanOrEqual(3);
     expect(marks['120m'].level).toBeGreaterThanOrEqual(4);
     // an afternoon of play: the first expansion ($3,500), the first rival beaten, a real crew
     expect(marks['360m'].room).toBeGreaterThanOrEqual(8);
     expect(marks['360m'].beaten).toBeGreaterThanOrEqual(1);
     expect(marks['360m'].crew).toBeGreaterThanOrEqual(3);
     expect(marks['360m'].level).toBeGreaterThanOrEqual(6);
-    // and not so fast that it's over in an afternoon (the original's ladder runs to $150k rooms)
-    expect(marks['120m'].room).toBe(7);
+    // and not so fast that it's over in an afternoon (the original's ladder runs to $150k rooms). The
+    // original's $5,000 start buys the first ($3,500) expansion early; the second waits
+    expect(marks['120m'].room).toBeLessThanOrEqual(8);
     expect(marks['360m'].room).toBeLessThanOrEqual(9);
     expect(marks['360m'].level).toBeLessThanOrEqual(12);
     expect(marks['360m'].beaten).toBeLessThanOrEqual(3);
