@@ -3,7 +3,7 @@
  * the joints bend the way the original's clips do. Run `npx vite` and open /tools/poses.html?c=joe.
  */
 import Phaser from 'phaser';
-import { initArt, loadChar } from '../src/scenes/assets';
+import { loadChar } from '../src/scenes/assets';
 import { Puppet, type Pose } from '../src/scenes/puppet';
 
 const q = new URLSearchParams(location.search);
@@ -33,7 +33,6 @@ const CH = 132 * K;
 
 class Sheet extends Phaser.Scene {
   async create() {
-    initArt();
     await Promise.all([loadChar(this, human), loadChar(this, zombie)]);
     const { charArt } = await import('../src/scenes/assets');
     const ha = charArt(human)!;

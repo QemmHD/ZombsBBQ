@@ -12,6 +12,55 @@ import { addXp, furnById, itemOf, releaseJob, room, setPath } from './sim';
 
 const KEEP_WARM_COST = 300;
 
+// ---------- layout version ----------
+// Renderers redraw the room when this changes. It's a fingerprint (two 32-bit FNV-style hashes) of
+// everything that shapes the drawn room: size, wall and floor finishes, furniture (item, spot, facing,
+// heat lamp) and wall hangings. Computed without allocating, so it's cheap to check every frame, and it
+// can't go stale the way a hand-bumped counter can when a new code path moves furniture.
+let ha = 0;
+let hb = 0;
+function hNum(v: number) {
+  ha = Math.imul(ha ^ (v | 0), 16777619);
+  hb = Math.imul(hb ^ (v | 0), 0x5bd1e995);
+  hb ^= hb >>> 13;
+}
+function hStr(t: string | undefined) {
+  if (t === undefined) return hNum(-7);
+  for (let i = 0; i < t.length; i++) hNum(t.charCodeAt(i));
+  hNum(-1);
+}
+export function layoutVersion(s: GameState): number {
+  ha = 0x811c9dc5;
+  hb = 0x9747b28c;
+  hNum(s.roomW);
+  hNum(s.roomH);
+  for (const w of s.walls.l) hStr(w);
+  hNum(-2);
+  for (const w of s.walls.r) hStr(w);
+  hNum(-3);
+  for (const k in s.floors) {
+    hStr(k);
+    hStr(s.floors[k]);
+  }
+  hNum(-4);
+  for (const f of s.furniture) {
+    hStr(f.id);
+    hStr(f.item);
+    hNum(f.x * 16);
+    hNum(f.y * 16);
+    hStr(f.dir);
+    hNum(f.keepWarm ? 1 : 0);
+  }
+  hNum(-5);
+  for (const w of s.wallItems) {
+    hStr(w.id);
+    hStr(w.item);
+    hStr(w.wall);
+    hNum(w.index);
+  }
+  return (ha >>> 0) * 2097152 + ((hb >>> 0) & 0x1fffff);
+}
+
 export function priceText(def: { cash?: number; sauce?: number }): string {
   if (def.sauce) return `🧪${def.sauce}`;
   return `$${(def.cash ?? 0).toLocaleString('en-US')}`;

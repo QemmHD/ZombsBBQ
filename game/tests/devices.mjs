@@ -81,7 +81,7 @@ for (const d of DEVICES) {
   }, d);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${d.name}: ${e}`));
-  await page.goto(`http://localhost:${server.address().port}/index.html`);
+  await page.goto(`http://localhost:${server.address().port}/index.html?debug`);
   await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
   // let the start-up background work (the raid map is pre-rasterized after the joint loads) settle
   await page.waitForTimeout(6000);

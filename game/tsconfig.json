@@ -12,7 +12,9 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "types": []
+    "types": [],
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsc.tsbuildinfo"
   },
   "include": ["src", "tests"]
 }

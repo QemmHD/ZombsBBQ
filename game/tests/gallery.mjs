@@ -25,10 +25,12 @@ const browser = await chromium.launch({
 });
 const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
+// a busy machine renders SwiftShader frames slowly: give screenshots and waits room
+page.setDefaultTimeout(120000);
 const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto(`http://localhost:${server.address().port}/index.html`);
+await page.goto(`http://localhost:${server.address().port}/index.html?debug`);
 await page.waitForFunction(() => window.zbbq?.game?.scene?.getScene('joint')?.ready, null, { timeout: 60000 });
 const wait = (ms) => page.waitForTimeout(ms);
 const ff = (sec) => page.evaluate((n) => { for (let i = 0; i < n; i++) window.zbbq.ctl.update(0.1); }, Math.round(sec * 10));
