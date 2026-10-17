@@ -737,14 +737,61 @@ export function clumps(a: Pt, b: Pt, n: number, depth: number, seed = 1): string
   return dd;
 }
 
-/** Paint a hair mass: cel shade, strand lines, a dull sheen band. */
+/**
+ * Turn authored strand curves (`M x,y Q cx,cy x2,y2`, `M x,y V y2`, `M x,y L x2,y2`) into big tapered
+ * clumps: a wedge `w` wide at the strand's root narrowing to a point at its tip, filled in the hair's
+ * shadow tone. The original draws hair as a few chunky dark clumps over the base, never as hatching.
+ * Anything the parser does not understand is kept as a thin line.
+ */
+export function strandClumps(strands: string, col: string, w = 5.2, o = 0.95): string {
+  const re = /M(-?[\d.]+),(-?[\d.]+)(?:Q(-?[\d.]+),(-?[\d.]+) (-?[\d.]+),(-?[\d.]+)|V(-?[\d.]+)|L(-?[\d.]+),(-?[\d.]+))/g;
+  let dd = '';
+  let rest = '';
+  let n = 0;
+  for (const m of strands.matchAll(re)) {
+    n++;
+    const x1 = +m[1];
+    const y1 = +m[2];
+    let cx: number;
+    let cy: number;
+    let x2: number;
+    let y2: number;
+    if (m[3] !== undefined) {
+      cx = +m[3];
+      cy = +m[4];
+      x2 = +m[5];
+      y2 = +m[6];
+    } else if (m[7] !== undefined) {
+      x2 = x1;
+      y2 = +m[7];
+      cx = x1;
+      cy = (y1 + y2) / 2;
+    } else {
+      x2 = +m[8];
+      y2 = +m[9];
+      cx = (x1 + x2) / 2;
+      cy = (y1 + y2) / 2;
+    }
+    const L = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const nx = -(y2 - y1) / L;
+    const ny = (x2 - x1) / L;
+    const h = w / 2;
+    dd +=
+      `M${f(x1 + nx * h)},${f(y1 + ny * h)}Q${f(cx + nx * h * 0.45)},${f(cy + ny * h * 0.45)} ${f(x2)},${f(y2)}` +
+      `Q${f(cx - nx * h * 0.45)},${f(cy - ny * h * 0.45)} ${f(x1 - nx * h)},${f(y1 - ny * h)}Z`;
+  }
+  if (n === 0) rest = line(strands, 0.5, col, 'opacity="0.85"');
+  return (dd ? fill(dd, col, `opacity="${f(o)}"`) : '') + rest;
+}
+
+/** Paint a hair mass: hard cel shade, chunky dark clumps where the strands were, a faint sheen band. */
 export function hairMass(c: Ctx, path: string, t: Tone, strands: string, sheen?: string): string {
   const { d, seed } = c;
-  let inner = line(strands, 0.5, t.d, 'opacity="0.85"');
+  let inner = strandClumps(strands, t.s);
   // a dull sheen on the front views only (from behind it read as a pale wedge)
-  if (sheen && !c.back) inner += fill(sheen, lt(t.b, 0.22), 'opacity="0.45"');
-  inner += speck([-26, -110, 30, -40], 40, [t.d, lt(t.b, 0.2)], seed + 13, 0.2, 0.45, 0.4);
-  return shade(d, path, t, { off: [-1.6, -1.6], inner });
+  if (sheen && !c.back) inner += fill(sheen, lt(t.b, 0.22), 'opacity="0.3"');
+  inner += speck([-26, -110, 30, -40], 24, [t.d, lt(t.b, 0.2)], seed + 13, 0.2, 0.45, 0.3);
+  return shade(d, path, t, { off: [-1.8, -1.8], inner });
 }
 
 /** Zombie bald patches: green scalp showing through thinning hair (clipped to the hair shape). */

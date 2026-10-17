@@ -72,14 +72,14 @@ function seqE(...ps: (((c: Ctx, e: Expr) => string) | undefined)[]): (c: Ctx, e:
 
 // ---------------------------------------------------------------- hair tones
 const HAIR = {
-  brown: tone('#5A4430', '#3E2E1E'),
+  brown: tone('#665533', '#443322'),
   dark: tone('#3A2E24', '#261E16'),
   black: tone('#2A2622', '#1A1714'),
   grey: tone('#8E8A80', '#6A665C'),
   white: tone('#B8B4A6', '#908C7E'),
-  blond: tone('#B89E5E', '#8E763E'),
+  blond: tone('#DDCC77', '#AA9933'),
   bleach: tone('#C8BC8A', '#A09464'),
-  ginger: tone('#9A5A2E', '#74401E'),
+  ginger: tone('#BB7733', '#774411'),
   mouse: tone('#6E6048', '#504432'),
   perm: tone('#A6A2AA', '#86828C'),
 };
