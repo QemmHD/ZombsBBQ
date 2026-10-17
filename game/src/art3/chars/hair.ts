@@ -409,8 +409,8 @@ export function manbun(t: Tone): HairSet {
       const cap = `M-17,-62C-8,-63.6 4,-64 10.6,-63C10.8,-70 11,-76 13.6,-79.4C17,-82 19.6,-84 20.4,-88C17,-97 8,-98.6 1,-98.6C-10,-98 -19,-92 -19.8,-80C-20.2,-72 -19,-66 -17,-62Z`;
       // undercut: only a stubble band shows at the nape, the tied-back mass covers the rest (from behind it read as a grey face)
       let s = inside(c.d, cap, fill(cap, t.s, 'opacity="0.45"') + speck([-22, -100, 22, -60], 120, [t.d], c.seed, 0.18, 0.32, 0.9));
-      const top = `M-19.6,-75C-9,-78.6 9,-78.6 20.2,-75C21,-94 10,-103 0,-103C-10,-103 -20.4,-95 -19.6,-75Z`;
-      s += hairMass(c, top, t, 'M18,-78Q8,-92 -4,-100M-17,-78Q-9,-92 -4,-100M1,-78Q0,-92 -4,-100');
+      const top = `M-19,-67C-12,-69.4 -4,-66.6 0,-68.4C5,-66.4 13,-69.6 19.6,-67C21.6,-90 10,-103 0,-103C-10,-103 -21,-92 -19,-67Z`;
+      s += hairMass(c, top, t, 'M17,-70Q8,-90 -4,-100M-16,-70Q-9,-90 -4,-100M1,-70Q0,-90 -4,-100');
       s += bunAt(c, -4, -102);
       return s;
     },
