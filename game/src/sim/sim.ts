@@ -1780,40 +1780,43 @@ export const TUTORIAL = [
   'This dump needs work: stains, loose tiles and grimy appliances drag your rating down. Hit the Shop and fix it up!',
 ];
 
+/** The tutorial's steps by name (indexes into TUTORIAL), so the sim and the screen side agree. */
+export const TUT = { cook: 0, cooking: 1, carry: 2, open: 3, serve: 4, infect: 5, zombieCook: 6, rest: 7, shop: 8 } as const;
+
 function updateTutorial(s: GameState, dt: number) {
   const anyStove = (st: string) => s.stoves.some((x) => x.status === st);
   switch (s.tut) {
-    case 0:
-      if (anyStove('reserved') || anyStove('cooking')) s.tut = 1;
+    case TUT.cook:
+      if (anyStove('reserved') || anyStove('cooking')) s.tut = TUT.cooking;
       break;
-    case 1:
-      if (anyStove('done')) s.tut = 2;
+    case TUT.cooking:
+      if (anyStove('done')) s.tut = TUT.carry;
       break;
-    case 2:
-      if (s.counter.some((c) => c.servings > 0)) s.tut = 3;
+    case TUT.carry:
+      if (s.counter.some((c) => c.servings > 0)) s.tut = TUT.open;
       break;
-    case 3:
-      if (!s.closed) s.tut = 4;
+    case TUT.open:
+      if (!s.closed) s.tut = TUT.serve;
       break;
-    case 4:
-      if (s.stats.served > 0) s.tut = 5;
+    case TUT.serve:
+      if (s.stats.served > 0) s.tut = TUT.infect;
       break;
-    case 5:
-      if (zombies(s).length > 0) s.tut = 6;
+    case TUT.infect:
+      if (zombies(s).length > 0) s.tut = TUT.zombieCook;
       break;
-    case 6:
-      if (s.stoves.some((st) => st.cookId && s.workers.find((w) => w.id === st.cookId)?.kind === 'zombie')) s.tut = 7;
+    case TUT.zombieCook:
+      if (s.stoves.some((st) => st.cookId && s.workers.find((w) => w.id === st.cookId)?.kind === 'zombie')) s.tut = TUT.rest;
       break;
-    case 7:
+    case TUT.rest:
       s.tutTimer += dt;
       if (s.tutTimer > 45 || s.workers.some((w) => w.state === 'resting' || w.state === 'toRest')) {
-        s.tut = 8;
+        s.tut = TUT.shop;
         s.tutTimer = 0;
       }
       break;
-    case 8:
+    case TUT.shop:
       s.tutTimer += dt;
-      if (s.tutTimer > 25) s.tut = 9;
+      if (s.tutTimer > 25) s.tut = TUTORIAL.length;
       break;
   }
 }

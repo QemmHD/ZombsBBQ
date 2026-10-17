@@ -6,7 +6,7 @@
  * OK; then the arrow bounces over the thing to touch and the camera pans to it. The steps themselves
  * (when the tutorial moves on) are the sim's `TUTORIAL` / `updateTutorial`.
  */
-import { TUTORIAL, zombies, type GameState } from '../sim';
+import { TUT, TUTORIAL, zombies, type GameState } from '../sim';
 import type { Selection } from './controller';
 
 export type TutTarget =
@@ -20,8 +20,8 @@ export type TutTarget =
 
 export const tutorialActive = (s: GameState) => s.tut < TUTORIAL.length;
 
-/** Customers are needed from this step on (serve, infect): a closed café has to open first. */
-const NEEDS_CUSTOMERS = [3, 4];
+/** Steps that need customers (open up, serve, infect): a closed café has to open first. */
+const NEEDS_CUSTOMERS: number[] = [TUT.open, TUT.serve, TUT.infect];
 
 /** The café is closed and the tutorial needs diners: the door is the thing to tap. */
 export const doorStep = (s: GameState) => tutorialActive(s) && !!s.closed && NEEDS_CUSTOMERS.includes(s.tut);
@@ -50,28 +50,34 @@ export function tutorialTarget(s: GameState, sel: Selection, picking = false): T
   const seated = s.customers.find((c) => c.state === 'waiting' || c.state === 'eating') ?? s.customers.find((c) => c.state === 'entering');
   const selWorker = sel?.kind === 'worker' ? s.workers.find((w) => w.id === sel.id) : undefined;
   switch (s.tut) {
-    case 0:
+    case TUT.cook:
       if (picking || sel?.kind === 'dishPicker') return { t: 'dom', sel: '[data-dish]' };
       if (selWorker && stove) return { t: 'stove', id: stove.id };
       return you ? { t: 'worker', id: you.id } : null;
-    case 1:
+    case TUT.cooking:
       return stove ? { t: 'stove', id: stove.id } : null;
-    case 2: {
+    case TUT.carry: {
+      // pick a crew member, then touch the finished stove
       const done = s.stoves.find((x) => x.status === 'done');
-      return done ? { t: 'stove', id: done.id } : null;
+      if (!done) return null;
+      if (selWorker) return { t: 'stove', id: done.id };
+      return you ? { t: 'worker', id: you.id } : null;
     }
-    case 3:
+    case TUT.open:
+      return { t: 'door' };
+    case TUT.serve:
+      // nothing to tap: whoever is free serves the diner
       return null;
-    case 4:
+    case TUT.infect:
       if (sel?.kind === 'customer') return { t: 'dom', sel: '[data-a="infect"]' };
       return seated ? { t: 'customer', id: seated.id } : null;
-    case 5:
+    case TUT.zombieCook:
       if (selWorker?.kind === 'zombie' && stove) return { t: 'stove', id: stove.id };
       return zombie ? { t: 'worker', id: zombie.id } : null;
-    case 6:
+    case TUT.rest:
       if (selWorker?.kind === 'zombie') return { t: 'dom', sel: '[data-a="rest"]' };
       return zombie ? { t: 'worker', id: zombie.id } : null;
-    case 7:
+    case TUT.shop:
       return { t: 'dom', sel: '[data-k="shop"]' };
   }
   return null;
@@ -91,9 +97,9 @@ export function tutorialIcons(s: GameState): Set<string> {
   const all = ['shop', 'goals', 'map', 'book', 'crew', 'edit', 'locker', 'sign', 'fridge', 'pedia'];
   if (!tutorialActive(s)) return new Set(all);
   const out = new Set<string>(['sign']);
-  if (s.tut >= 1) out.add('book');
-  if (s.tut >= 5 || zombies(s).length) out.add('crew');
-  if (s.tut >= 7) for (const k of ['shop', 'edit']) out.add(k);
+  if (s.tut >= TUT.cooking) out.add('book');
+  if (s.tut >= TUT.zombieCook || zombies(s).length) out.add('crew');
+  if (s.tut >= TUT.shop) for (const k of ['shop', 'edit']) out.add(k);
   return out;
 }
 
