@@ -82,7 +82,15 @@ const screenOf = (wx, wy, scene = 'joint') =>
   );
 const isoW = (x, y) => ({ x: (x - y) * 48, y: (x + y) * 30 });
 const tapWorld = async (wx, wy, scene) => {
-  const p = await screenOf(wx, wy, scene);
+  let p = await screenOf(wx, wy, scene);
+  // the room is framed taller than the screen: pan first (as a player would) if the spot sits under the awning,
+  // the bottom bars or an open card
+  const covered = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName !== 'CANVAS', [p.x, p.y]);
+  if (covered || p.y < 70 || p.y > 290) {
+    await page.evaluate(([x, y, sc]) => window.zbbq.game.scene.getScene(sc).cameras.main.centerOn(x, y), [wx, wy, scene ?? 'joint']);
+    await wait(100);
+    p = await screenOf(wx, wy, scene);
+  }
   await page.touchscreen.tap(p.x, p.y);
   await wait(250);
 };

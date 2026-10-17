@@ -4,6 +4,7 @@
 //   node tools/icons.mjs [outDir=public]        writes icons/ + manifest.webmanifest (Vite copies them into dist)
 //   node tools/icons.mjs --svg file.svg          just the SVG (for art review)
 import { mkdir, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
 const INK = '#16120C';
@@ -156,4 +157,5 @@ async function main() {
   console.log(`${out}/icons: ${files.map((x) => x[0]).join(', ')} + manifest.webmanifest`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+// run as a script (not when imported); pathToFileURL keeps this true on Windows paths too
+if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();
