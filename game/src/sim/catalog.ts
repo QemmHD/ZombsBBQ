@@ -5,6 +5,7 @@
  * ladder (see docs/08-original-deep-dive.md); names and art are our own.
  */
 import type { StationKind } from './data';
+import type { PetType } from './petdata';
 
 /** Facings. Most items have two (front toward screen lower-left 'sw' or lower-right 'se'); chairs have four. */
 export type Dir = 'se' | 'sw' | 'ne' | 'nw';
@@ -56,7 +57,7 @@ export interface ItemDef {
   speed?: number;
   /** money-makers: cash per hour, up to a maximum (original) */
   payout?: { perHour: number; max: number };
-  pet?: 'pug' | 'rotweiler';
+  pet?: PetType;
   /** tombstones: which raid boost (a 5 s glow, or the revive tombstone's instant get-up) */
   boost?: 'str' | 'hp' | 'revive';
   max?: number;
@@ -203,9 +204,18 @@ export const ITEMS: ItemDef[] = [
   // ----- outdoor: pets and raid tombstones live on the front lawn -----
   I({ id: 'pethouse_pug', name: 'Pug House', tab: 'special', kind: 'pethouse', level: 4, cash: 1000, art: 'pethouse_pug', pet: 'pug', outdoor: true, max: 1, blurb: 'Adopt a Zombie Pug. It sniffs out loose change.' }),
   I({ id: 'pethouse_kennel', name: 'Spiked Kennel', tab: 'special', kind: 'pethouse', level: 8, sauce: 10, art: 'pethouse_kennel', pet: 'rotweiler', outdoor: true, max: 1, blurb: 'Adopt a Rot-weiler. It fights in raids.' }),
+  // the rest of the raid pets (original pet table, doc 17 §3.7: prices and levels; the creatures are ours)
+  I({ id: 'pethouse_wolf', name: 'Wolf Den', tab: 'special', kind: 'pethouse', level: 8, sauce: 50, art: 'pethouse_kennel', pet: 'wolf', outdoor: true, max: 1, blurb: 'Adopt a Grave Wolf: 950 HP, big crits in raids.' }),
+  I({ id: 'pethouse_cat', name: 'Cat Tower', tab: 'special', kind: 'pethouse', level: 8, sauce: 50, art: 'pethouse_kennel', pet: 'cat', outdoor: true, max: 1, blurb: 'Adopt a Grinning Ghoul-Cat: the fastest claws in a raid.' }),
+  I({ id: 'pethouse_sphinx', name: 'Sphinx Shrine', tab: 'special', kind: 'pethouse', level: 8, sauce: 50, art: 'pethouse_kennel', pet: 'sphinx', outdoor: true, max: 1, blurb: 'Adopt a Mummy Sphinx: 1000 HP of raid muscle.' }),
+  I({ id: 'pethouse_robohound', name: 'Robo-Hound Dock', tab: 'special', kind: 'pethouse', level: 12, sauce: 40, art: 'pethouse_kennel', pet: 'robohound', outdoor: true, max: 1, blurb: 'Adopt a Robo-Hound: hits hard, walks slow.' }),
+  I({ id: 'pethouse_robolion', name: 'Robo-Lion Dock', tab: 'special', kind: 'pethouse', level: 12, sauce: 60, art: 'pethouse_kennel', pet: 'robolion', outdoor: true, max: 1, blurb: 'Adopt a Robo-Lion: the strongest pet in a raid.' }),
+  I({ id: 'pethouse_robobear', name: 'Robo-Bear Dock', tab: 'special', kind: 'pethouse', level: 12, sauce: 20, art: 'pethouse_kennel', pet: 'robobear', outdoor: true, max: 1, blurb: 'Adopt a Robo-Bear for raids.' }),
+  I({ id: 'pethouse_robobull', name: 'Robo-Bull Dock', tab: 'special', kind: 'pethouse', level: 12, sauce: 30, art: 'pethouse_kennel', pet: 'robobull', outdoor: true, max: 1, blurb: 'Adopt a Robo-Bull for raids.' }),
+  I({ id: 'pethouse_robopanther', name: 'Robo-Panther Dock', tab: 'special', kind: 'pethouse', level: 12, cash: 50000, art: 'pethouse_kennel', pet: 'robopanther', outdoor: true, max: 1, blurb: 'Adopt a Robo-Panther for raids.' }),
   I({ id: 'tombstone_str', name: 'Strength Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_str', outdoor: true, boost: 'str', blurb: 'Raid boost: tap it mid-raid and your horde hits twice as hard for 5 s. 5 uses a day.' }),
   I({ id: 'tombstone_hp', name: 'Health Tombstone', tab: 'special', kind: 'tombstone', level: 5, sauce: 25, art: 'tombstone_hp', outdoor: true, boost: 'hp', blurb: 'Raid boost: tap it mid-raid and your horde heals +100 over 5 s. 5 uses a day.' }),
-  I({ id: 'tombstone_revive', name: 'Revival Tombstone', tab: 'special', kind: 'tombstone', level: 8, sauce: 40, art: 'tombstone_revive', outdoor: true, boost: 'revive', blurb: 'Raid boost: tap it mid-raid and every knocked-out zombie gets back up. 5 uses a day.' }),
+  I({ id: 'tombstone_revive', name: 'Revival Tombstone', tab: 'special', kind: 'tombstone', level: 8, sauce: 40, art: 'tombstone_revive', outdoor: true, boost: 'revive', blurb: 'Raid boost: tap it mid-raid and every knocked-out zombie gets back up with 100 energy. 1 use a day.' }),
 ];
 
 /** Stove upgrades (any station): each tier cooks 10% faster and widens the burn window 15%. */

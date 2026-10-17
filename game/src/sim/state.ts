@@ -2,6 +2,7 @@ import { CUSTOMER_BY_ID, DISH_BY_ID, TUNING, YOU_STATS, crewCapForLevel, zombieL
 import { ITEM_BY_ID, START_SIZE, type Dir } from './catalog';
 import { DOOR_X, type Pt } from './grid';
 import type { HintState } from './hints';
+import type { PetType } from './petdata';
 
 export interface Furniture {
   id: string;
@@ -159,7 +160,7 @@ export interface CounterSlot {
 
 export interface Pet extends Mover {
   id: string;
-  type: 'pug' | 'rotweiler';
+  type: PetType;
   homeId: string;
   nextAction: number;
   state: 'roam' | 'sniff' | 'raiding';

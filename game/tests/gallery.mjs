@@ -96,25 +96,47 @@ await ff(20);
 await wait(1500);
 await zoomShot('joint-zoom2.png', 2.2);
 
-for (const rival of ['chuck', 'hank', 'vera', 'crunch', 'snob']) {
-  const err = await page.evaluate((id) => {
+// every raid pet, from its house on the lawn (they take turns coming along, four a raid)
+const petErrs = await page.evaluate(() => {
+  const { ctl, sim } = window.zbbq;
+  const s = ctl.state;
+  const errs = [];
+  let i = 0;
+  for (const p of sim.PETS) {
+    let placed = false;
+    for (; i < 60 && !placed; i++) placed = !sim.buyAndPlace(s, p.house, s.roomW + 1 + (i % 3), 4 + Math.floor(i / 3));
+    if (!placed) errs.push(`pet house ${p.house}: no room`);
+  }
+  for (let k = 0; k < 5; k++) ctl.update(0.1);
+  return errs;
+});
+problems.push(...petErrs);
+const RAIDS = ['chuck', 'hank', 'vera', 'crunch', 'snob', 'sushi', 'taco', 'lab', 'clown', 'boss'];
+for (const [ri, rival] of RAIDS.entries()) {
+  const err = await page.evaluate(([id, ri]) => {
     const { ctl, sim } = window.zbbq;
     const s = ctl.state;
     for (const r of sim.RIVALS) if (r.id !== id) s.rivals[r.id] = { stars: 1, wins: 1, nextAt: 0 };
     s.rivals[id] = { stars: 0, wins: 0, nextAt: 0 };
+    // late joints open at higher levels
+    if (s.level < sim.RIVAL_BY_ID[id].level) s.level = sim.RIVAL_BY_ID[id].level;
+    // the boss café keeps its own hours: visit while it's parked
+    if (id === 'boss' && !sim.bossHere(s)) s.now = Math.ceil(s.now / 36000) * 36000 + 60;
     for (const w of s.workers) if (w.kind === 'zombie') Object.assign(w, { state: 'idle', energy: w.stats.energy, path: [] });
     const crew = s.workers.filter((w) => w.kind === 'zombie').slice(0, 8).map((w) => w.id);
-    return ctl.beginRaid(id, crew, s.pets.map((p) => p.id));
-  }, rival);
+    const pets = s.pets.map((p) => p.id);
+    const four = [0, 1, 2, 3].map((k) => pets[(ri * 4 + k) % pets.length]).filter((p, k, a) => p && a.indexOf(p) === k);
+    return ctl.beginRaid(id, crew, four);
+  }, [rival, ri]);
   if (err) { errors.push(`${rival}: ${err}`); continue; }
   await page.waitForFunction(() => window.zbbq.game.scene.getScene('raid')?.ready, null, { timeout: 30000 });
   await wait(1000);
   await page.screenshot({ path: join(out, `raid-${rival}-0.png`) });
   await page.evaluate(() => window.zbbq.sim.sendAll(window.zbbq.ctl.raid));
-  await ff(9);
+  await ff(5);
   await wait(3000);
   await page.screenshot({ path: join(out, `raid-${rival}-1.png`) });
-  await ff(16);
+  await ff(5);
   await wait(3000);
   await page.screenshot({ path: join(out, `raid-${rival}-2.png`) });
   await page.evaluate(() => window.zbbq.sim.retreat(window.zbbq.ctl.raid));

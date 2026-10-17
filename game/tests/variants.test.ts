@@ -6,7 +6,7 @@ import {
   TUNING,
   VARIANTS,
   VARIANT_DISHES,
-  COUNTER_VARIANT_CHANCE,
+  COUNTER_VARIANT_ODDS,
   baseDishId,
   canStudy,
   createInitialState,
@@ -107,9 +107,9 @@ describe('rare dish variants: raids, the fridge, the stove', () => {
       // whatever came home is in the fridge
       expect(s.fridge.map((f) => f.dish)).toEqual(dishes);
     }
-    expect(variants / total).toBeGreaterThan(COUNTER_VARIANT_CHANCE - 0.08);
-    expect(variants / total).toBeLessThan(COUNTER_VARIANT_CHANCE + 0.08);
-    expect(kinds.size).toBe(6);
+    expect(variants / total).toBeGreaterThan(1 - COUNTER_VARIANT_ODDS[0][1] / 100 - 0.08);
+    expect(variants / total).toBeLessThan(1 - COUNTER_VARIANT_ODDS[0][1] / 100 + 0.08);
+    expect(kinds.size).toBe(9); // all nine of the original's variants turn up (Very ones included)
     void baseDishId;
   });
 

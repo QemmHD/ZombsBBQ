@@ -36,6 +36,10 @@ import {
   useSummon,
   useTombstone,
   ABILITIES,
+  PET_BY_TYPE,
+  TOMBSTONE_USES_L2,
+  petArt,
+  petName,
   raidThreat,
   raidReward,
   type Threat,
@@ -139,7 +143,7 @@ function openRivalCard(hud: Hud, id: RivalId) {
 }
 
 /** Gus's standing raid advice (focusing the waiters turns many coin-toss fights into wins). */
-const gusTip = () => `<div class="loot-row gus-tip"><img class="ico" src="${headUrl('gus')}" alt=""/><span><b>Gus:</b> “Clear the waiters first; stay out of the kitchen.”</span></div>`;
+const gusTip = () => `<div class="loot-row gus-tip"><img class="ico" src="${headUrl('gus')}" alt=""/><span><b>Gus:</b> “Clear the waiters first: the chef only comes out once they’re all down. Hit the chef early and it fights back!”</span></div>`;
 
 const THREAT_COL: Record<Threat, string> = { Easy: '#7a9a32', Even: '#c9a63a', Deadly: '#a3342a' };
 function threatHtml(label: Threat, who: string): string {
@@ -172,14 +176,14 @@ function openSquad(hud: Hud, id: RivalId, picked?: Set<string>, pets?: Set<strin
   const petTiles = s.pets
     .map(
       (p) =>
-        `<button class="squad-tile ${pets!.has(p.id) ? 'on' : ''}" data-a="pet" data-id="${p.id}"><img src="${headUrl(p.type === 'pug' ? 'pet_pug' : 'pet_rotweiler')}" alt=""/><b>${p.type === 'pug' ? 'Zombie Pug' : 'Rot-weiler'}</b><span class="sub">Pet</span></button>`,
+        `<button class="squad-tile ${pets!.has(p.id) ? 'on' : ''}" data-a="pet" data-id="${p.id}"><img src="${headUrl(petArt(p.type))}" alt=""/><b>${esc(petName(p.type))}</b><span class="sub">Pet · ${PET_BY_TYPE[p.type]?.hp ?? '?'} HP</span></button>`,
     )
     .join('');
   const stones = tombstones(s);
   const m = hud.openModal(
     `<h2>Pick your squad · ${esc(rivalName(s, id))}</h2>
     <div class="squad">${tiles || '<p>No zombie’s free! Knocked-out zombies can’t come (cooks can: their dish waits), and the chef (you) minds the joint.</p>'}${petTiles}</div>
-    ${picked.size ? threatHtml(raidThreat(s, id, [...picked]).label, 'this squad') : ''}${gusTip()}
+    ${picked.size ? threatHtml(raidThreat(s, id, [...picked], [...pets]).label, 'this squad') : ''}${gusTip()}
     <div class="kit"><span>${
       stones.length ? `Tombstones: ${stones.map((f) => `${icon(ITEM_BY_ID[f.item].art, 'ico')}×${tombstoneUses(s, f)}`).join(' ')}` : 'No tombstones yet: buy them in the Shop (Special) and set them on your lawn.'
     }</span>
@@ -272,7 +276,7 @@ export function tombstoneCard(s: GameState, f: Furniture): string {
   const wait = left <= 0 && f.usesResetAt ? ` · refills in ${Math.ceil((f.usesResetAt - s.now) / 3600)} h` : '';
   return `<div class="state">Level ${lvl} · ${left}/${max} uses left today${wait}</div>
     <div class="actions">${left < max ? `<button class="btn green" data-a="recharge" ${s.sauce < TOMBSTONE_RECHARGE_SAUCE ? 'disabled' : ''}>Recharge · ${priceHtml({ sauce: TOMBSTONE_RECHARGE_SAUCE })}</button>` : ''}${
-      lvl < 2 ? `<button class="btn" data-a="upgrade" ${s.sauce < TOMBSTONE_UPGRADE_SAUCE ? 'disabled' : ''}>Level 2 (7 uses) · ${priceHtml({ sauce: TOMBSTONE_UPGRADE_SAUCE })}</button>` : ''
+      lvl < 2 && ITEM_BY_ID[f.item].boost !== 'revive' ? `<button class="btn" data-a="upgrade" ${s.sauce < TOMBSTONE_UPGRADE_SAUCE ? 'disabled' : ''}>Level 2 (${TOMBSTONE_USES_L2} uses) · ${priceHtml({ sauce: TOMBSTONE_UPGRADE_SAUCE })}</button>` : ''
     }</div>`;
 }
 
@@ -359,13 +363,15 @@ export class RaidUi {
     const queued = squad.some((u) => u.state === 'queued');
     q('sendall').style.display = queued && fighting ? '' : 'none';
     q('attack').style.display = sel && fighting ? '' : 'none';
-    q('hint').textContent = !fighting ? '' : sel ? 'Now tap a target, the counter, or ATTACK.' : queued ? 'Tap a zombie in line, then a target. Or ATTACK ALL. Gus says: clear the waiters first, stay out of the kitchen!' : '';
+    q('hint').textContent = !fighting ? '' : sel ? 'Now tap a target, the counter, or ATTACK.' : queued ? 'Tap a zombie, then who to go for (or the counter). Or ATTACK ALL. Gus: clear the waiters first, the chef comes out last!' : 'Tap a zombie, then a target.';
     q('loot').innerHTML = `${priceHtml({ cash: r.cashEaten })}${r.stolen.map((d) => `<img class="ico" src="${artUrl(DISH_BY_ID[d].icon)}" alt=""/>`).join('')}`;
     for (const f of stones) {
       const n = this.el.querySelector<HTMLElement>(`[data-k="st${f.id}"]`);
       if (n) n.textContent = String(tombstoneUses(s, f));
       const boost = ITEM_BY_ID[f.item].boost;
       n?.parentElement?.classList.toggle('glow', !!r.buff && r.t < r.buff.until && boost === r.buff.kind);
+      // each stone works once per raid: dim it once it's been used
+      if (n?.parentElement) n.parentElement.style.opacity = r.used.includes(f.id) ? '0.45' : '';
     }
     q('hc').textContent = String(s.inventory.headstone);
     q('hc').parentElement?.classList.toggle('glow', !!r.heal && r.t < r.heal.until);
